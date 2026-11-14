@@ -209,7 +209,8 @@ internal object KakaoAffiliatePortals {
         if (!ninehireDeveloper(target.id, job)) throw PostingExcluded("${target.name} 직무 규칙에서 제외: ${job["externalTitle"]}")
         val body = htmlText(browser, result["html"]?.toString().orEmpty())
         check(body.length >= 120) { "Ninehire 본문 누락" }
-        val closed = job["status"] in setOf("closed", "finished", "ended") || job["closedAt"] != null || deadlinePassed(job["endAt"]?.toString())
+        // 재오픈된 공고에도 과거 closedAt이 남는다. 현재 상태와 명시적인 접수 마감일로 판단한다.
+        val closed = job["status"] in setOf("closed", "finished", "ended") || deadlinePassed(job["endAt"]?.toString())
         return ExtractedPosting(job["externalTitle"].toString(), target.name, securitiesLocations(job), body, closed)
     }
 
