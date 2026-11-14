@@ -1,0 +1,23 @@
+import { dateLabel, durationLabel, sourceById, STAGES, STATUS_LABELS, summarize } from '../data'
+import type { CollectionRun } from '../types'
+import { BrandMark } from './BrandMark'
+import { Icon } from './Icon'
+
+export function RunCard({ run, expanded, onToggle, onRetry, busy }: { run: CollectionRun; expanded: boolean; onToggle: () => void; onRetry: (ids?: string[]) => void; busy: boolean }) {
+  const summary = summarize(run)
+  const unresolved = run.results.flatMap((r) => r.failures).filter((f) => !f.resolved)
+  return <article className={`run-card ${expanded ? 'expanded' : ''}`}>
+    <button className="run-summary" onClick={onToggle} aria-expanded={expanded}>
+      <span className={`run-symbol status-${summary.status}`}><Icon name={summary.status === 'running' ? 'refresh' : summary.status === 'success' ? 'check' : 'alert'} size={20} className={summary.status === 'running' ? 'spin' : ''}/></span>
+      <span className="run-name"><strong>{dateLabel(run.startedAt, true)}<span className="sample-pill">{run.retryOf ? '재시도' : '샘플'}</span></strong><small>{run.results.length}개 기업군 · {durationLabel(run)}{!run.finishedAt && ` · ${summary.done}/${run.results.length} 완료`}</small></span>
+      <span className="run-counts">신규 <b>{summary.added}</b><i>·</i>변경 <b>{summary.changed}</b><i>·</i>실패 <b className={summary.failed ? 'failure-number' : ''}>{summary.failed}</b></span>
+      <span className={`status-badge status-${summary.status}`}>{STATUS_LABELS[summary.status]}</span><Icon name="down" size={16} className={expanded ? 'rotate-180' : ''}/>
+    </button>
+    {expanded && <div className="run-details">
+      {run.retryOf && <div className="retry-note"><Icon name="refresh" size={14}/>실패한 단계부터 이어서 실행한 기록이에요. 성공한 단계의 결과는 다시 가져오지 않아요.</div>}
+      <div className="table-scroll"><table className="results-table"><thead><tr><th>기업군</th><th>결과</th><th>신규</th><th>변경</th><th>동일</th><th>실패</th></tr></thead><tbody>{run.results.map((result) => <tr key={result.sourceId}><td><span className="result-company"><BrandMark sourceId={result.sourceId} small/>{sourceById(result.sourceId).name}</span></td><td><span className={`status-badge status-${result.status}`}>{result.status === 'running' && <Icon name="refresh" size={11} className="spin"/>}{STATUS_LABELS[result.status]}</span>{result.recovered > 0 && <small className="recovered-label">{result.recovered}건 복구</small>}</td><td>{result.added ?? '—'}</td><td>{result.changed ?? '—'}</td><td>{result.identical ?? '—'}</td><td>{result.failed === null ? result.failures.length ? <a className="failure-count" href={`#failure-${result.failures[0].id}`}>— <Icon name="info" size={11}/></a> : '—' : result.failed > 0 ? <a className="failure-count" href={`#failure-${result.failures[0].id}`}>{result.failed}<Icon name="chevron" size={11}/></a> : '0'}</td></tr>)}</tbody></table></div>
+      <div className="result-explainer"><Icon name="info" size={13}/><span>동일: 내용이 같아 새 버전을 저장하지 않은 공고 · —: 목록을 확인하지 못했거나 아직 집계 전</span></div>
+      {!!summary.failed && <div className="failures-section"><div className="failure-heading"><h3>실패 상세 <span>{summary.failed}</span></h3><button className="button secondary small" disabled={busy || !unresolved.length} onClick={() => onRetry()}><Icon name="refresh" size={13}/>{unresolved.length ? '실패 항목만 재시도' : '모두 재시도 완료'}</button></div>{run.results.flatMap((r) => r.failures).map((failure) => <details key={failure.id} id={`failure-${failure.id}`} className={`failure-item ${failure.resolved ? 'resolved' : ''}`}><summary><span className={`failure-stage ${failure.resolved ? 'recovered' : ''}`}>{failure.resolved ? '복구 완료' : STAGES[failure.stage]}</span><span className="failure-item-title"><strong>{failure.company}</strong><span>{failure.title ?? '채용공고 목록을 가져오지 못했어요'}</span></span><Icon name="down" size={14}/></summary><div className="failure-body"><dl><div><dt>실패 단계</dt><dd>{STAGES[failure.stage]}</dd></div><div><dt>실패 시각</dt><dd>{dateLabel(failure.at, true)}</dd></div><div><dt>재시도 횟수</dt><dd>{failure.attempts - 1}회</dd></div><div className="failure-url"><dt>대상 URL</dt><dd><a href={failure.url} target="_blank" rel="noreferrer">{failure.url}<Icon name="external" size={11}/></a></dd></div></dl><span className="error-message-label">오류 메시지 원문 · 샘플</span><pre>{failure.error}</pre><div className="failure-actions"><span>{failure.stage === 'capture' ? '저장된 본문을 유지하고 캡처부터 재시도해요.' : `${STAGES[failure.stage]} 단계부터 이어서 재시도해요.`}</span><button className="button secondary small" disabled={busy || failure.resolved} onClick={() => onRetry([failure.id])}><Icon name="refresh" size={13}/>{failure.resolved ? '복구 완료' : '이 항목 재시도'}</button></div></div></details>)}</div>}
+    </div>}
+  </article>
+}

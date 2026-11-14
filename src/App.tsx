@@ -1,0 +1,72 @@
+import { useCallback, useMemo, useState } from 'react'
+import { SOURCES, dateLabel, sourceById, summarize } from './data'
+import type { FailureStage, SourceId } from './types'
+import { useCollection } from './useCollection'
+import { BrandMark } from './components/BrandMark'
+import { Icon } from './components/Icon'
+import { CollectDialog } from './components/CollectDialog'
+import { JobDrawer } from './components/JobDrawer'
+import { RunCard } from './components/History'
+import './App.css'
+
+const PAGE_SIZE = 8
+function App() {
+  const { data, notice, start, retryFailures, toggleRead, markRead, running } = useCollection()
+  const [view, setView] = useState<'jobs' | 'history'>('jobs')
+  const [source, setSource] = useState<SourceId | 'all'>('all')
+  const [tab, setTab] = useState<'all' | 'unread' | 'new'>('all')
+  const [query, setQuery] = useState('')
+  const [sort, setSort] = useState('newest')
+  const [page, setPage] = useState(1)
+  const [includeClosed, setIncludeClosed] = useState(false)
+  const [collectOpen, setCollectOpen] = useState(false)
+  const [selectedJob, setSelectedJob] = useState<string | null>(null)
+  const [expandedRuns, setExpandedRuns] = useState<string[]>([data.runs[0]?.id])
+  const closeCollect = useCallback(() => setCollectOpen(false), [])
+  const closeJob = useCallback(() => setSelectedJob(null), [])
+  const latestRun = data.runs[0]
+  const latest = latestRun ? summarize(latestRun) : null
+  const available = data.jobs.filter((job) => includeClosed || !job.closed)
+  const unread = available.filter((job) => !job.read).length
+  const newCount = available.filter((job) => job.latestChange === 'new').length
+  const closedCount = data.jobs.filter((job) => job.closed).length
+
+  const filtered = useMemo(() => data.jobs.filter((job) =>
+    (includeClosed || !job.closed) && (source === 'all' || job.sourceId === source) &&
+    (tab !== 'unread' || !job.read) && (tab !== 'new' || job.latestChange === 'new') &&
+    `${job.title} ${job.company} ${job.location}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
+  ).sort((a, b) => sort === 'company' ? a.company.localeCompare(b.company, 'ko') : sort === 'oldest' ? a.firstSeen.localeCompare(b.firstSeen) : b.firstSeen.localeCompare(a.firstSeen)), [data.jobs, includeClosed, source, tab, query, sort])
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const visibleJobs = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  const activeJob = data.jobs.find((job) => job.id === selectedJob)
+  const changeSource = (id: SourceId | 'all') => { setSource(id); setView('jobs'); setPage(1) }
+  const openRun = (id: string) => { setView('history'); setExpandedRuns((ids) => ids.includes(id) ? ids : [id, ...ids]) }
+  const begin = (ids: SourceId[], failure: FailureStage | null) => { const id = start(ids, failure); if (id) { setCollectOpen(false); setExpandedRuns((items) => [id, ...items]) } }
+  const retry = (runId: string, ids?: string[]) => { const id = retryFailures(runId, ids); if (id) openRun(id) }
+  const resetFilters = () => { setSource('all'); setTab('all'); setQuery(''); setPage(1) }
+
+  return <div className="app-shell">
+    <aside className="sidebar"><button className="wordmark" onClick={() => { changeSource('all'); setTab('all'); setQuery('') }} aria-label="JobMoa 홈"><span className="logo-symbol"><Icon name="layers" size={23}/></span>jobmoa<span className="wordmark-dot">.</span></button>
+      <div className="workspace-label">MY WORKSPACE</div><nav className="main-nav" aria-label="주 메뉴"><button className={view === 'jobs' ? 'active' : ''} onClick={() => changeSource('all')}><Icon name="grid" size={18}/><span>공고 모아보기</span><span className="nav-count">{available.length}</span></button><button className={view === 'history' ? 'active' : ''} onClick={() => setView('history')}><Icon name="history" size={18}/><span>수집 기록</span>{running && <span className="live-dot"/>}</button></nav>
+      <div className="source-section-heading"><span>관심 기업군</span><span>{SOURCES.length}</span></div><nav className="source-nav" aria-label="기업군 선택"><button className={source === 'all' && view === 'jobs' ? 'selected' : ''} onClick={() => changeSource('all')}><span className="all-source-icon"><Icon name="layers" size={16}/></span><span>전체 기업</span><span className="source-count">{available.length}</span></button>{SOURCES.map((item) => <button key={item.id} className={source === item.id && view === 'jobs' ? 'selected' : ''} onClick={() => changeSource(item.id)}><BrandMark sourceId={item.id} small/><span>{item.name}</span><span className="source-count">{available.filter((job) => job.sourceId === item.id).length}</span></button>)}</nav>
+      <div className="affiliate-note"><span className="tiny-dot"/>각 기업군의 계열사 포함</div><div className="sidebar-bottom"><div className="local-box"><span className="local-icon"><Icon name="monitor" size={18}/></span><div><strong>나만의 로컬 공간</strong><span>필요할 때 켜고, 한 번에 수집</span></div><span className="local-dot"/></div><div className="sidebar-footer"><span>JobMoa</span><span>Frontend preview · v0.1</span></div></div>
+    </aside>
+    <div className="main-shell"><header className="topbar"><div className="breadcrumb"><Icon name="layers" size={16}/><span>내 워크스페이스</span><Icon name="chevron" size={12}/><strong>{view === 'jobs' ? '공고 모아보기' : '수집 기록'}</strong></div><div className="topbar-right"><span className="preview-badge"><span/>화면 검토용 · 샘플 데이터</span><span className="avatar" aria-label="개인 워크스페이스">J</span></div></header>
+      <main><div className="page-heading"><div><div className="eyebrow">A LITTLE CLOSER TO YOUR NEXT CHAPTER</div><h1>{view === 'jobs' ? source === 'all' ? '공고 모아보기' : `${sourceById(source).name} 공고` : '수집 기록'}<span className="heading-dot">.</span></h1><p>{view === 'jobs' ? '관심 있는 회사의 개발자 채용공고를 한곳에 모아요.' : '언제, 어디에서, 얼마나 모았는지 확인해요.'}</p></div><button className="button primary collect-button" disabled={running} onClick={() => setCollectOpen(true)}><Icon name="refresh" size={18} className={running ? 'spin' : ''}/>{running ? '공고 수집 중' : '공고 수집'}{!running && <span className="button-plus">+</span>}</button></div>
+      {view === 'jobs' ? <>
+        <section className="overview" aria-label="공고 요약"><div className="overview-intro"><span className="overview-art"><Icon name="layers" size={32}/><span className="art-dot"/></span><div><span className="overview-caption">나의 다음 기회를 차곡차곡</span><p>좋은 공고, 놓치지 않도록.</p><span className="overview-rule">명확한 개발 공고만 · 계열사까지 함께</span></div></div><div className="overview-stat"><span>모아둔 공고</span><strong>{data.jobs.length}<small>개</small></strong></div><div className="overview-stat"><span>아직 읽지 않은 공고</span><strong>{unread}<small>개</small></strong></div><div className="overview-stat stat-accent"><span>이번 수집 신규</span><strong>+{newCount}<small>개</small></strong></div></section>
+        {latestRun && latest && (running ? <section className="live-progress" aria-label="기업별 수집 진행 상황"><div><Icon name="refresh" size={17} className="spin"/><strong>새로운 공고를 모으고 있어요</strong><span>{latest.done} / {latestRun.results.length}개 기업군</span><button className="text-button" onClick={() => openRun(latestRun.id)}>실행 기록 보기<Icon name="chevron" size={12}/></button></div><div className="live-source-list">{latestRun.results.map((r) => <span className={`live-source status-${r.status}`} key={r.sourceId}><BrandMark sourceId={r.sourceId} small/>{sourceById(r.sourceId).name}{r.status === 'running' ? <Icon name="refresh" size={11} className="spin"/> : r.status === 'success' ? <Icon name="check" size={11}/> : r.status === 'failed' || r.status === 'partial' ? <Icon name="alert" size={11}/> : <span className="tiny-dot"/>}</span>)}</div><div className="progress-track"><div style={{ width: `${Math.max(3, latest.done / latestRun.results.length * 100)}%` }}/></div></section> : <button className="last-collection" onClick={() => openRun(latestRun.id)}><span><span className={`tiny-dot ${latest.failed ? 'warning' : ''}`}/>마지막 수집 <b>{dateLabel(latestRun.startedAt, true)}</b><i/>신규 <strong>{latest.added}</strong> · 변경 <strong>{latest.changed}</strong>{latest.failed > 0 && <span className="error-label">실패 {latest.failed}</span>}</span><span>수집 기록 보기<Icon name="chevron" size={12}/></span></button>)}
+        <section className="jobs-section" aria-label="수집된 공고 목록"><div className="list-tabs" role="tablist" aria-label="공고 보기"><button role="tab" aria-selected={tab === 'all'} className={tab === 'all' ? 'active' : ''} onClick={() => { setTab('all'); setPage(1) }}>전체 공고<span>{available.length}</span></button><button role="tab" aria-selected={tab === 'unread'} className={tab === 'unread' ? 'active' : ''} onClick={() => { setTab('unread'); setPage(1) }}>안 읽은 공고<span>{unread}</span></button><button role="tab" aria-selected={tab === 'new'} className={tab === 'new' ? 'active' : ''} onClick={() => { setTab('new'); setPage(1) }}>이번 수집 신규<span>{newCount}</span></button><label className="closed-toggle"><input type="checkbox" checked={includeClosed} onChange={(e) => { setIncludeClosed(e.target.checked); setPage(1) }}/>마감 포함 <span>{closedCount}</span></label></div>
+          <div className="list-toolbar"><label className="search-field"><Icon name="search" size={18}/><input aria-label="회사, 공고명, 근무지 검색" placeholder="회사, 공고명, 근무지 검색" value={query} onChange={(e) => { setQuery(e.target.value); setPage(1) }}/>{query && <button className="icon-button" onClick={() => { setQuery(''); setPage(1) }} aria-label="검색어 지우기"><Icon name="close" size={15}/></button>}</label><div className="list-options">{source !== 'all' && <button className="filter-chip" onClick={() => changeSource('all')}>{sourceById(source).name}<Icon name="close" size={12}/></button>}<span className="result-count">총 <strong>{filtered.length}</strong>개</span><label className="sort-select"><select aria-label="공고 정렬" value={sort} onChange={(e) => { setSort(e.target.value); setPage(1) }}><option value="newest">최초 발견일 최신순</option><option value="oldest">최초 발견일 오래된순</option><option value="company">회사 이름순</option></select><Icon name="down" size={13}/></label></div></div>
+          <div className="table-scroll"><table className="jobs-table"><thead><tr><th><span className="sr-only">읽음</span><Icon name="check" size={16}/></th><th>회사</th><th>공고명</th><th>근무지</th><th>최초 발견일</th><th>원문</th></tr></thead><tbody>{visibleJobs.map((job) => <tr key={job.id} className={job.read ? 'job-read' : ''}><td><label className="read-checkbox" title={job.read ? '안 읽음으로 변경' : '읽음으로 표시'}><input type="checkbox" checked={job.read} aria-label={`${job.title} 읽음 표시`} onChange={() => toggleRead(job.id)}/><span><Icon name="check" size={12}/></span></label></td><td><div className="company-cell"><BrandMark sourceId={job.sourceId}/><span>{job.company}<small>{sourceById(job.sourceId).name} 기업군</small></span></div></td><td className="title-cell"><button onClick={() => { markRead(job.id); setSelectedJob(job.id) }}><span>{job.title}</span>{job.latestChange === 'new' && <span className="new-badge">NEW</span>}{job.latestChange === 'changed' && <span className="changed-badge">변경</span>}{job.closed && <span className="closed-badge">마감</span>}</button><span className="saved-indicator"><Icon name="image" size={12}/><span>캡처 {job.versions[0].captureAvailable ? '예시' : '미저장'}</span><span className="saved-dot">·</span><Icon name="file" size={12}/><span>본문</span>{job.versions.length > 1 && <><span className="saved-dot">·</span><span>버전 {job.versions.length}</span></>}</span></td><td className="location-cell">{job.location}</td><td className="date-cell">{dateLabel(job.firstSeen)}</td><td><a className="original-link" href={job.url} target="_blank" rel="noreferrer" aria-label={`${job.company} 공식 채용 사이트 열기`} title="샘플: 공식 채용 홈으로 이동"><Icon name="external" size={16}/></a></td></tr>)}</tbody></table></div>
+          {!filtered.length && <div className="empty-state"><span><Icon name="search" size={28}/></span><h3>조건에 맞는 공고가 없어요</h3><p>검색어나 선택한 기업군을 바꿔보세요.</p><button className="button secondary small" onClick={resetFilters}>검색 조건 초기화</button></div>}
+          <div className="table-footer"><span>{filtered.length ? `${(safePage - 1) * PAGE_SIZE + 1}–${Math.min(safePage * PAGE_SIZE, filtered.length)}` : '0'}<span> / {filtered.length}개 공고</span></span><nav className="pagination" aria-label="공고 페이지"><button aria-label="이전 페이지" disabled={safePage === 1} onClick={() => setPage(safePage - 1)}><Icon name="chevron" className="rotate-180" size={14}/></button>{Array.from({ length: totalPages }, (_, i) => i + 1).filter((p) => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1).map((p, index, array) => <span key={p}>{index > 0 && p - array[index - 1] > 1 && <span className="page-ellipsis">…</span>}<button aria-label={`${p}페이지`} aria-current={safePage === p ? 'page' : undefined} className={safePage === p ? 'active' : ''} onClick={() => setPage(p)}>{p}</button></span>)}<button aria-label="다음 페이지" disabled={safePage === totalPages} onClick={() => setPage(safePage + 1)}><Icon name="chevron" size={14}/></button></nav></div>
+        </section><div className="page-footnote"><Icon name="info" size={14}/><span>화면 검토용 샘플이며 실제 채용 여부와 무관해요. 마감 공고는 보관되며 기본 목록에서 숨겨져요.</span></div>
+      </> : <section className="history-view"><div className="section-heading"><h2>실행별 수집 내역 <span>{data.runs.length}</span></h2><p>버튼 한 번에 기록 하나. 성공한 결과는 실패와 관계없이 저장해요.</p></div>{data.runs.map((run) => <RunCard key={run.id} run={run} expanded={expandedRuns.includes(run.id)} onToggle={() => setExpandedRuns((ids) => ids.includes(run.id) ? ids.filter((id) => id !== run.id) : [...ids, run.id])} onRetry={(ids) => retry(run.id, ids)} busy={running}/>)}<div className="page-footnote"><Icon name="info" size={14}/><span>현재 기록은 샘플 시뮬레이션이에요. 공고·읽음 표시·수집 이력은 이 브라우저에 저장돼요.</span></div></section>}
+      <footer className="main-footer"><span>하나씩 모으다 보면, 다음이 보여요.</span><span>Made for your next move <Icon name="spark" size={12}/></span></footer>
+      </main>
+    </div>{collectOpen && <CollectDialog onClose={closeCollect} onStart={begin}/>}{activeJob && <JobDrawer key={activeJob.id} job={activeJob} onClose={closeJob} onToggleRead={() => toggleRead(activeJob.id)}/>}{notice && <div className="toast" role="status"><Icon name="check" size={17}/>{notice}</div>}
+  </div>
+}
+export default App
