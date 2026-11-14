@@ -10,15 +10,27 @@ import java.util.Locale
 @Component
 class CompanyRegistry(sources: SourceRegistry) {
     val categories = listOf(
-        CategoryDefinition("all", "전체 개발 직무", "기존 기업별 개발 직무 기준으로 수집"),
+        CategoryDefinition("all", "전체 공고", "각 회사 수집기가 지원하는 분야의 공고를 함께 수집"),
         CategoryDefinition("web-backend", "웹 백엔드", "웹·앱 서비스의 API와 서버 비즈니스 로직 개발"),
+        CategoryDefinition("web-frontend", "프론트엔드", "브라우저에서 동작하는 웹 UI와 프론트엔드 애플리케이션 개발"),
+        CategoryDefinition("android", "Android", "Android 앱과 클라이언트 개발"),
+        CategoryDefinition("ios", "iOS", "iOS 앱과 클라이언트 개발"),
+        CategoryDefinition("fullstack", "풀스택", "프론트엔드와 백엔드를 함께 담당하는 풀스택 개발"),
+        CategoryDefinition("data-engineer", "데이터 엔지니어", "데이터 파이프라인·수집·적재·처리 플랫폼 개발"),
+        CategoryDefinition("ml-engineer", "ML 엔지니어", "머신러닝 모델 구현·서비스 적용·추론 시스템 개발"),
+        CategoryDefinition("devops-sre", "DevOps/SRE", "배포 자동화·서비스 신뢰성·운영 인프라 엔지니어링"),
+        CategoryDefinition("planning", "기획", "서비스·사업의 요구사항, 운영 정책과 실행 계획 수립"),
+        CategoryDefinition("product-management", "PM", "제품·프로젝트의 목표, 로드맵, 우선순위와 일정 관리"),
+        CategoryDefinition("design", "디자인", "UX/UI·프로덕트·브랜드 등의 디자인과 사용자 경험 설계"),
+        CategoryDefinition("marketing", "마케팅", "브랜드·콘텐츠·퍼포먼스 마케팅과 캠페인 기획·실행"),
+        CategoryDefinition("sales", "영업", "고객 영업·제휴·사업개발을 통한 신규 고객과 매출 확보"),
     )
     private val definitions = buildList {
-        fun company(id: String, sourceId: String, portalId: String, name: String, vararg aliases: String, backend: Boolean = true) {
+        fun company(id: String, sourceId: String, portalId: String, name: String, vararg aliases: String) {
             val portal = sources.adapter(sourceId).discoveryTargets.find { it.id == portalId }
                 ?: error("회사 $id 의 수집 포털이 없습니다: $portalId")
             add(CompanyDefinition(id, sourceId, name, portal.listingUrl, portalId,
-                (aliases.toSet() + name), if (backend) setOf("all", "web-backend") else setOf("all")))
+                (aliases.toSet() + name), supportedCategories(sourceId, id)))
         }
         company("naver", "naver", "naver", "네이버", "NAVER", "NAVER Corporation", "네이버(주)")
         company("naver-cloud", "naver", "naver-cloud", "네이버클라우드", "NAVER Cloud", "NAVER CLOUD", "NAVER Cloud Corp.")
@@ -80,14 +92,16 @@ class CompanyRegistry(sources: SourceRegistry) {
         company("line-pay-thailand-korea", "line", "line-careers", "LINE Pay (Thailand) Korea Office")
         company("line-indonesia", "line", "line-careers", "LINE Indonesia")
         company("line-financial", "line", "line-careers", "LINE Financial Corp.")
-        company("line-studio", "line", "line-careers", "LINE studio", backend = false)
-        company("line-ipx", "line", "line-careers", "IPX", backend = false)
-        company("line-friends-square", "line", "line-careers", "LINE Friends Square", backend = false)
+        company("line-studio", "line", "line-careers", "LINE studio")
+        company("line-ipx", "line", "line-careers", "IPX")
+        company("line-friends-square", "line", "line-careers", "LINE Friends Square")
         company("ly-japan", "line", "ly-japan", "LY Corporation", "LINEヤフー株式会社", "LINEヤフー")
         company("ly-communications", "line", "ly-communications", "LY Communications", "LYコミュニケーションズ株式会社", "LYコミュニケーションズ")
 
         company("woowa-brothers", "woowa", "woowa-brothers", "우아한형제들", "Woowa Brothers")
         company("woowa-youths", "woowa", "woowa-youths", "우아한청년들", "Woowa Youths")
+
+        company("bucketplace", "bucketplace", "bucketplace", "오늘의집", "버킷플레이스", "Bucketplace")
     }
     private val byId = definitions.associateBy { it.id }
     private val aliases = definitions.associate { it.id to it.companyNames.map(::normalize).toSet() }
@@ -112,6 +126,27 @@ class CompanyRegistry(sources: SourceRegistry) {
 
     fun resolve(sourceId: String, postingCompany: String, url: String): List<CompanyDefinition> =
         definitions.filter { it.sourceId == sourceId && matches(it.id, postingCompany, url) }
+
+    /** 구현된 회사별 직무 프로필이다. 현재 공고가 존재한다는 뜻은 아니다. */
+    private fun supportedCategories(sourceId: String, companyId: String): Set<String> {
+        val companyOverride = when (companyId) {
+            "line-studio" -> setOf("all", "android", "ios")
+            "line-ipx", "line-friends-square" -> setOf("all")
+            else -> null
+        }
+        if (companyOverride != null) return companyOverride
+        return when (sourceId) {
+            "naver" -> setOf("all", "web-backend", "web-frontend", "android", "ios", "fullstack", "data-engineer", "ml-engineer", "devops-sre")
+            "toss" -> setOf("all", "web-backend", "web-frontend", "android", "ios", "fullstack", "data-engineer", "ml-engineer", "devops-sre")
+            "kakao" -> setOf("all", "web-backend", "web-frontend", "android", "ios", "fullstack", "data-engineer", "ml-engineer", "devops-sre")
+            "coupang" -> setOf("all", "web-backend", "web-frontend", "android", "ios", "fullstack", "data-engineer", "ml-engineer", "devops-sre")
+            "daangn" -> setOf("all", "web-backend", "web-frontend", "android", "ios", "fullstack", "data-engineer", "ml-engineer", "devops-sre")
+            "line" -> setOf("all", "web-backend", "web-frontend", "android", "ios", "fullstack", "data-engineer", "ml-engineer", "devops-sre")
+            "woowa" -> setOf("all", "web-backend", "web-frontend", "android", "ios", "fullstack", "data-engineer", "ml-engineer", "devops-sre")
+            "bucketplace" -> setOf("all", "web-backend", "web-frontend", "android", "ios", "fullstack", "data-engineer", "ml-engineer", "devops-sre", "planning", "product-management", "design", "marketing", "sales")
+            else -> setOf("all")
+        }
+    }
 
     private fun normalize(value: String): String = value.lowercase(Locale.ROOT)
         .replace(Regex("주식회사|\\(주\\)|㈜|\\(유\\)|유한회사"), "")

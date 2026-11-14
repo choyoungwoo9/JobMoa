@@ -15,6 +15,7 @@ class SourceRegistry(adapters: List<RecruitmentSite>) {
         SourceDefinition("daangn", "당근", "https://careers.daangn.com/jobs/"),
         SourceDefinition("line", "LINE", "https://careers.linecorp.com/ko/jobs/"),
         SourceDefinition("woowa", "우아한형제들", "https://career.woowahan.com/"),
+        SourceDefinition("bucketplace", "오늘의집", "https://www.bucketplace.com/careers/"),
     )
     fun supported(id: String) = adapters.containsKey(id)
     fun definition(id: String) = definitions.find { it.id == id } ?: throw IllegalArgumentException("알 수 없는 기업군: $id")
