@@ -53,13 +53,7 @@ class TaskService(private val tasks: CrawlTaskRepository, private val postings: 
         if (outcome != TaskOutcome.IDENTICAL) postings.saveVersion(PostingVersion(postingId = posting.id,
             taskId = task.id, contentHash = task.contentHash, bodyText = task.bodyText, capturePath = task.capturePath, savedAt = now))
         tasks.save(task.copy(status = TaskStatus.COMPLETED, outcome = outcome, leaseToken = null, leaseExpiresAt = null))
-        var parentId = task.retryOfTaskId
-        val visited = mutableSetOf<String>()
-        while (parentId != null && visited.add(parentId)) {
-            val parent = tasks.lock(parentId)
-            tasks.save(parent.copy(resolvedAt = now))
-            parentId = parent.retryOfTaskId
-        }
+        resolveParents(task, now)
     }
 
     @Transactional
@@ -67,6 +61,17 @@ class TaskService(private val tasks: CrawlTaskRepository, private val postings: 
         val task = tasks.lock(id).also { it.requireOwnership(token, Instant.now()) }
         tasks.save(task.copy(status = TaskStatus.COMPLETED, outcome = TaskOutcome.EXCLUDED,
             error = reason, leaseToken = null, leaseExpiresAt = null))
+        resolveParents(task, Instant.now())
+    }
+
+    private fun resolveParents(task: CrawlTask, now: Instant) {
+        var parentId = task.retryOfTaskId
+        val visited = mutableSetOf<String>()
+        while (parentId != null && visited.add(parentId)) {
+            val parent = tasks.lock(parentId)
+            tasks.save(parent.copy(resolvedAt = now))
+            parentId = parent.retryOfTaskId
+        }
     }
 
     @Transactional

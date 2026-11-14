@@ -28,17 +28,37 @@ class NaverRecruitmentSite : RecruitmentSite {
     override fun discoverAt(browser: BrowserPage, listingUrl: String, emit: (DiscoveredPosting) -> Unit) {
         val host = URI(listingUrl).host
         require(host in hosts)
+        // 계열사 전용 공고 ID는 통합 포털에서 열리지 않는다. 실제 통합 목록에 있는 ID만 합친다.
+        val mainIds = if (host in sharedPortalHosts && host != URI(definition.listingUrl).host) {
+            loadRows(browser, URI(definition.listingUrl).host).map { it["annoId"].toString() }.toSet()
+        } else emptySet()
+        loadRows(browser, host).forEach { row ->
+            val id = row["annoId"]?.toString() ?: error("공고 ID가 없습니다.")
+            val title = row["annoSubject"]?.toString().orEmpty()
+            if (!NaverDeveloperRule.accepts(row["classCdNm"]?.toString().orEmpty(), row["subJobCdNm"]?.toString().orEmpty(), title)) return@forEach
+            val url = row["jobDetailLink"]?.toString() ?: error("공고 URL이 없습니다: $id")
+            check(acceptsUrl(url)) { "미지원 네이버 상세 주소: $url" }
+            val canonical = if (id in mainIds) "https://recruit.navercorp.com/rcrt/view.do?annoId=$id" else url
+            emit(DiscoveredPosting(canonical, row["sysCompanyCdNm"]?.toString().orEmpty(), title))
+        }
+    }
+
+    private fun loadRows(browser: BrowserPage, host: String): List<Map<*, *>> {
         var offset = 0
         val seen = mutableSetOf<String>()
+        val collected = mutableListOf<Map<*, *>>()
         while (true) {
             browser.navigate("https://$host/rcrt/loadJobList.do?firstIndex=$offset&recordCountPerPage=100&lang=ko")
             val response = browser.evaluate("() => JSON.parse(document.body.innerText)") as? Map<*, *> ?: error("네이버 목록 응답 형식이 바뀌었습니다.")
-            check(response["result"] == "Y") { "네이버 목록 조회 실패: ${response["result"]}" }
             val rows = response["list"] as? List<*> ?: error("네이버 공고 목록이 없습니다.")
             val total = response["totalSize"].toString().toIntOrNull() ?: error("네이버 전체 공고 수를 확인하지 못했습니다.")
+            // 공식 목록 화면도 list=[] / totalSize=0을 '진행 중인 공고 없음'으로 표시한다.
+            check(response["result"] == "Y" || (response["result"] == "N" && rows.isEmpty() && total == 0)) {
+                "네이버 목록 조회 실패: ${response["result"]}"
+            }
             if (rows.isEmpty()) {
                 check(offset >= total) { "전체 $total 건 중 $offset 건만 조회됐습니다." }
-                return
+                return collected
             }
             var fresh = 0
             rows.forEach { value ->
@@ -46,21 +66,16 @@ class NaverRecruitmentSite : RecruitmentSite {
                 val id = row["annoId"]?.toString() ?: error("공고 ID가 없습니다.")
                 if (!seen.add(id)) return@forEach
                 fresh++
-                val title = row["annoSubject"]?.toString().orEmpty()
-                if (!NaverDeveloperRule.accepts(row["classCdNm"]?.toString().orEmpty(), row["subJobCdNm"]?.toString().orEmpty(), title)) return@forEach
-                val url = row["jobDetailLink"]?.toString() ?: error("공고 URL이 없습니다: $id")
-                check(acceptsUrl(url)) { "미지원 네이버 상세 주소: $url" }
-                // 통합 포털과 계열사 포털에 함께 게시된 공고는 같은 공식 원문 URL로 합친다.
-                val canonical = if (URI(url).host in sharedPortalHosts) "https://recruit.navercorp.com/rcrt/view.do?annoId=$id" else url
-                emit(DiscoveredPosting(canonical, row["sysCompanyCdNm"]?.toString().orEmpty(), title))
+                collected.add(row)
             }
             offset += rows.size
-            if (offset >= total) return
+            if (offset >= total) return collected
             check(fresh > 0 && offset < 100_000) { "네이버 목록 페이지가 반복되거나 비정상적으로 많습니다." }
         }
     }
 
     override fun extract(browser: BrowserPage, posting: DiscoveredPosting): ExtractedPosting {
+        if (NaverDeveloperRule.isTalentPool(posting.title)) throw PostingExcluded("네이버 인재풀 공고는 수집하지 않습니다.")
         browser.waitFor(".card_title")
         browser.waitFor(".detail_wrap")
         val title = browser.text(".card_title").orEmpty()
@@ -90,6 +105,8 @@ private object NaverDeveloperRule {
     private val softwareRoles = setOf("Embedded SW", "Back-end", "Front-end", "Android", "iOS", "Software Development", "DevOps", "SRE")
     private val softwareTitle = Regex("software engineer|firmware engineer|backend|back.end|frontend|front.end|full.?stack|server (developer|engineer)|백엔드|프론트엔드|개발자|개발.?엔지니어", RegexOption.IGNORE_CASE)
     private val excluded = Regex("hardware|mechanical|보안|security|QA|test engineer|scientist|research engineer|기획|디자이너|사업|sales|contents developer", RegexOption.IGNORE_CASE)
+    private val talentPool = Regex("인재\\s*(?:풀|pool)|talent\\s*pool", RegexOption.IGNORE_CASE)
+    fun isTalentPool(title: String): Boolean = talentPool.containsMatchIn(title)
     fun accepts(category: String, role: String, title: String): Boolean =
-        category == "Tech" && !excluded.containsMatchIn(title) && (role in softwareRoles || softwareTitle.containsMatchIn(title))
+        category == "Tech" && !isTalentPool(title) && !excluded.containsMatchIn(title) && (role in softwareRoles || softwareTitle.containsMatchIn(title))
 }
