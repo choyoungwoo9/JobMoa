@@ -70,6 +70,14 @@ class KakaoRecruitmentSite : RecruitmentSite {
             job["locationName"]?.toString().orEmpty(), body, job["closeFlag"] == true || job["statusCode"] == "CLOSED")
     }
 
+    override fun canonicalizeUrl(url: String): String = runCatching {
+        val uri = URI(url)
+        val legacyHosts = setOf("career.kakaostyle.com", "kakaovxrecruiter.ninehire.site")
+        if (uri.scheme == "https" && uri.host in legacyHosts && Regex("/jobs/[A-Za-z0-9_-]+").matches(uri.path)) {
+            url.replaceFirst("/jobs/", "/job_posting/")
+        } else url
+    }.getOrDefault(url)
+
     override fun acceptsUrl(url: String): Boolean = KakaoAffiliatePortals.acceptsUrl(url) || runCatching {
         val uri = URI(url)
         uri.scheme == "https" && uri.host == "careers.kakao.com" && Regex("/jobs/[A-Za-z]-[0-9]+").matches(uri.path)

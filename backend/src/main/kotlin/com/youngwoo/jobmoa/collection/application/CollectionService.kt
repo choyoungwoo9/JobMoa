@@ -44,7 +44,7 @@ class CollectionService(
         require(run.active) { "종료된 실행에는 공고를 추가할 수 없습니다." }
         require(runs.sources(runId).any { it.sourceId == sourceId })
         val adapter = sites.adapter(sourceId)
-        val url = PostingUrl.normalize(posting.url)
+        val url = PostingUrl.normalize(adapter.canonicalizeUrl(PostingUrl.normalize(posting.url)))
         require(adapter.acceptsUrl(url)) { "수집기가 지원하지 않는 공고 주소입니다." }
         return tasks.enqueue(CrawlTask(UUID.randomUUID().toString(), runId, sourceId,
             posting.company.take(255), url, PostingUrl.hash(url), PostingUrl.siteKey(url), Instant.now(),
@@ -68,7 +68,15 @@ class CollectionService(
             RunSource("$id:$source", id, source, DiscoveryStatus.COMPLETED)
         }
         runs.activate(CollectionRun(id, Instant.now(), retryOf = runId), retrySources)
-        failures.forEach { tasks.enqueue(it.retry(id, UUID.randomUUID().toString())) }
+        failures.forEach { failed ->
+            val adapter = sites.adapter(failed.sourceId)
+            val retried = failed.retry(id, UUID.randomUUID().toString())
+            // 본문 단계에서 잘못 생성된 과거 주소도 수정된 사이트 규칙으로 재시도한다.
+            // 캡처/저장 체크포인트는 이미 추출한 본문과 주소를 그대로 유지한다.
+            val url = if (failed.stage == CrawlStage.BODY) PostingUrl.normalize(adapter.canonicalizeUrl(failed.url)) else failed.url
+            require(adapter.acceptsUrl(url)) { "수집기가 지원하지 않는 재시도 주소입니다: $url" }
+            tasks.enqueue(retried.copy(url = url, urlHash = PostingUrl.hash(url), siteKey = PostingUrl.siteKey(url)))
+        }
         return id
     }
 

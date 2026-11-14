@@ -28,7 +28,7 @@ internal object KakaoAffiliatePortals {
         val target = target(url) ?: return false
         uri.scheme == "https" && when (target.id) {
             "kakaobank" -> Regex("/jobs/[0-9]+").matches(uri.path)
-            in ninehireIds -> Regex(Regex.escape(URI(target.listingUrl).path) + "/[A-Za-z0-9_-]+").matches(uri.path)
+            in ninehireIds -> Regex("/job_posting/[A-Za-z0-9_-]+").matches(uri.path)
             else -> Regex("/ko/o/[0-9]+").matches(uri.path)
         }
     }.getOrDefault(false)
@@ -187,7 +187,7 @@ internal object KakaoAffiliatePortals {
                 fresh++
                 if (job["status"] != "in_progress" || job["jobPostingIsActive"] != true || job["isListExposed"] == false || !ninehireDeveloper(target.id, job)) return@forEach
                 val key = job["addressKey"]?.toString() ?: error("Ninehire 상세 주소 누락")
-                emit(DiscoveredPosting("${target.listingUrl}/$key", target.name, job["externalTitle"].toString(), securitiesLocations(job)))
+                emit(DiscoveredPosting("https://${URI(target.listingUrl).host}/job_posting/$key", target.name, job["externalTitle"].toString(), securitiesLocations(job)))
             }
             if (seen.size >= total) return
             check(fresh > 0 && page < 10_000) { "Ninehire 목록 페이지 반복" }
@@ -208,6 +208,22 @@ internal object KakaoAffiliatePortals {
         if (!ninehireDeveloper(target.id, job)) throw PostingExcluded("${target.name} 직무 규칙에서 제외: ${job["externalTitle"]}")
         val body = htmlText(browser, result["html"]?.toString().orEmpty())
         check(body.length >= 120) { "Ninehire 본문 누락" }
+        // Ninehire는 본문을 내부 스크롤 영역에 넣는다. 전체 페이지 캡처에 본문 전체가 포함되도록 펼친다.
+        browser.evaluate("""() => {
+            for (const element of document.querySelectorAll('*')) {
+                const style = getComputedStyle(element);
+                if (element.clientHeight > 100 && element.scrollHeight > element.clientHeight + 50 && /auto|scroll/.test(style.overflowY)) {
+                    const height = element.scrollHeight;
+                    element.style.setProperty('height', height + 'px', 'important');
+                    element.style.setProperty('min-height', height + 'px', 'important');
+                    element.style.setProperty('max-height', 'none', 'important');
+                    element.style.setProperty('flex', '0 0 auto', 'important');
+                    element.style.setProperty('overflow', 'visible', 'important');
+                }
+            }
+            document.documentElement.style.setProperty('overflow', 'visible', 'important');
+            document.body.style.setProperty('overflow', 'visible', 'important');
+        }""")
         val closed = job["status"] in setOf("closed", "finished", "ended") || job["closedAt"] != null || deadlinePassed(job["endAt"]?.toString())
         return ExtractedPosting(job["externalTitle"].toString(), target.name, securitiesLocations(job), body, closed)
     }
