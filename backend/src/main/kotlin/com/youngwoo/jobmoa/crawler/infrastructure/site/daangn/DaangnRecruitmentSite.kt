@@ -49,7 +49,7 @@ class DaangnRecruitmentSite : RecruitmentSite {
         check(unique.size == total) { "당근 전체 $total 건 중 ${unique.size} 건만 표시됐습니다. 목록 페이지 구조를 확인하세요." }
         unique.forEach { row ->
             val title = row["title"]?.toString().orEmpty()
-            if (!DaangnDeveloperRule.accepts(title)) return@forEach
+            if (!DaangnJobRule.accepts(title)) return@forEach
             val url = row["url"]?.toString().orEmpty()
             check(acceptsUrl(url)) { "미지원 당근 공고 주소: $url" }
             val company = row["company"]?.toString().orEmpty()
@@ -76,7 +76,7 @@ class DaangnRecruitmentSite : RecruitmentSite {
                 closed: Array.from(document.querySelectorAll('main article button, main article a')).some(e => /^(채용이 마감되었습니다|마감된 공고|채용 마감|마감)$/.test(e.innerText.trim()))};
         }""") as? Map<*, *> ?: error("당근 상세 구조를 확인하지 못했습니다.")
         val title = result["title"]?.toString().orEmpty()
-        if (!DaangnDeveloperRule.accepts(title)) throw PostingExcluded("당근 개발 직무명에 해당하지 않습니다: $title")
+        if (!DaangnJobRule.accepts(title)) throw PostingExcluded("당근 지원 직무명에 해당하지 않습니다: $title")
         val body = result["body"]?.toString().orEmpty()
         check(body.length >= 100) { "당근 공고 본문이 비어 있거나 너무 짧습니다: $title" }
         val company = result["company"]?.toString().orEmpty().ifBlank { posting.company }
@@ -95,8 +95,11 @@ class DaangnRecruitmentSite : RecruitmentSite {
 }
 
 /** 당근이 실제 사용하는 명확한 소프트웨어 직무명만 허용한다. Tech 전체를 포함하지 않는다. */
-private object DaangnDeveloperRule {
+private object DaangnJobRule {
     private val software = Regex("""^(?:\[[^]]+]\s*)?(?:(?:Senior|Staff|Principal|Lead|Junior)\s+)*(?:(?:Software|Back[ -]?end|Front[ -]?end|Full[ -]?stack|Android|iOS|Mobile|Data|Machine Learning|ML|AI|DevOps|Site Reliability) (?:Engineer|Developer)|SRE|(?:백엔드|프론트엔드|풀스택|안드로이드|데이터|머신러닝|AI|데브옵스)\s*(?:개발자|엔지니어))(?:\b|\s|$)""", RegexOption.IGNORE_CASE)
     private val excluded = Regex("""\b(?:QA|SDET|security|scientist|analyst|manager|director)\b|사이언티스트|애널리스트|분석가|품질|테스트|정보보안|정보보호""", RegexOption.IGNORE_CASE)
-    fun accepts(title: String): Boolean = software.containsMatchIn(title) && !excluded.containsMatchIn(title)
+    private val business = Regex("""^(?:\[[^]]+]\s*)?(?:(?:Senior|Staff|Lead|Junior)\s+)*(?:(?:Product|Project) (?:Manager|Owner)|(?:Product|Brand|Graphic|Marketing|Visual|UX/UI|UX|UI) Designer|(?:Performance|Growth|Brand|Content|CRM|Product) Marketer|Marketing Manager|(?:AD )?Sales Manager|Account (?:Manager|Executive)|Business Development|프로덕트\s*(?:매니저|오너|디자이너)|(?:서비스|사업|비즈니스|광고)\s*기획|(?:퍼포먼스|그로스|브랜드|콘텐츠|CRM)\s*마케터|마케팅\s*(?:매니저|담당)|세일즈\s*매니저|영업\s*(?:매니저|담당))""", RegexOption.IGNORE_CASE)
+    private val businessExcluded = Regex("""인재\s*풀|talent\s*pool|researcher|리서처|analyst|분석가|engineer|개발자|세일즈\s*(?:운영|지원)|sales\s*(?:operations|support)""", RegexOption.IGNORE_CASE)
+    fun accepts(title: String): Boolean = (software.containsMatchIn(title) && !excluded.containsMatchIn(title)) ||
+        (business.containsMatchIn(title) && !businessExcluded.containsMatchIn(title))
 }

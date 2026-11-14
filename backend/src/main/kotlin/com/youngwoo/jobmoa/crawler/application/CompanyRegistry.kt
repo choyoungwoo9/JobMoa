@@ -137,10 +137,11 @@ class CompanyRegistry(sources: SourceRegistry) {
         if (companyOverride != null) return companyOverride
         return when (sourceId) {
             "naver" -> setOf("all", "web-backend", "web-frontend", "android", "ios", "fullstack", "data-engineer", "ml-engineer", "devops-sre")
-            "toss" -> setOf("all", "web-backend", "web-frontend", "android", "ios", "fullstack", "data-engineer", "ml-engineer", "devops-sre")
+            "toss" -> categories.map { it.id }.toSet()
             "kakao" -> setOf("all", "web-backend", "web-frontend", "android", "ios", "fullstack", "data-engineer", "ml-engineer", "devops-sre")
             "coupang" -> setOf("all", "web-backend", "web-frontend", "android", "ios", "fullstack", "data-engineer", "ml-engineer", "devops-sre")
-            "daangn" -> setOf("all", "web-backend", "web-frontend", "android", "ios", "fullstack", "data-engineer", "ml-engineer", "devops-sre")
+            "daangn" -> if (companyId in setOf("daangn", "daangn-pay")) categories.map { it.id }.toSet()
+                else setOf("all", "web-backend", "web-frontend", "android", "ios", "fullstack", "data-engineer", "ml-engineer", "devops-sre")
             "line" -> setOf("all", "web-backend", "web-frontend", "android", "ios", "fullstack", "data-engineer", "ml-engineer", "devops-sre")
             "woowa" -> setOf("all", "web-backend", "web-frontend", "android", "ios", "fullstack", "data-engineer", "ml-engineer", "devops-sre")
             "bucketplace" -> setOf("all", "web-backend", "web-frontend", "android", "ios", "fullstack", "data-engineer", "ml-engineer", "devops-sre", "planning", "product-management", "design", "marketing", "sales")

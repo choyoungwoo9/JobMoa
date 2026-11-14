@@ -69,7 +69,7 @@ MySQL 격리 수준은 `READ_COMMITTED`입니다. 여러 작업자가 서로 다
 
 ### 분야별 수집
 
-`/api/state`의 `categories`와 `companies`에서 지원 분야·계열사 조합을 확인합니다. `all`은 각 사이트 어댑터가 지원하는 전체 공고이며 별도 공고 태그로 저장하지 않습니다. 기존 7개 기업군은 개발 범위를 유지하고 오늘의집은 비개발도 지원합니다. 개발 분야는 웹 백엔드·프론트엔드·Android·iOS·풀스택·데이터 엔지니어·ML 엔지니어·DevOps/SRE이며, 기획·PM·디자인·마케팅·영업은 오늘의집에서만 지원합니다. 각 분야는 명확한 직함과 본문 업무 근거를 모두 요구합니다. 전체 63개 회사 × 분야 지원표와 제외 기준은 [분야 문서](../docs/job-categories.md), 기존 어댑터의 선행 필터는 [네이버·토스·카카오](../docs/adapter-role-coverage.md), [쿠팡·당근·LINE·우형](../docs/adapter-role-coverage-extra.md)을 참고하세요.
+`/api/state`의 `categories`와 `companies`에서 지원 분야·계열사 조합을 확인합니다. `all`은 각 사이트 어댑터가 지원하는 전체 공고이며 별도 공고 태그로 저장하지 않습니다. 토스·당근 국내·오늘의집은 비개발도 지원하고 다른 포털의 개발 범위는 유지합니다. 개발 분야는 웹 백엔드·프론트엔드·Android·iOS·풀스택·데이터 엔지니어·ML 엔지니어·DevOps/SRE이며, 기획·PM·디자인·마케팅·영업은 토스 9개 계열사·당근·당근페이·오늘의집에서 지원합니다. [회사별 규칙](../docs/non-development-sources.md). 각 분야는 명확한 직함과 본문 업무 근거를 모두 요구합니다. 전체 63개 회사 × 분야 지원표와 제외 기준은 [분야 문서](../docs/job-categories.md), 기존 어댑터의 선행 필터는 [네이버·토스·카카오](../docs/adapter-role-coverage.md), [쿠팡·당근·LINE·우형](../docs/adapter-role-coverage-extra.md)을 참고하세요.
 
 회사 카탈로그는 `CompanyRegistry`, 회사 × 분야 판별은 `CategoryClassifier`에 선언합니다. 통합 포털은 한 번 탐색하고 선택한 계열사의 공고만 큐에 넣습니다. 수집 실행과 작업에 분야·계열사 정보를 저장하므로 재시도에도 동일한 범위가 유지됩니다.
 

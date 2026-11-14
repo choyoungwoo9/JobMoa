@@ -1,0 +1,19 @@
+# 비개발 직무를 지원하는 공식 사이트
+
+통계 구현에 앞서 기획·PM·디자인·마케팅·영업을 3개 공식 사이트로 확장했다. 개발 8개 분야(웹 백엔드·프론트엔드·Android·iOS·풀스택·데이터 엔지니어·ML 엔지니어·DevOps/SRE)는 유지한다.
+
+| 사이트 | 회사 | 선행 후보 조건 |
+| --- | --- | --- |
+| 토스 | 등록된 계열사 9개 | 공식 직군 Product Ownership/Operations, Product/Platform/Brand Design, Marketing, Sales, Strategy, Bank, IT Planning에서 각각 명확한 직함을 요구 |
+| 당근 국내 | 당근·당근페이 | Product/Project Manager·Owner, 명확한 Designer·Marketer·Sales/Account/Business Development 및 한국어 직함 |
+| 오늘의집 | 버킷플레이스 | 공식 목록의 팀·직함 기준. 기존 지원 범위 유지 |
+
+분야별로 총 12개 회사의 판별 규칙이 등록돼 있다. 현재 공고가 존재한다는 뜻은 아니다. 당근서비스·해외 포털, 나머지 사이트의 비개발 직무는 지원 표시하지 않는다.
+
+각 회사의 선행 필터를 통과한 뒤 회사 × 분야 `CategoryClassifier`가 제목과 본문 근거를 함께 요구한다. 토스의 Account Manager는 공식 Sales 분류가 먼저 필요하며, 금융상품·IT·전략 기획은 해당 공식 분류와 구체적인 기획 직함을 확인한다. Sales Support, HR, AML, 법무 등의 이름에 기획·영업이 포함됐다는 이유로 지원 범위를 넓히지 않는다. 영업 지원·운영·교육, 분석·리서치, 인재풀은 제외한다. Marketing Designer는 마케팅에 자동 중복 분류하지 않는다.
+
+개발 세분화에서 당근의 `Software Engineer, Data`와 `Software Engineer, Machine Learning` 직함도 회사별로 해석한다. 각각 데이터 파이프라인과 모델 구현의 본문 근거를 확인하며 단순 Software Engineer로 확대하지 않는다.
+
+동일 공고는 분야가 달라도 하나의 원본을 공유한다. `all`은 해당 사이트가 지원하는 개발·비개발 공고의 합집합이며, 분야 카테고리는 분야별 수집 실행을 통과했을 때만 연결한다.
+
+검증: 2026-11-14 저장해 둔 토스 공식 목록과 당근 공식 페이지로 직함·직군을 대조했다. 실제 버튼 수집 결과는 검증 후 이 문서에 덧붙인다. 새 직무 지원 여부와 전체 조합의 실사이트 검증은 구분한다.

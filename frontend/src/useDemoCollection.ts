@@ -300,7 +300,7 @@ export function useDemoCollection() {
   return {
     data,
     categories: CATEGORIES,
-    companies: SOURCES.map(source => ({ id: source.id, sourceId: source.id, name: source.name, supportedCategoryIds: CATEGORIES.filter(category => source.id === 'bucketplace' || !['planning', 'product-management', 'design', 'marketing', 'sales'].includes(category.id)).map(category => category.id) })),
+    companies: SOURCES.map(source => ({ id: source.id, sourceId: source.id, name: source.name, supportedCategoryIds: CATEGORIES.filter(category => ['bucketplace', 'toss', 'daangn'].includes(source.id) || !['planning', 'product-management', 'design', 'marketing', 'sales'].includes(category.id)).map(category => category.id) })),
     notice,
     start,
     retryFailures,

@@ -12,7 +12,8 @@ import org.springframework.stereotype.Component
 class CategoryClassifier(private val companies: CompanyRegistry) {
     private val strategies: Map<Pair<String, String>, JobPolicy> = companies.list().flatMap { company ->
         company.supportedCategoryIds.filter { it != "all" }.map { categoryId ->
-            val policy = if (company.sourceId == "bucketplace") bucketplacePolicy(categoryId)
+            val policy = if (categoryId in BUSINESS_CATEGORIES && company.sourceId in setOf("toss", "daangn")) businessPolicy(company.sourceId, categoryId)
+            else if (company.sourceId == "bucketplace") bucketplacePolicy(categoryId)
             else if (categoryId == "web-backend") when (company.sourceId) {
                 "naver" -> naverPolicy(company.id)
                 "toss" -> tossPolicy(company.id)
@@ -226,8 +227,8 @@ private fun daangnFieldTitles(companyId: String, category: String): String {
         "android" -> "\\bandroid\\b|안드로이드"
         "ios" -> "\\bios\\b|아이오에스"
         "fullstack" -> FULLSTACK_ROLE
-        "data-engineer" -> if (international) "data[ -]?(?:engineer|engineering)|データエンジニア" else "data[ -]?(?:engineer|engineering)|데이터\\s*엔지니어"
-        "ml-engineer" -> if (international) "machine[ -]?learning\\s*engineer|\\bML\\s*engineer|機械学習エンジニア" else "machine[ -]?learning\\s*engineer|\\bML\\s*engineer|머신러닝\\s*엔지니어"
+        "data-engineer" -> if (international) "data[ -]?(?:engineer|engineering)|データエンジニア" else "data[ -]?(?:engineer|engineering)|데이터\\s*엔지니어|software\\s*engineer\\s*,\\s*data\\b"
+        "ml-engineer" -> if (international) "machine[ -]?learning\\s*engineer|\\bML\\s*engineer|機械学習エンジニア" else "machine[ -]?learning\\s*engineer|\\bML\\s*engineer|머신러닝\\s*엔지니어|software\\s*engineer\\s*,\\s*machine\\s*learning"
         "devops-sre" -> "dev[ -]?ops|\\bsre\\b|site\\s*reliability"
         else -> error("당근 미지원 분야: $category")
     }
@@ -310,3 +311,23 @@ private fun bucketplaceFieldTitles(category: String): String = when (category) {
 // 두 카카오 계열사의 AI Engineer 직함은 모델 자체를 구현하는 근거가 있어야 한다.
 // 외부 LLM API를 호출하거나 프롬프트를 작성하는 업무만으로 이 조건을 충족하지 않는다.
 private const val MODEL_IMPLEMENTATION_WORK = "모델(?:을|의)?\\s*(?:학습|개발|구현|파인튜닝)|(?:모델\\s*)?(?:서빙|추론)\\s*(?:시스템|서버|엔진|파이프라인)\\s*(?:개발|구축|설계|최적화)|model\\s*(?:training|implementation|fine[ -]?tuning)|(?:train(?:ing)?|fine[ -]?tun(?:e|ing))\\s+(?:machine[ -]?learning\\s+|ML\\s+|AI\\s+)?models?|(?:build|develop|design)\\w*\\s+(?:model\\s+)?(?:serving|inference)\\s+(?:systems?|servers?|pipelines?)"
+
+private val BUSINESS_CATEGORIES = setOf("planning", "product-management", "design", "marketing", "sales")
+
+/** 비개발도 회사별 공식 직군을 선행 조건으로 삼고, 명확한 직함 + 본문 근거를 요구한다. */
+private fun businessPolicy(sourceId: String, categoryId: String): JobPolicy {
+    val base = bucketplacePolicy(categoryId)
+    return when (sourceId) {
+        "toss" -> when (categoryId) {
+            "planning" -> base.copy(titleRoles = regex("(?:서비스|사업|비즈니스|커머스|수신상품|여신상품|여신제도|기업여신|IT)\\s*(?:전략\\s*)?(?:기획|심사기획)|전략\\s*매니저|(?:service|business|commerce|IT)\\s*(?:planning|planner)|strategy\\s*manager"))
+            "sales" -> base.copy(titleRoles = regex("세일즈|영업|\\bsales\\b|business\\s*development|account\\s*manager"))
+            else -> base
+        }
+        "daangn" -> when (categoryId) {
+            "planning" -> base.copy(titleRoles = regex("(?:서비스|사업|비즈니스|광고)\\s*기획|(?:service|business)\\s*planner"))
+            "sales" -> base.copy(titleRoles = regex("세일즈|영업|\\bsales\\b|business\\s*development|account\\s*(?:manager|executive)"))
+            else -> base
+        }
+        else -> error("비개발 회사 전략이 없습니다: $sourceId")
+    }
+}
