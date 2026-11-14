@@ -89,8 +89,8 @@ class KakaoRecruitmentSite : RecruitmentSite {
 }
 
 private object KakaoDeveloperRule {
-    private val engineeringSkills = setOf("Android", "iOS", "Windows", "Web_front", "Server", "Hadoop_eco_system")
-    private val excludedTitle = Regex("scientist|research|연구|analyst|분석가|QA|quality|test engineer|보안|security|기획|디자인|운영.?담당", RegexOption.IGNORE_CASE)
+    private val engineeringSkills = setOf("Android", "iOS", "Windows", "Web_front", "Server", "Hadoop_eco_system", "Algorithm_ML")
+    private val excludedTitle = Regex("scientist|research|연구|analyst|분석가|(?<![A-Za-z])QA(?![A-Za-z])|quality|test engineer|보안|security|게임|game (?:server|client)|기획|디자인|운영.?담당|인재\\s*(?:풀|pool)|talent\\s*pool", RegexOption.IGNORE_CASE)
     private val softwareTitle = Regex("개발|developer|software|engineer|엔지니어|DevOps|SRE", RegexOption.IGNORE_CASE)
     fun accepts(job: Map<*, *>): Boolean {
         val title = job["jobOfferTitle"]?.toString().orEmpty()

@@ -7,7 +7,8 @@ import java.net.URI
 /** LINE Careers와 다른 일본 공식 포털. 일본어 엔지니어 직무 태그로 독립 판별한다. */
 internal object LyRecruitmentPortal {
     val definition = SourceDefinition("ly-japan", "LY Corporation 일본", "https://www.lycorp.co.jp/ja/recruit/career/job-categories/")
-    private val softwareRoles = setOf("j-0-0", "j-0-1", "j-0-2", "j-0-6", "j-0-7")
+    // 공식 역할 태그: 프론트엔드·백엔드·앱·머신러닝·데이터·DevOps·SRE. 인프라/보안/QA는 별도 직무다.
+    private val softwareRoles = setOf("j-0-0", "j-0-1", "j-0-2", "j-0-3", "j-0-6", "j-0-7", "j-0-8")
     private val excludedTitle = Regex("アナリスト|サイエンティスト|サポート|マネージャー|マネジメント|ディレクター|コンサル|コーチ|セキュリティ|品質|テスト|Staff Lead|Manager|Scientist|Analyst|\\bQA\\b|\\btest(?:ing)?\\b|\\bquality\\b", RegexOption.IGNORE_CASE)
 
     fun discover(browser: BrowserPage, emit: (DiscoveredPosting) -> Unit) {

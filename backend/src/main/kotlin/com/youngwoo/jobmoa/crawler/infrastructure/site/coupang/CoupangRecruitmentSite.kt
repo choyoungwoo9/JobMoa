@@ -144,8 +144,8 @@ class CoupangRecruitmentSite : RecruitmentSite {
 
 /** 쿠팡은 기술 조직 소속과 구체적인 소프트웨어 직무명을 함께 확인한다. */
 private object CoupangDeveloperRule {
-    private val excluded = Regex("\\b(?:QA|SDET|test engineer|security|hardware|mechanical|scientist|analyst|manager|director|recruiter|sales)\\b|품질|보안|기계|설비|채용|영업|물류.*운영", RegexOption.IGNORE_CASE)
-    private val software = Regex("software engineer|software developer|back[ -]?end|front[ -]?end|full[ -]?stack|(?:android|ios|machine learning|data|ai|platform|site reliability) engineer|\\bSRE\\b|소프트웨어.*(?:개발|엔지니어)|백엔드|프론트엔드|서버.*개발|데이터.*엔지니어", RegexOption.IGNORE_CASE)
+    private val excluded = Regex("\\b(?:QA|SDET|test engineer|security|hardware|mechanical|scientist|analyst|manager|director|recruiter|sales)\\b|사이언티스트|애널리스트|분석가|품질|보안|기계|설비|채용|영업|물류.*운영", RegexOption.IGNORE_CASE)
+    private val software = Regex("""software (?:engineer|developer)|back[ -]?end|front[ -]?end|full[ -]?stack|(?:android|ios|machine learning|ml|data|ai|platform|site reliability|devops|mobile) engineer|data engineering|\bSRE\b|소프트웨어.*(?:개발|엔지니어)|백엔드|프론트엔드|풀스택|서버.*개발|데이터\s*엔지니어|머신\s*러닝\s*엔지니어|(?:안드로이드|iOS)\s*(?:개발|엔지니어)|데브옵스""", RegexOption.IGNORE_CASE)
     private val technology = setOf("Technology", "eCommerce Engineering", "Tech Infrastructure", "Search and Discovery", "Catalog Tech", "Coupang Intelligent Cloud (CIC)", "Global Operations Technology (Global Ops Tech)", "Corporate IT", "Marketing System", "Supernova")
     fun accepts(title: String, departments: List<String>): Boolean = !excluded.containsMatchIn(title) && software.containsMatchIn(title) &&
         departments.any { it in technology || it.endsWith(" Tech") }

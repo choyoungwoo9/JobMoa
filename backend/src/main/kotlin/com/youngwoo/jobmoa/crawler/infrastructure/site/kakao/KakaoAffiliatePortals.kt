@@ -91,18 +91,18 @@ internal object KakaoAffiliatePortals {
     }
 
     private fun greetingDeveloper(portal: String, title: String, positions: List<Map<*, *>>): Boolean {
-        if (Regex("인재.?풀|인재.?pool|talent.?pool|scientist|research|QA|품질|보안|security|HW|하드웨어|테크니션|기획|디자이너|디자인|PM|분석가|컨설턴트|assistant|어시스턴트", RegexOption.IGNORE_CASE).containsMatchIn(title)) return false
+        if (Regex("인재.?풀|인재.?pool|talent.?pool|scientist|research|(?<![A-Za-z])QA(?![A-Za-z])|품질|보안|security|(?<![A-Za-z])HW(?![A-Za-z])|하드웨어|mechanical|게임|game (?:server|client)|테크니션|기획|디자이너|디자인|(?<![A-Za-z])PM(?![A-Za-z])|analyst|분석가|컨설턴트|assistant|어시스턴트", RegexOption.IGNORE_CASE).containsMatchIn(title)) return false
         val occupations = positions.mapNotNull { (it["workspaceOccupation"] as? Map<*, *>)?.get("occupation")?.toString() }
         val jobs = positions.mapNotNull { (it["workspaceJob"] as? Map<*, *>)?.get("job")?.toString() }
         return when (portal) {
-            "kakaomobility" -> "개발" in jobs && Regex("개발자|개발.?엔지니어|백엔드|프론트엔드|서버 개발|소프트웨어|SLAM|AI.*엔지니어|시스템 엔지니어", RegexOption.IGNORE_CASE).containsMatchIn(title)
+            "kakaomobility" -> "개발" in jobs && Regex("개발자|개발.?엔지니어|백엔드|프론트엔드|풀스택|서버 개발|소프트웨어|SLAM|(?:AI|ML|데이터).*엔지니어|(?:data|machine learning|android|ios|full.?stack).*engineer|시스템 엔지니어|DevOps|SRE", RegexOption.IGNORE_CASE).containsMatchIn(title)
             "kakaopay" -> occupations.any { it in setOf("개발", "기술", "테크", "Tech") } && Regex("개발|engineer|엔지니어|DevOps|SRE", RegexOption.IGNORE_CASE).containsMatchIn(title)
-            "kakaoenterprise" -> "Tech" in occupations && Regex("개발자|개발.?엔지니어|백엔드|프론트엔드|software|DevOps|SRE", RegexOption.IGNORE_CASE).containsMatchIn(title)
+            "kakaoenterprise" -> "Tech" in occupations && Regex("개발자|개발.?엔지니어|백엔드|프론트엔드|풀스택|software|(?:AI|ML|데이터).*엔지니어|(?:data|machine learning|android|ios|full.?stack).*engineer|DevOps|SRE", RegexOption.IGNORE_CASE).containsMatchIn(title)
             "kakaogames" -> "개발" in occupations && jobs.any { it in setOf("데이터개발", "어플리케이션개발", "웹서비스개발", "플랫폼개발") }
             "kakaopayins" -> occupations.any { it in setOf("Tech", "테크", "기술", "개발") } && jobs.any {
-                it in setOf("Backend", "Frontend", "Server", "서버개발", "클라이언트개발", "시스템개발", "인프라개발", "DevOps", "SRE")
+                it in setOf("Backend", "Frontend", "Server", "서버개발", "클라이언트개발", "시스템개발", "인프라개발", "Android", "iOS", "Fullstack", "Full-stack", "Data Engineering", "ML", "AI", "DevOps", "SRE")
             } && Regex("개발|engineer|엔지니어|DevOps|SRE", RegexOption.IGNORE_CASE).containsMatchIn(title)
-            "dktechin" -> occupations.any { it in setOf("Backend", "Frontend", "Android", "iOS") } && Regex("개발|engineer|엔지니어", RegexOption.IGNORE_CASE).containsMatchIn(title)
+            "dktechin" -> occupations.any { it in setOf("Backend", "Frontend", "Android", "iOS", "Fullstack", "Full-stack", "Data Engineering", "ML", "AI", "DevOps", "SRE") } && Regex("개발|engineer|엔지니어|DevOps|SRE", RegexOption.IGNORE_CASE).containsMatchIn(title)
             "kidsnote" -> "개발" in occupations && "개발" in jobs && Regex("개발자|engineer|엔지니어", RegexOption.IGNORE_CASE).containsMatchIn(title)
             "kakaoent" -> occupations.any { it in setOf("개발", "기술", "Tech", "테크", "개발/기술") } && Regex("개발|engineer|엔지니어|DevOps|SRE", RegexOption.IGNORE_CASE).containsMatchIn(title)
             else -> false
@@ -155,8 +155,9 @@ internal object KakaoAffiliatePortals {
 
     private fun bankDeveloper(job: Map<*, *>): Boolean {
         val title = job["recruitNoticeName"]?.toString().orEmpty()
-        return job["recruitClassName"] == "Engineering" &&
-            !Regex("QA|보안|security|품질|기획|분석가|scientist|research|네트워크|DBA|IT 운영|인재풀", RegexOption.IGNORE_CASE).containsMatchIn(title) &&
+        // 카카오뱅크는 서버·계정계·데이터·AI 개발을 Engineering과 별도 직군으로 공개한다.
+        return job["recruitClassName"] in setOf("Engineering", "Server", "Core Banking", "Data", "AI") &&
+            !Regex("(?<![A-Za-z])QA(?![A-Za-z])|보안|security|품질|기획|analyst|분석가|scientist|research|게임|game (?:server|client)|네트워크|DBA|IT 운영|인재\\s*(?:풀|pool)|어시스턴트|assistant", RegexOption.IGNORE_CASE).containsMatchIn(title) &&
             Regex("개발|engineer|엔지니어|DevOps|SRE", RegexOption.IGNORE_CASE).containsMatchIn(title)
     }
 
@@ -240,13 +241,13 @@ internal object KakaoAffiliatePortals {
         val group = (job["jobGroup"] as? Map<*, *>)?.get("title")?.toString().orEmpty()
         val title = job["externalTitle"]?.toString().orEmpty()
         val task = (job["jobTask"] as? Map<*, *>)?.get("title")?.toString().orEmpty()
-        if (Regex("QA|보안|security|기획|분석가|인재풀|인재.?pool|디자이너|품질|운영 매니저", RegexOption.IGNORE_CASE).containsMatchIn(title)) return false
+        if (Regex("(?<![A-Za-z])QA(?![A-Za-z])|보안|security|기획|analyst|분석가|scientist|research|인재풀|인재.?pool|게임|game (?:server|client)|디자이너|품질|운영 매니저", RegexOption.IGNORE_CASE).containsMatchIn(title)) return false
         return when (portal) {
-            "kakaopaysec" -> group in setOf("백엔드 개발", "프론트엔드 개발", "서버 개발", "Android 개발", "iOS 개발", "데이터 엔지니어링", "플랫폼 개발", "개발")
-            "kakaostyle" -> group == "Tech" && (task in setOf("Backend", "Frontend", "Android", "iOS") ||
-                task in setOf("Data", "Infra") && Regex("MLOps|DevOps|SRE|데이터 엔지니어|Data Engineer", RegexOption.IGNORE_CASE).containsMatchIn(title))
+            "kakaopaysec" -> group in setOf("백엔드 개발", "프론트엔드 개발", "서버 개발", "Android 개발", "iOS 개발", "풀스택 개발", "데이터 엔지니어링", "플랫폼 개발", "개발", "AI 엔지니어링", "DevOps", "SRE")
+            "kakaostyle" -> group == "Tech" && (task in setOf("Backend", "Frontend", "Android", "iOS", "Fullstack", "Full-stack") ||
+                task in setOf("Data", "Infra") && Regex("MLOps|DevOps|SRE|데이터\\s*엔지니어|Data Engineer|(?:AI|ML|머신러닝)\\s*엔지니어|Machine Learning Engineer", RegexOption.IGNORE_CASE).containsMatchIn(title))
             "kakaovx" -> group == "개발" && Regex("개발|프로그래머|engineer", RegexOption.IGNORE_CASE).containsMatchIn(title) ||
-                group == "기술" && task in setOf("DevOps", "SRE")
+                group == "기술" && task in setOf("DevOps", "SRE", "Data Engineering", "ML", "AI") && Regex("개발|엔지니어|engineer|DevOps|SRE", RegexOption.IGNORE_CASE).containsMatchIn(title)
             else -> false
         }
     }

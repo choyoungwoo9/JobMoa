@@ -8,7 +8,9 @@ import java.time.Instant
 /** 당근서비스는 그룹 포털 외에 별도 Greeting 게시판을 운영한다. */
 internal object DaangnServicePortal {
     val definition = SourceDefinition("daangn-service", "당근서비스", "https://daangnservice.career.greetinghr.com/ko/apply")
-    private val softwareRole = Regex("^(?:Software Engineer|Software Developer|Product Engineer\\s*\\(ERP\\)|Backend Engineer|Frontend Engineer|Full[ -]?stack Engineer|백엔드 개발자|프론트엔드 개발자)(?:\\b|\\s|$)", RegexOption.IGNORE_CASE)
+    private val softwareRole = Regex("""^(?:\[[^]]+]\s*)?(?:(?:Senior|Staff|Principal|Lead|Junior)\s+)*(?:(?:Software|Back[ -]?end|Front[ -]?end|Full[ -]?stack|Android|iOS|Mobile|Data|Machine Learning|ML|AI|DevOps|Site Reliability) (?:Engineer|Developer)|Product Engineer\s*\(ERP\)|SRE|(?:백엔드|프론트엔드|풀스택|안드로이드|데이터|머신러닝|AI|데브옵스)\s*(?:개발자|엔지니어))(?:\b|\s|$)""", RegexOption.IGNORE_CASE)
+    private val excludedTitle = Regex("""\b(?:QA|SDET|security|scientist|analyst|manager|director)\b|사이언티스트|애널리스트|분석가|품질|테스트|정보보안|정보보호""", RegexOption.IGNORE_CASE)
+    private fun isDeveloper(title: String): Boolean = softwareRole.containsMatchIn(title) && !excludedTitle.containsMatchIn(title)
 
     fun discover(browser: BrowserPage, emit: (DiscoveredPosting) -> Unit) {
         browser.navigate(definition.listingUrl)
@@ -27,7 +29,7 @@ internal object DaangnServicePortal {
             check(seen.add(id)) { "당근서비스 목록 공고 ID 중복: $id" }
             if (row["deploy"] != true) return@forEach
             val title = row["title"]?.toString().orEmpty()
-            if (!softwareRole.containsMatchIn(title)) return@forEach
+            if (!isDeveloper(title)) return@forEach
             val positions = (row["openingJobPosition"] as? Map<*, *>)?.get("openingJobPositions") as? List<*>
             val location = locations(positions.orEmpty())
             emit(DiscoveredPosting("https://daangnservice.career.greetinghr.com/ko/o/$id", "당근서비스", title, location))
@@ -46,7 +48,7 @@ internal object DaangnServicePortal {
         val data = result["data"] as? Map<*, *> ?: error("당근서비스 상세 정보 누락")
         val info = data["openingsInfo"] as? Map<*, *> ?: error("당근서비스 공고 내용 누락")
         val title = info["title"]?.toString().orEmpty()
-        if (!softwareRole.containsMatchIn(title)) throw PostingExcluded("당근서비스 소프트웨어 직무명에 해당하지 않습니다: $title")
+        if (!isDeveloper(title)) throw PostingExcluded("당근서비스 소프트웨어 직무명에 해당하지 않습니다: $title")
         val body = result["body"]?.toString().orEmpty()
         check(body.length >= 100) { "당근서비스 공고 본문이 정상 렌더링되지 않았습니다: $title" }
         val positions = (data["jobPositionSetting"] as? Map<*, *>)?.get("jobPositions") as? List<*>

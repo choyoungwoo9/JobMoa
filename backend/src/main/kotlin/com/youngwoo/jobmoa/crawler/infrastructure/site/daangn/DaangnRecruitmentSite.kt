@@ -96,6 +96,7 @@ class DaangnRecruitmentSite : RecruitmentSite {
 
 /** 당근이 실제 사용하는 명확한 소프트웨어 직무명만 허용한다. Tech 전체를 포함하지 않는다. */
 private object DaangnDeveloperRule {
-    private val software = Regex("^(?:\\[[^]]+]\\s*)?(?:Software Engineer(?:\\b|,)|Site Reliability Engineer\\b)", RegexOption.IGNORE_CASE)
-    fun accepts(title: String): Boolean = software.containsMatchIn(title)
+    private val software = Regex("""^(?:\[[^]]+]\s*)?(?:(?:Senior|Staff|Principal|Lead|Junior)\s+)*(?:(?:Software|Back[ -]?end|Front[ -]?end|Full[ -]?stack|Android|iOS|Mobile|Data|Machine Learning|ML|AI|DevOps|Site Reliability) (?:Engineer|Developer)|SRE|(?:백엔드|프론트엔드|풀스택|안드로이드|데이터|머신러닝|AI|데브옵스)\s*(?:개발자|엔지니어))(?:\b|\s|$)""", RegexOption.IGNORE_CASE)
+    private val excluded = Regex("""\b(?:QA|SDET|security|scientist|analyst|manager|director)\b|사이언티스트|애널리스트|분석가|품질|테스트|정보보안|정보보호""", RegexOption.IGNORE_CASE)
+    fun accepts(title: String): Boolean = software.containsMatchIn(title) && !excluded.containsMatchIn(title)
 }

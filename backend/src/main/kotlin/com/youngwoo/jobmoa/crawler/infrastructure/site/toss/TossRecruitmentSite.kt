@@ -90,7 +90,7 @@ class TossRecruitmentSite : RecruitmentSite {
 /** 토스가 제공하는 Job Category를 우선하고 모호한 직무는 제외한다. */
 private object TossDeveloperRule {
     private val developmentCategories = setOf("Backend", "Frontend", "App", "Data Engineering", "ML", "Infra", "Device", "병역특례")
-    private val excludedTitle = Regex("QA|quality|test engineer|scientist|analyst|분석가|기획|디자인|디자이너|어시스턴트|assistant|IT 운영|IT 담당|IDC|network|security|보안|Technical Writer|제품 관리자", RegexOption.IGNORE_CASE)
+    private val excludedTitle = Regex("(?<![A-Za-z])QA(?![A-Za-z])|quality|test engineer|scientist|analyst|분석가|인재\\s*(?:풀|pool)|talent\\s*pool|게임|game (?:server|client)|기획|디자인|디자이너|어시스턴트|assistant|IT 운영|IT 담당|IDC|network|security|보안|Technical Writer|제품 관리자", RegexOption.IGNORE_CASE)
     private val softwareTitle = Regex("개발|엔지니어|engineer|developer|DevOps|SRE", RegexOption.IGNORE_CASE)
     fun accepts(category: String, title: String): Boolean = category in developmentCategories &&
         !excludedTitle.containsMatchIn(title) && softwareTitle.containsMatchIn(title)

@@ -94,8 +94,8 @@ class LineRecruitmentSite : RecruitmentSite {
 /** Engineering 전체가 개발직은 아니다. QA·보안 운영·관리직을 걸러낸 뒤 소프트웨어 세부 직무를 허용한다. */
 private object LineDeveloperRule {
     private val softwareFields = setOf("Client-side", "Web Development", "Server-side", "Data Engineering", "(Not in use)Front-end", "(Not in use)Desktop/C++", "(Not in use)Game Engineering", "(not in use)Android", "(not in use)iOS", "(not in use)Blockchain")
-    private val softwareTitle = Regex("software|back.?end|front.?end|full.?stack|android|\\bios\\b|server engineer|data engineer|devops|\\bsre\\b.*(?:dev|engineer)|(?:alpha|data) dev\\b|개발자|소프트웨어", RegexOption.IGNORE_CASE)
-    private val excludedTitle = Regex("\\bqa\\b|\\bset\\b|\\btest(?:ing)?\\b|\\bquality\\b|scientist|analyst|product manager|project manager|engineering manager|team lead|technical partner|security professional|security operations|incident response|support engineer|테스트|품질|분석가|기획|디자이너", RegexOption.IGNORE_CASE)
+    private val softwareTitle = Regex("""software|back.?end|front.?end|full.?stack|android|\bios\b|server engineer|data engineer|machine learning engineer|\b(?:ml|ai) engineer\b|devops|\bsre\b|site reliability engineer(?:ing)?|(?:alpha|data) dev\b|개발자|소프트웨어|머신\s*러닝\s*엔지니어|데이터\s*엔지니어|데브옵스""", RegexOption.IGNORE_CASE)
+    private val excludedTitle = Regex("""\bqa\b|\bset\b|\btest(?:ing)?\b|\bquality\b|scientist|analyst|product manager|project manager|engineering manager|team lead|technical partner|\bsecurity\b|incident response|support engineer|database administrator|\bdba\b|테스트|사이언티스트|애널리스트|분석가|품질|분석가|기획|디자이너|정보보안|정보보호""", RegexOption.IGNORE_CASE)
 
     fun accepts(units: List<String>, fields: List<String>, title: String): Boolean =
         "Engineering" in units && !excludedTitle.containsMatchIn(title) &&

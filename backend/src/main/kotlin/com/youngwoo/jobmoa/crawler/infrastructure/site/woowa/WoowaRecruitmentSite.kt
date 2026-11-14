@@ -107,8 +107,8 @@ class WoowaRecruitmentSite : RecruitmentSite {
 
 /** BA005001은 공식 Tech 직군. 보안·QA·DB 운영도 포함하므로 공고명에서 개발 역할을 추가로 확인한다. */
 private object WoowaDeveloperRule {
-    private val softwareTitle = Regex("소프트웨어|백엔드|프론트엔드|서버.?개발|웹.?개발|앱.?개발|플랫폼.?개발|플랫폼엔지니어링|데이터엔지니어링|머신러닝.?엔지니어|개발자|software|back.?end|front.?end|full.?stack|android|\\bios\\b|devops|\\bsre\\b|data engineer|machine learning engineer", RegexOption.IGNORE_CASE)
-    private val excludedTitle = Regex("\\bqa\\b|\\btest(?:ing)?\\b|\\bquality\\b|테스트|품질|정보보호|정보보안|침해|보안관제|데이터베이스|\\bdba\\b|scientist|analyst|데이터분석|프로덕트.?매니저|기획|디자인|영업", RegexOption.IGNORE_CASE)
+    private val softwareTitle = Regex("""소프트웨어|백엔드|프론트엔드|풀스택|서버\s*개발|웹\s*개발|앱\s*개발|플랫폼\s*개발|플랫폼\s*엔지니어링|데이터\s*엔지니어(?:링)?|머신\s*러닝\s*(?:엔지니어|개발)|(?:AI|인공지능)\s*(?:엔지니어|개발)|안드로이드\s*(?:개발|엔지니어)|개발자|software|back.?end|front.?end|full.?stack|android|\bios\b|devops|\bsre\b|site reliability engineer|data engineer|machine learning engineer|\b(?:ml|ai) engineer\b|데브옵스""", RegexOption.IGNORE_CASE)
+    private val excludedTitle = Regex("\\bqa\\b|\\btest(?:ing)?\\b|\\bquality\\b|테스트|사이언티스트|애널리스트|분석가|품질|정보보호|정보보안|침해|보안관제|데이터베이스|\\bdba\\b|scientist|analyst|데이터분석|프로덕트.?매니저|기획|디자인|영업", RegexOption.IGNORE_CASE)
     fun accepts(host: String, group: String, title: String): Boolean =
         // 청년들 BA005001은 재무 직군이다. 형제들의 Tech 코드를 다른 포털에 재사용하지 않는다.
         (host == "career.woowayouths.com" || group == "BA005001") &&

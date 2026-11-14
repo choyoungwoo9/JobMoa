@@ -12,8 +12,8 @@ internal object KarrotGlobalPortals {
         SourceDefinition("karrot-japan", "Karrot Japan", "https://careers.jp.karrotmarket.com/jobs/"),
     )
     private val hosts = definitions.map { URI(it.listingUrl).host }.toSet()
-    private val software = Regex("software (?:engineer|developer)|back[ -]?end (?:engineer|developer)|front[ -]?end (?:engineer|developer)|full[ -]?stack (?:engineer|developer)|(?:android|ios|machine learning|data|site reliability) engineer|ソフトウェアエンジニア|バックエンドエンジニア|フロントエンドエンジニア", RegexOption.IGNORE_CASE)
-    private val excluded = Regex("\\b(?:QA|SDET|security|hardware|mechanical|scientist|analyst|manager|director|sales)\\b|テスト|セキュリティ", RegexOption.IGNORE_CASE)
+    private val software = Regex("""software (?:engineer|developer)|back[ -]?end (?:engineer|developer)|front[ -]?end (?:engineer|developer)|full[ -]?stack (?:engineer|developer)|(?:android|ios|mobile|machine learning|ml|ai|data|devops|site reliability) (?:engineer|developer)|SREエンジニア|\bSRE\b|ソフトウェアエンジニア|バックエンドエンジニア|フロントエンドエンジニア|フルスタックエンジニア|データエンジニア|機械学習エンジニア|DevOpsエンジニア""", RegexOption.IGNORE_CASE)
+    private val excluded = Regex("\\b(?:QA|SDET|security|hardware|mechanical|scientist|analyst|manager|director|sales)\\b|テスト|セキュリティ|サイエンティスト|アナリスト", RegexOption.IGNORE_CASE)
     private fun isDeveloper(title: String) = software.containsMatchIn(title) && !excluded.containsMatchIn(title)
 
     fun supportsListing(url: String) = definitions.any { it.listingUrl == url }

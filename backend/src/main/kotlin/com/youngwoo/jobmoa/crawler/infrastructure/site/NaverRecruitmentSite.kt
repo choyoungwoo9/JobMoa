@@ -102,9 +102,10 @@ class NaverRecruitmentSite : RecruitmentSite {
 }
 
 private object NaverDeveloperRule {
-    private val softwareRoles = setOf("Embedded SW", "Back-end", "Front-end", "Android", "iOS", "Software Development", "DevOps", "SRE")
-    private val softwareTitle = Regex("software engineer|firmware engineer|backend|back.end|frontend|front.end|full.?stack|server (developer|engineer)|백엔드|프론트엔드|개발자|개발.?엔지니어", RegexOption.IGNORE_CASE)
-    private val excluded = Regex("hardware|mechanical|보안|security|QA|test engineer|scientist|research engineer|기획|디자이너|사업|sales|contents developer", RegexOption.IGNORE_CASE)
+    private val softwareRoles = setOf("Embedded SW", "Back-end", "Backend", "Front-end", "Frontend", "Android", "iOS", "Software Development", "DevOps", "SRE")
+    // Tech 공통 직무로 등록된 경우도 명확한 개발 직함은 직무별 수집 단계까지 전달한다.
+    private val softwareTitle = Regex("software engineer|firmware engineer|backend|back.end|frontend|front.end|full.?stack|server (developer|engineer)|(?:android|ios|data|machine learning|ml|ai|mlops|devops) (?:developer|engineer)|site reliability engineer|\\bSRE\\b|백엔드|프론트엔드|풀스택|(?:데이터|머신러닝|AI|ML|MLOps|DevOps)\\s*엔지니어|개발자|개발.?엔지니어", RegexOption.IGNORE_CASE)
+    private val excluded = Regex("hardware|mechanical|보안|security|(?<![A-Za-z])QA(?![A-Za-z])|test engineer|scientist|research engineer|analyst|분석가|게임|game (?:server|client)|기획|디자이너|사업|sales|contents developer", RegexOption.IGNORE_CASE)
     private val talentPool = Regex("인재\\s*(?:풀|pool)|talent\\s*pool", RegexOption.IGNORE_CASE)
     fun isTalentPool(title: String): Boolean = talentPool.containsMatchIn(title)
     fun accepts(category: String, role: String, title: String): Boolean =
