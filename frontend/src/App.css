@@ -3317,3 +3317,23 @@ dialog::backdrop {
   .category-choice { gap: 8px; padding: 14px 10px; }
   .category-support-count { display: none; }
 }
+
+/* Keep collection actions visible while the company choices and notes scroll. */
+.collect-dialog { overflow: hidden; }
+.collect-dialog .dialog-inner {
+  --collect-padding: 28px;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 58px);
+  padding: 0;
+}
+.collect-dialog-header { flex: 0 0 auto; padding: var(--collect-padding) var(--collect-padding) 0; }
+.collect-dialog-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 var(--collect-padding) 20px; overscroll-behavior: contain; }
+.collect-dialog .company-groups { max-height: none; overflow: visible; padding-right: 0; }
+.collect-dialog .modal-actions { flex: 0 0 auto; margin: 0; padding: 18px var(--collect-padding) 22px; border-top: 1px solid #e8eedf; background: #fff; }
+@media (max-width: 550px) {
+  .collect-dialog .dialog-inner { --collect-padding: 20px; }
+  .collect-dialog .modal-actions { padding-top: 14px; padding-bottom: 18px; }
+}
+
+.collection-scope { color: #657055; font-size: 12px; line-height: 1.7; margin: 0 0 16px; overflow-wrap: anywhere; }

@@ -32,6 +32,7 @@ export function CollectDialog({ onClose, onStart, demo, availableSources, catego
   }
   return (
     <Modal onClose={onClose} labelId="collect-title" className="collect-dialog">
+      <div className="collect-dialog-header">
       <div className="modal-heading">
         <div className="modal-symbol"><Icon name="layers" size={24} /></div>
         <span className="collection-step">{step} / 2 · {step === 1 ? '분야 선택' : '기업 선택'}</span>
@@ -39,6 +40,8 @@ export function CollectDialog({ onClose, onStart, demo, availableSources, catego
       </div>
       <h2 id="collect-title">{step === 1 ? '어떤 공고를 모아볼까요?' : `${category?.name ?? '공고'} 수집`}</h2>
       <p className="modal-description">{step === 1 ? '관심 분야를 고르면, 그 분야의 수집을 지원하는 기업을 보여드려요.' : '기업군을 펼쳐 계열사를 선택하세요. 선택한 분야의 수집을 지원하는 기업만 표시해요.'}</p>
+      </div>
+      <div className="collect-dialog-body">
       {step === 1 ? (
         <div className="category-choices">
           {categories.map(item => (
@@ -61,7 +64,7 @@ export function CollectDialog({ onClose, onStart, demo, availableSources, catego
               if (!members.length) return null
               const count = members.filter(company => selected.includes(company.id)).length
               return (
-                <details className="company-group" key={source.id} open>
+                <details className="company-group" key={source.id}>
                   <summary>
                     <input type="checkbox" checked={count === members.length} ref={element => { if (element) element.indeterminate = count > 0 && count < members.length }} aria-label={`${source.name} 기업군 전체 선택`} onClick={event => event.stopPropagation()} onChange={() => toggle(members.map(company => company.id))} />
                     <BrandMark sourceId={source.id} small /><strong>{source.name}</strong><span>{count} / {members.length}</span><Icon name="down" size={14} />
@@ -84,6 +87,7 @@ export function CollectDialog({ onClose, onStart, demo, availableSources, catego
           </div></div>
         </>
       )}
+      </div>
       <div className="modal-actions">
         <button className="button secondary" onClick={step === 1 ? onClose : () => setStep(1)}>{step === 1 ? '취소' : '이전'}</button>
         {step === 1 ? <button className="button primary" disabled={!supported.length} onClick={() => setStep(2)}>기업 선택<Icon name="chevron" size={14} /></button> : <button className="button primary" disabled={!selectedCompanies.length} onClick={() => onStart([...new Set(selectedCompanies.map(company => company.sourceId))], failure ? stage : null, categoryId, selectedCompanies.map(company => company.id))}><Icon name="refresh" size={16} />{selectedCompanies.length}개 기업 {demo ? '수집 미리보기' : '수집 시작'}</button>}

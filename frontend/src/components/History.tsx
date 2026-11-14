@@ -7,7 +7,7 @@ import {
   STATUS_LABELS,
   summarize,
 } from '../data'
-import type { CollectionRun } from '../types'
+import type { CollectionRun, Company } from '../types'
 import { BrandMark } from './BrandMark'
 import { Icon } from './Icon'
 
@@ -18,8 +18,10 @@ export function RunCard({
   onRetry,
   busy,
   onOpenOriginal,
+  companies = [],
 }: {
   run: CollectionRun
+  companies?: Company[]
   expanded: boolean
   onToggle: () => void
   onRetry: (ids?: string[]) => void
@@ -84,6 +86,7 @@ export function RunCard({
       </button>
       {expanded && (
         <div className="run-details">
+          {!!run.companyIds?.length && <p className="collection-scope">수집 대상 · {companies.filter(company => run.companyIds?.includes(company.id)).map(company => company.name).join(', ')}</p>}
           {run.retryOf && (
             <div className="retry-note">
               <Icon name="refresh" size={14} />

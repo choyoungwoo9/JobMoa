@@ -759,6 +759,7 @@ function App() {
               </div>
               {data.runs.map((run) => (
                 <RunCard
+                  companies={companies}
                   key={run.id}
                   run={run}
                   expanded={expandedRuns.includes(run.id)}
