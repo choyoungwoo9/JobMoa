@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { SOURCES, categoryName, dateLabel, sourceById, summarize } from './data'
+import { SOURCES, dateLabel, sourceById, summarize } from './data'
 import type { FailureStage, SourceId } from './types'
 import { useCollection } from './useCollection'
 import { BrandMark } from './components/BrandMark'
@@ -29,6 +29,7 @@ function App() {
   const closeJob = useCallback(() => setSelectedJob(null), [])
   const latestRun = data.runs[0]
   const latest = latestRun ? summarize(latestRun) : null
+  const categoryName = (id = 'all') => categories.find(category => category.id === id)?.name ?? '기타 분야'
   const categoryJobs = data.jobs.filter(job => categoryId === 'all' || job.categories?.includes(categoryId))
   const available = categoryJobs.filter((job) => includeClosed || !job.closed)
   const unread = available.filter((job) => !job.read).length
@@ -238,7 +239,7 @@ function App() {
               </h1>
               <p>
                 {view === 'jobs'
-                  ? '관심 있는 회사의 개발자 채용공고를 한곳에 모아요.'
+                  ? '관심 있는 회사와 직무의 채용공고를 한곳에 모아요.'
                   : '언제, 어디에서, 얼마나 모았는지 확인해요.'}
               </p>
             </div>
@@ -274,7 +275,7 @@ function App() {
                     </span>
                     <p>좋은 공고, 놓치지 않도록.</p>
                     <span className="overview-rule">
-                      명확한 개발 공고만 · 계열사까지 함께
+                      선택한 직무의 공고만 · 계열사까지 함께
                     </span>
                   </div>
                 </div>
@@ -760,6 +761,7 @@ function App() {
               {data.runs.map((run) => (
                 <RunCard
                   companies={companies}
+                  categories={categories}
                   key={run.id}
                   run={run}
                   expanded={expandedRuns.includes(run.id)}

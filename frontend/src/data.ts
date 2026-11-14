@@ -42,6 +42,7 @@ export const SOURCES: Source[] = [
     mark: '배',
     url: 'https://career.woowahan.com/',
   },
+  { id: 'bucketplace', name: '오늘의집', mark: '집', url: 'https://www.bucketplace.com/careers/' },
 ]
 export const sourceById = (id: SourceId) =>
   SOURCES.find((source) => source.id === id)!
@@ -102,6 +103,7 @@ const JOB_SEEDS: [SourceId, string, string, string][] = [
   ['naver', '네이버', '웹 서비스 개발자', '경기 성남 · 분당'],
   ['toss', '토스', 'Frontend Developer, Platform', '서울 강남'],
   ['kakao', '카카오', '검색 서비스 서버 개발자', '경기 성남 · 판교'],
+  ['bucketplace', '오늘의집', 'Product Designer', '서울 서초'],
 ]
 
 export function emptyResult(sourceId: SourceId): SourceResult {
@@ -385,5 +387,20 @@ export function summarize(run: CollectionRun) {
   } as const
 }
 
-export const CATEGORIES = [{ id: 'all', name: '전체 개발 공고' }, { id: 'web-backend', name: '웹 백엔드' }]
+export const CATEGORIES = [
+  { id: 'all', name: '전체 공고', description: '선택한 회사에서 수집을 지원하는 모든 직무의 공고' },
+  { id: 'web-backend', name: '웹 백엔드', description: '웹·앱 서비스 API와 서버 로직 개발 · 풀스택 제외' },
+  { id: 'web-frontend', name: '프론트엔드', description: '웹 화면과 브라우저 클라이언트 개발 · 풀스택 제외' },
+  { id: 'android', name: 'Android', description: 'Android 앱과 클라이언트 개발' },
+  { id: 'ios', name: 'iOS', description: 'iOS 앱과 클라이언트 개발' },
+  { id: 'fullstack', name: '풀스택', description: '프론트엔드와 백엔드 양쪽을 담당하는 명확한 풀스택 직무' },
+  { id: 'data-engineer', name: '데이터 엔지니어', description: '데이터 파이프라인·수집·처리 플랫폼 개발 · 분석가 제외' },
+  { id: 'ml-engineer', name: 'ML 엔지니어', description: '머신러닝 모델·추론 서비스 구현 · 순수 연구 직무 제외' },
+  { id: 'devops-sre', name: 'DevOps/SRE', description: '배포 자동화·서비스 신뢰성·운영 인프라 엔지니어링' },
+  { id: 'planning', name: '기획', description: '서비스·사업 기획과 실행 계획 수립' },
+  { id: 'product-management', name: 'PM', description: '제품·프로젝트의 우선순위와 실행을 이끄는 PM 직무' },
+  { id: 'design', name: '디자인', description: '프로덕트·UX/UI·브랜드 등 명확한 디자인 직무' },
+  { id: 'marketing', name: '마케팅', description: '브랜드·콘텐츠·퍼포먼스·CRM 등 마케팅 직무' },
+  { id: 'sales', name: '영업', description: '고객·파트너 발굴과 매출 창출을 담당하는 영업 직무' },
+]
 export const categoryName = (id = 'all') => CATEGORIES.find(category => category.id === id)?.name ?? id

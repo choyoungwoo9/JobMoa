@@ -3337,3 +3337,9 @@ dialog::backdrop {
 }
 
 .collection-scope { color: #657055; font-size: 12px; line-height: 1.7; margin: 0 0 16px; overflow-wrap: anywhere; }
+
+/* Many fields remain reachable without shrinking labels or widening the page. */
+.category-tabs { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; }
+.category-tabs button { flex: 0 0 auto; white-space: nowrap; }
+
+.brand-bucketplace { background: #27c3d7; color: #fff; }

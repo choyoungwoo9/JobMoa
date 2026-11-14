@@ -6,9 +6,11 @@ export type SourceId =
   | 'daangn'
   | 'line'
   | 'woowa'
+  | 'bucketplace'
 export interface Category {
   id: string
   name: string
+  description?: string
 }
 export interface Company {
   id: string

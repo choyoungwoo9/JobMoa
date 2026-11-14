@@ -47,7 +47,7 @@ export function CollectDialog({ onClose, onStart, demo, availableSources, catego
           {categories.map(item => (
             <label key={item.id} className={`category-choice ${categoryId === item.id ? 'selected' : ''}`}>
               <input type="radio" name="collection-category" value={item.id} checked={categoryId === item.id} onChange={() => chooseCategory(item.id)} />
-              <span><strong>{item.name}</strong><small>{item.id === 'web-backend' ? '서비스 API·서버 로직 개발 · 풀스택 제외' : '현재 지원하는 개발 분야의 공고를 함께 수집'}</small></span>
+              <span><strong>{item.name}</strong><small>{item.description ?? '해당 분야의 수집을 지원하는 기업에서 공고를 모아요.'}</small></span>
               <span className="category-support-count">{companies.filter(company => availableSources.includes(company.sourceId) && company.supportedCategoryIds.includes(item.id)).length}개 기업</span>
             </label>
           ))}

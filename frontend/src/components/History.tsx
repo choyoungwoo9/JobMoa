@@ -7,7 +7,7 @@ import {
   STATUS_LABELS,
   summarize,
 } from '../data'
-import type { CollectionRun, Company } from '../types'
+import type { CollectionRun, Company, Category } from '../types'
 import { BrandMark } from './BrandMark'
 import { Icon } from './Icon'
 
@@ -19,9 +19,11 @@ export function RunCard({
   busy,
   onOpenOriginal,
   companies = [],
+  categories = [],
 }: {
   run: CollectionRun
   companies?: Company[]
+  categories?: Category[]
   expanded: boolean
   onToggle: () => void
   onRetry: (ids?: string[]) => void
@@ -29,6 +31,7 @@ export function RunCard({
   onOpenOriginal: (id: string) => void
 }) {
   const summary = summarize(run)
+  const fieldName = categories.find(category => category.id === run.categoryId)?.name ?? categoryName(run.categoryId)
   const unresolved = run.results
     .flatMap((r) => r.failures)
     .filter((f) => !f.resolved)
@@ -67,7 +70,7 @@ export function RunCard({
             </span>
           </strong>
           <small>
-            {categoryName(run.categoryId)} · {run.results.length}개 기업군{run.companyIds?.length ? ` · ${run.companyIds.length}개 기업` : ''} · {durationLabel(run)}
+            {fieldName} · {run.results.length}개 기업군{run.companyIds?.length ? ` · ${run.companyIds.length}개 기업` : ''} · {durationLabel(run)}
             {!run.finishedAt && ` · ${summary.done}/${run.results.length} 완료`}
           </small>
         </span>
