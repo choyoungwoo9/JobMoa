@@ -11,12 +11,27 @@ import java.time.format.DateTimeFormatter
 @Component
 class NaverRecruitmentSite : RecruitmentSite {
     override val definition = SourceDefinition("naver", "네이버", "https://recruit.navercorp.com/rcrt/list.do")
+    override val discoveryTargets = listOf(definition,
+        SourceDefinition("naver-cloud", "네이버클라우드", "https://recruit.navercloudcorp.com/rcrt/list.do"),
+        SourceDefinition("naver-snow", "SNOW · KREAM", "https://recruit.snowcorp.com/rcrt/list.do"),
+        SourceDefinition("naver-labs", "네이버랩스", "https://recruit.naverlabs.com/rcrt/list.do"),
+        SourceDefinition("naver-webtoon", "네이버웹툰", "https://recruit.webtoonscorp.com/rcrt/list.do"),
+        SourceDefinition("naver-financial", "네이버파이낸셜", "https://recruit.naverfincorp.com/rcrt/list.do"),
+        SourceDefinition("naver-ins", "네이버 I&S", "https://recruit.naverins.com/rcrt/list.do"),
+        SourceDefinition("naver-z", "네이버 Z", "https://recruit.naverz-corp.com/rcrt/list.do"),
+    )
+    private val hosts = discoveryTargets.map { URI(it.listingUrl).host }.toSet()
+    private val sharedPortalHosts = hosts - setOf("recruit.naverz-corp.com", "recruit.naverfincorp.com")
 
-    override fun discover(browser: BrowserPage, emit: (DiscoveredPosting) -> Unit) {
+    override fun discover(browser: BrowserPage, emit: (DiscoveredPosting) -> Unit) = discoverAt(browser, definition.listingUrl, emit)
+
+    override fun discoverAt(browser: BrowserPage, listingUrl: String, emit: (DiscoveredPosting) -> Unit) {
+        val host = URI(listingUrl).host
+        require(host in hosts)
         var offset = 0
         val seen = mutableSetOf<String>()
         while (true) {
-            browser.navigate("https://recruit.navercorp.com/rcrt/loadJobList.do?firstIndex=$offset&recordCountPerPage=100&lang=ko")
+            browser.navigate("https://$host/rcrt/loadJobList.do?firstIndex=$offset&recordCountPerPage=100&lang=ko")
             val response = browser.evaluate("() => JSON.parse(document.body.innerText)") as? Map<*, *> ?: error("네이버 목록 응답 형식이 바뀌었습니다.")
             check(response["result"] == "Y") { "네이버 목록 조회 실패: ${response["result"]}" }
             val rows = response["list"] as? List<*> ?: error("네이버 공고 목록이 없습니다.")
@@ -35,7 +50,9 @@ class NaverRecruitmentSite : RecruitmentSite {
                 if (!NaverDeveloperRule.accepts(row["classCdNm"]?.toString().orEmpty(), row["subJobCdNm"]?.toString().orEmpty(), title)) return@forEach
                 val url = row["jobDetailLink"]?.toString() ?: error("공고 URL이 없습니다: $id")
                 check(acceptsUrl(url)) { "미지원 네이버 상세 주소: $url" }
-                emit(DiscoveredPosting(url, row["sysCompanyCdNm"]?.toString().orEmpty(), title))
+                // 통합 포털과 계열사 포털에 함께 게시된 공고는 같은 공식 원문 URL로 합친다.
+                val canonical = if (URI(url).host in sharedPortalHosts) "https://recruit.navercorp.com/rcrt/view.do?annoId=$id" else url
+                emit(DiscoveredPosting(canonical, row["sysCompanyCdNm"]?.toString().orEmpty(), title))
             }
             offset += rows.size
             if (offset >= total) return
@@ -64,7 +81,7 @@ class NaverRecruitmentSite : RecruitmentSite {
 
     override fun acceptsUrl(url: String): Boolean = runCatching {
         val uri = URI(url)
-        uri.scheme == "https" && uri.host == "recruit.navercorp.com" && uri.path == "/rcrt/view.do" &&
+        uri.scheme == "https" && uri.host in hosts && uri.path == "/rcrt/view.do" &&
             Regex("(?:^|&)annoId=\\d+(?:&|$)").containsMatchIn(uri.rawQuery.orEmpty())
     }.getOrDefault(false)
 }
