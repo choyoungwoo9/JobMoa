@@ -27,4 +27,5 @@ data class Posting(
     val read: Boolean = false,
     val closed: Boolean = false,
     val lastChange: String? = null,
+    val categories: Set<String> = emptySet(),
 )

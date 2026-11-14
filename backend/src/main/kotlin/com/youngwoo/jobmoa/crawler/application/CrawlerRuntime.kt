@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class CrawlerRuntime(private val properties: CrawlerProperties, private val tasks: CrawlTaskRepository,
     private val runs: CollectionRepository, private val collections: CollectionService,
     private val taskService: TaskService, private val sources: SourceRegistry,
-    private val limiter: SiteLimiter, private val captures: CaptureStorage) {
+    private val limiter: SiteLimiter, private val captures: CaptureStorage, private val classifier: CategoryClassifier) {
     private val log = LoggerFactory.getLogger(javaClass)
     private val sequence = AtomicInteger()
     private val workers = Executors.newFixedThreadPool(properties.workers) { r -> Thread(r, "crawl-worker-${sequence.incrementAndGet()}") }
@@ -73,16 +73,23 @@ class CrawlerRuntime(private val properties: CrawlerProperties, private val task
                         }
                         session.withPage { page ->
                             page.navigate(task.url)
+                            var checkpoint: CrawlTask = task
                             var posting = DiscoveredPosting(task.url, task.company, task.title, task.location)
                             if (task.stage == CrawlStage.BODY) {
                                 val extracted = adapter.extract(page, posting)
-                                val checkpoint = taskService.body(task.id, token, extracted)
+                                if (!classifier.accepts(task.categoryId, task.companyId, extracted)) {
+                                    throw PostingExcluded("선택한 분야의 회사별 판별 기준에서 제외: ${task.categoryId} / ${extracted.title}")
+                                }
+                                checkpoint = taskService.body(task.id, token, extracted)
                                 posting = DiscoveredPosting(checkpoint.url, checkpoint.company, checkpoint.title, checkpoint.location)
                             }
-                            // 캡처 재시도는 저장된 본문을 유지하고 렌더링·캡처만 수행한다.
-                            adapter.prepareCapture(page, posting)
-                            val path = captures.save(page.capture())
-                            taskService.captured(task.id, token, path)
+                            // 동일 본문은 SAVE로 이동하여 캡처·버전 저장을 모두 생략한다.
+                            // CAPTURE 재시도는 저장된 본문을 유지하고 렌더링·캡처만 수행한다.
+                            if (checkpoint.stage == CrawlStage.CAPTURE) {
+                                adapter.prepareCapture(page, posting)
+                                val path = captures.save(page.capture())
+                                taskService.captured(task.id, token, path)
+                            }
                         }
                     }
                     taskService.finish(task.id, token)

@@ -40,13 +40,14 @@ interface TaskSummaryProjection {
     val url: String; val urlHash: String; val status: String; val stage: String
     val attempts: Int; val failedAt: Instant?; val error: String?; val outcome: String?
     val resolvedAt: Instant?; val retryOfTaskId: String?
+    val categoryId: String; val companyId: String; val reusedVersionId: Long?
 }
 
 interface CrawlTaskJpaRepository : JpaRepository<CrawlTaskEntity, String> {
     @Query("""select t.id as id, t.sourceId as sourceId, t.company as company, t.title as title,
         t.url as url, t.urlHash as urlHash, t.status as status, t.stage as stage, t.attempts as attempts,
         t.failedAt as failedAt, t.error as error, t.outcome as outcome, t.resolvedAt as resolvedAt,
-        t.retryOfTaskId as retryOfTaskId from CrawlTaskEntity t where t.runId = :id order by t.discoveredAt, t.id""")
+        t.retryOfTaskId as retryOfTaskId, t.categoryId as categoryId, t.companyId as companyId, t.reusedVersionId as reusedVersionId from CrawlTaskEntity t where t.runId = :id order by t.discoveredAt, t.id""")
     fun summaries(@Param("id") runId: String): List<TaskSummaryProjection>
     fun findAllByRunIdOrderByDiscoveredAtAscIdAsc(runId: String): List<CrawlTaskEntity>
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -76,8 +77,8 @@ interface CrawlTaskJpaRepository : JpaRepository<CrawlTaskEntity, String> {
     @Modifying
     @Query(value = """
         INSERT INTO crawl_task
-        (id,run_id,source_id,company,url,url_hash,site_key,discovered_at,title,location,status,stage,attempts,body_text,content_hash,capture_path,retry_of_task_id,closed)
-        VALUES (:#{#task.id},:#{#task.runId},:#{#task.sourceId},:#{#task.company},:#{#task.url},:#{#task.urlHash},:#{#task.siteKey},:#{#task.discoveredAt},:#{#task.title},:#{#task.location},:#{#task.status.name()},:#{#task.stage.name()},:#{#task.attempts},:#{#task.bodyText},:#{#task.contentHash},:#{#task.capturePath},:#{#task.retryOfTaskId},:#{#task.closed})
+        (id,run_id,source_id,company,url,url_hash,site_key,discovered_at,title,location,status,stage,attempts,body_text,content_hash,capture_path,retry_of_task_id,closed,category_id,company_id,reused_version_id)
+        VALUES (:#{#task.id},:#{#task.runId},:#{#task.sourceId},:#{#task.company},:#{#task.url},:#{#task.urlHash},:#{#task.siteKey},:#{#task.discoveredAt},:#{#task.title},:#{#task.location},:#{#task.status.name()},:#{#task.stage.name()},:#{#task.attempts},:#{#task.bodyText},:#{#task.contentHash},:#{#task.capturePath},:#{#task.retryOfTaskId},:#{#task.closed},:#{#task.categoryId},:#{#task.companyId},:#{#task.reusedVersionId})
         ON DUPLICATE KEY UPDATE id = id
     """, nativeQuery = true)
     fun enqueue(@Param("task") task: CrawlTask): Int

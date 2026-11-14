@@ -11,6 +11,8 @@ data class CollectionRun(
     val status: RunStatus = RunStatus.DISCOVERING,
     val finishedAt: Instant? = null,
     val retryOf: String? = null,
+    val categoryId: String = "all",
+    val companyIds: Set<String> = emptySet(),
 ) {
     val active: Boolean get() = finishedAt == null
 }

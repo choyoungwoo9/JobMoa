@@ -2,6 +2,8 @@ package com.youngwoo.jobmoa.posting.infrastructure.repository
 
 import com.youngwoo.jobmoa.posting.infrastructure.entity.PostingEntity
 import com.youngwoo.jobmoa.posting.infrastructure.entity.PostingVersionEntity
+import com.youngwoo.jobmoa.posting.infrastructure.entity.PostingCategoryEntity
+import com.youngwoo.jobmoa.posting.infrastructure.entity.PostingCategoryId
 import jakarta.persistence.LockModeType
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
@@ -25,6 +27,11 @@ interface PostingVersionJpaRepository : JpaRepository<PostingVersionEntity, Long
         from PostingVersionEntity v where v.postingId in :ids order by v.savedAt desc, v.id desc""")
     fun summaries(@Param("ids") postingIds: List<Long>): List<VersionSummaryProjection>
     fun findAllByPostingIdOrderBySavedAtDescIdDesc(postingId: Long): List<PostingVersionEntity>
+    fun findFirstByPostingIdOrderBySavedAtDescIdDesc(postingId: Long): PostingVersionEntity?
+}
+
+interface PostingCategoryJpaRepository : JpaRepository<PostingCategoryEntity, PostingCategoryId> {
+    fun findAllByIdPostingIdIn(postingIds: List<Long>): List<PostingCategoryEntity>
 }
 
 interface VersionSummaryProjection {

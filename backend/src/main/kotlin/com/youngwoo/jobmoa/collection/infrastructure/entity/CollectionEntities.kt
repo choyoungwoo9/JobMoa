@@ -17,10 +17,12 @@ open class CollectionRunEntity(
     @field:Column(nullable = false) open var status: String = RunStatus.DISCOVERING.name,
     @field:Column(name = "finished_at") open var finishedAt: Instant? = null,
     @field:Column(name = "retry_of") open var retryOf: String? = null,
+    @field:Column(name = "category_id", nullable = false, length = 64) open var categoryId: String = "all",
+    @field:Column(name = "company_ids", nullable = false, columnDefinition = "text") open var companyIds: String = "",
 ) {
-    fun domain() = CollectionRun(id, startedAt, RunStatus.valueOf(status), finishedAt, retryOf)
+    fun domain() = CollectionRun(id, startedAt, RunStatus.valueOf(status), finishedAt, retryOf, categoryId, companyIds.split(',').filter { it.isNotBlank() }.toSet())
 }
-fun CollectionRun.entity() = CollectionRunEntity(id, startedAt, status.name, finishedAt, retryOf)
+fun CollectionRun.entity() = CollectionRunEntity(id, startedAt, status.name, finishedAt, retryOf, categoryId, companyIds.sorted().joinToString(","))
 
 @Entity @Table(name = "collection_run_source")
 open class RunSourceEntity(
@@ -66,13 +68,16 @@ open class CrawlTaskEntity(
     @field:Column(name = "retry_of_task_id") open var retryOfTaskId: String? = null,
     @field:Column(name = "resolved_at") open var resolvedAt: Instant? = null,
     @field:Column(nullable = false) open var closed: Boolean = false,
+    @field:Column(name = "category_id", nullable = false, length = 64) open var categoryId: String = "all",
+    @field:Column(name = "company_id", nullable = false, length = 64) open var companyId: String = "",
+    @field:Column(name = "reused_version_id") open var reusedVersionId: Long? = null,
 ) {
     fun domain() = CrawlTask(id, runId, sourceId, company, url, urlHash, siteKey, discoveredAt,
         title, location, TaskStatus.valueOf(status), CrawlStage.valueOf(stage), attempts,
         leaseToken, leaseExpiresAt, bodyText, contentHash, capturePath, error, failedAt,
-        outcome?.let(TaskOutcome::valueOf), retryOfTaskId, resolvedAt, closed)
+        outcome?.let(TaskOutcome::valueOf), retryOfTaskId, resolvedAt, closed, categoryId, companyId, reusedVersionId)
 }
 fun CrawlTask.entity() = CrawlTaskEntity(id, runId, sourceId, company, url, urlHash, siteKey,
     discoveredAt, title, location, status.name, stage.name, attempts, leaseToken,
     leaseExpiresAt, bodyText, contentHash, capturePath, error, failedAt, outcome?.name,
-    retryOfTaskId, resolvedAt, closed)
+    retryOfTaskId, resolvedAt, closed, categoryId, companyId, reusedVersionId)

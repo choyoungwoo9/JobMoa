@@ -3,6 +3,7 @@ package com.youngwoo.jobmoa.collection.application
 import com.youngwoo.jobmoa.collection.domain.model.*
 import com.youngwoo.jobmoa.collection.domain.repository.*
 import com.youngwoo.jobmoa.crawler.application.SourceRegistry
+import com.youngwoo.jobmoa.crawler.application.CompanyRegistry
 import com.youngwoo.jobmoa.posting.domain.model.Posting
 import com.youngwoo.jobmoa.posting.domain.repository.PostingRepository
 import com.youngwoo.jobmoa.shared.ResourceNotFound
@@ -12,13 +13,13 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 @Transactional(readOnly = true)
 class WorkspaceQuery(private val runs: CollectionRepository, private val tasks: CrawlTaskRepository,
-    private val postings: PostingRepository, private val sites: SourceRegistry) {
+    private val postings: PostingRepository, private val sites: SourceRegistry, private val companies: CompanyRegistry) {
     fun sources() = sites.definitions.map { definition -> mapOf(
         "id" to definition.id, "name" to definition.name, "url" to definition.listingUrl,
         "available" to sites.supported(definition.id),
         "portals" to if (sites.supported(definition.id)) sites.adapter(definition.id).discoveryTargets else emptyList<Any>(),
     ) }
-    fun state() = mapOf("version" to 1, "jobs" to jobs(), "runs" to collections(), "sources" to sources())
+    fun state() = mapOf("version" to 1, "jobs" to jobs(), "runs" to collections(), "sources" to sources(), "categories" to companies.categories, "companies" to companies.list())
     fun jobs(): List<Map<String, Any?>> {
         val all = postings.list()
         val versions = postings.versionSummaries(all.map { it.id }).groupBy { it.postingId }
@@ -37,6 +38,7 @@ class WorkspaceQuery(private val runs: CollectionRepository, private val tasks: 
     private fun metadata(p: Posting, change: String?) = mapOf(
         "id" to p.id.toString(), "sourceId" to p.sourceId, "company" to p.company, "title" to p.title,
         "location" to p.location, "url" to p.url, "firstSeen" to p.firstSeen, "read" to p.read, "closed" to p.closed,
+        "categories" to p.categories.sorted(),
         "latestChange" to change?.takeIf { it == "new" || it == "changed" },
     )
     fun collections() = runs.recentRuns().map(::collection)
@@ -52,6 +54,7 @@ class WorkspaceQuery(private val runs: CollectionRepository, private val tasks: 
         val terminal = all.count { it.status == TaskStatus.COMPLETED || it.status == TaskStatus.FAILED }
         return mapOf(
             "id" to run.id, "startedAt" to run.startedAt, "finishedAt" to run.finishedAt, "retryOf" to run.retryOf,
+            "categoryId" to run.categoryId, "companyIds" to run.companyIds.sorted(),
             "status" to run.status, "progress" to mapOf("discoveryFinished" to discoveryFinished, "total" to all.size,
                 "pending" to all.count { it.status == TaskStatus.PENDING }, "processing" to all.count { it.status == TaskStatus.PROCESSING },
                 "completed" to all.count { it.status == TaskStatus.COMPLETED }, "failed" to all.count { it.status == TaskStatus.FAILED },

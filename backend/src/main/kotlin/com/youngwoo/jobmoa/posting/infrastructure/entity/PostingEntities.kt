@@ -3,6 +3,7 @@ package com.youngwoo.jobmoa.posting.infrastructure.entity
 import com.youngwoo.jobmoa.posting.domain.model.*
 import jakarta.persistence.*
 import java.time.Instant
+import java.io.Serializable
 
 @Entity @Table(name = "posting")
 open class PostingEntity(
@@ -19,7 +20,7 @@ open class PostingEntity(
     @field:Column(nullable = false) open var closed: Boolean = false,
     @field:Column(name = "last_change") open var lastChange: String? = null,
 ) {
-    fun domain() = Posting(id!!, sourceId, company, title, location, url, urlHash, firstSeen, lastSeen, read, closed, lastChange)
+    fun domain(categories: Set<String> = emptySet()) = Posting(id!!, sourceId, company, title, location, url, urlHash, firstSeen, lastSeen, read, closed, lastChange, categories)
 }
 fun Posting.entity() = PostingEntity(id.takeIf { it != 0L }, sourceId, company, title, location, url, urlHash, firstSeen, lastSeen, read, closed, lastChange)
 
@@ -36,3 +37,14 @@ open class PostingVersionEntity(
     fun domain() = PostingVersion(id!!, postingId, taskId, contentHash, bodyText, capturePath, savedAt)
 }
 fun PostingVersion.entity() = PostingVersionEntity(id.takeIf { it != 0L }, postingId, taskId, contentHash, bodyText, capturePath, savedAt)
+
+@Embeddable
+data class PostingCategoryId(
+    @field:Column(name = "posting_id", nullable = false) var postingId: Long = 0,
+    @field:Column(name = "category_id", nullable = false, length = 64) var categoryId: String = "",
+) : Serializable
+
+@Entity @Table(name = "posting_category")
+open class PostingCategoryEntity(
+    @field:EmbeddedId open var id: PostingCategoryId = PostingCategoryId(),
+)

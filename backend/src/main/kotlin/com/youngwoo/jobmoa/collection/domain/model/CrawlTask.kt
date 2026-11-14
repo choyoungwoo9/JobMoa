@@ -32,6 +32,9 @@ data class CrawlTask(
     val retryOfTaskId: String? = null,
     val resolvedAt: Instant? = null,
     val closed: Boolean = false,
+    val categoryId: String = "all",
+    val companyId: String = "",
+    val reusedVersionId: Long? = null,
 ) {
     fun requireOwnership(token: String, now: Instant) {
         if (status != TaskStatus.PROCESSING || leaseToken != token || leaseExpiresAt?.isAfter(now) != true) throw LeaseLost()
