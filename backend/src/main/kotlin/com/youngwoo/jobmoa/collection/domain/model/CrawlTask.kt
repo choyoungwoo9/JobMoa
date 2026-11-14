@@ -5,7 +5,7 @@ import java.time.Instant
 
 enum class TaskStatus { PENDING, PROCESSING, COMPLETED, FAILED }
 enum class CrawlStage { BODY, CAPTURE, SAVE }
-enum class TaskOutcome { NEW, CHANGED, IDENTICAL }
+enum class TaskOutcome { NEW, CHANGED, IDENTICAL, EXCLUDED }
 
 data class CrawlTask(
     val id: String,

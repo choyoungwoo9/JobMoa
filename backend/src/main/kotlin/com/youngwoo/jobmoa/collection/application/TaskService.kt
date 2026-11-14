@@ -63,6 +63,13 @@ class TaskService(private val tasks: CrawlTaskRepository, private val postings: 
     }
 
     @Transactional
+    fun exclude(id: String, token: String, reason: String) {
+        val task = tasks.lock(id).also { it.requireOwnership(token, Instant.now()) }
+        tasks.save(task.copy(status = TaskStatus.COMPLETED, outcome = TaskOutcome.EXCLUDED,
+            error = reason, leaseToken = null, leaseExpiresAt = null))
+    }
+
+    @Transactional
     fun fail(id: String, token: String, error: Throwable) {
         val task = tasks.lock(id).also { it.requireOwnership(token, Instant.now()) }
         tasks.save(task.copy(status = TaskStatus.FAILED, error = error.stackTraceToString().take(24_000),

@@ -25,16 +25,15 @@ class CollectionService(
         val run = CollectionRun(UUID.randomUUID().toString(), Instant.now())
         runs.activate(run, sources.map { source -> RunSource("${run.id}:$source", run.id, source,
             if (targets.isEmpty()) DiscoveryStatus.PENDING else DiscoveryStatus.COMPLETED) })
-        targets.forEach { enqueue(run.id, it.sourceId, DiscoveredPosting(it.url, it.company.ifBlank { sites.definition(it.sourceId).name }, it.title, it.location), false) }
+        targets.forEach { enqueue(run.id, it.sourceId, DiscoveredPosting(it.url, it.company.ifBlank { sites.definition(it.sourceId).name }, it.title, it.location)) }
         return run.id
     }
 
     @Transactional
-    fun enqueue(runId: String, sourceId: String, posting: DiscoveredPosting, filterTitle: Boolean = true): Boolean {
+    fun enqueue(runId: String, sourceId: String, posting: DiscoveredPosting): Boolean {
         val run = runs.findRun(runId) ?: throw ResourceNotFound("수집 실행을 찾을 수 없습니다.")
         require(run.active) { "종료된 실행에는 공고를 추가할 수 없습니다." }
         require(runs.sources(runId).any { it.sourceId == sourceId })
-        if (filterTitle && !DeveloperPostingRule.accepts(posting.title)) return false
         val adapter = sites.adapter(sourceId)
         val url = PostingUrl.normalize(posting.url)
         require(adapter.acceptsUrl(url)) { "수집기가 지원하지 않는 공고 주소입니다." }
