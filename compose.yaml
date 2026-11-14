@@ -1,6 +1,6 @@
 services:
   frontend:
-    build: .
+    build: ./frontend
     ports:
       - "127.0.0.1:15173:80"
     restart: unless-stopped

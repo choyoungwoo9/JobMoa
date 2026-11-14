@@ -23,3 +23,10 @@ artifacts/
 *.njsproj
 *.sln
 *.sw?
+
+# Kotlin / Gradle
+.gradle/
+.kotlin/
+build/
+backend/storage/
+.env
