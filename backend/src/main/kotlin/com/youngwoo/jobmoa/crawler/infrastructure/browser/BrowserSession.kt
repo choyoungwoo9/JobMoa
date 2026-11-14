@@ -22,6 +22,7 @@ class BrowserSession(private val properties: CrawlerProperties, private val limi
         try { return browser.newContext(Browser.NewContextOptions().setViewportSize(1440, 1000).setLocale("ko-KR").setTimezoneId("Asia/Seoul")).use { context ->
             val page = context.newPage()
             page.setDefaultTimeout(properties.navigationTimeout.toMillis().toDouble())
+            var navigationSite: String? = null
             block(object : BrowserPage {
                 override fun navigate(url: String) {
                     checkOwner()
@@ -30,8 +31,29 @@ class BrowserSession(private val properties: CrawlerProperties, private val limi
                         while (permit == null) { permit = limiter.tryAcquire(PostingUrl.siteKey(url)); if (permit == null) Thread.sleep(200) }
                     }
                     limiter.beforeNavigation(PostingUrl.siteKey(url))
+                    navigationSite = PostingUrl.siteKey(url)
                     val response = page.navigate(url, Page.NavigateOptions().setWaitUntil(WaitUntilState.DOMCONTENTLOADED))
                     check(response != null && response.status() in 200..399) { "페이지 응답 오류: ${response?.status()} $url" }
+                }
+                override fun readJson(url: String): Any? {
+                    checkOwner()
+                    val site = PostingUrl.siteKey(url)
+                    var requestPermit: AutoCloseable? = null
+                    try {
+                        // 현재 페이지와 다른 API 호스트도 별도 동시 요청 제한을 지킨다.
+                        if (site != navigationSite) {
+                            while (requestPermit == null) {
+                                requestPermit = limiter.tryAcquire(site)
+                                if (requestPermit == null) Thread.sleep(200)
+                            }
+                        }
+                        limiter.beforeNavigation(site)
+                        val response = context.request().get(url, RequestOptions.create().setTimeout(properties.navigationTimeout.toMillis().toDouble()))
+                        try {
+                            check(response.ok()) { "JSON 응답 오류: ${response.status()} $url" }
+                            return page.evaluate("body => JSON.parse(body)", response.text())
+                        } finally { response.dispose() }
+                    } finally { requestPermit?.close() }
                 }
                 override fun text(selector: String): String? { checkOwner(); return page.locator(selector).first().takeIf { it.count() > 0 }?.innerText()?.trim() }
                 override fun evaluate(script: String, argument: Any?): Any? { checkOwner(); return page.evaluate(script, argument) }

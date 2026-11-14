@@ -11,6 +11,7 @@ import java.time.OffsetDateTime
 @Component
 class CoupangRecruitmentSite : RecruitmentSite {
     override val definition = SourceDefinition("coupang", "쿠팡", "https://www.coupang.jobs/en/jobs/")
+    override val requiresWindowedBrowser = true
     private val boardUrl = "https://boards-api.greenhouse.io/v1/boards/coupang"
 
     override fun discover(browser: BrowserPage, emit: (DiscoveredPosting) -> Unit) {
@@ -69,10 +70,9 @@ class CoupangRecruitmentSite : RecruitmentSite {
         val id = Regex("(?:^|&)gh_jid=(\\d+)(?:&|$)").find(URI(posting.url).rawQuery.orEmpty())?.groupValues?.get(1)
             ?: error("쿠팡 상세 주소에 gh_jid가 없습니다.")
         // 원문에 렌더링된 내용과 공식 보드 본문을 대조한다. API만 성공해도 차단 화면을 캡처하지 않는다.
-        val response = browser.evaluate("""async id => {
-            const response = await fetch('https://boards-api.greenhouse.io/v1/boards/coupang/jobs/' + encodeURIComponent(id));
-            if (!response.ok) throw new Error('쿠팡 상세 API 응답 오류: ' + response.status);
-            const job = await response.json();
+        val job = browser.readJson("https://boards-api.greenhouse.io/v1/boards/coupang/jobs/$id") as? Map<*, *>
+            ?: error("쿠팡 상세 API 구조 변경")
+        val response = browser.evaluate("""job => {
             const decoded = new DOMParser().parseFromString(job.content || '', 'text/html').body.textContent || '';
             const documentBody = new DOMParser().parseFromString(decoded, 'text/html').body;
             documentBody.querySelectorAll('script,style').forEach(e => e.remove());
@@ -82,7 +82,7 @@ class CoupangRecruitmentSite : RecruitmentSite {
             const visible = normalize(document.body.innerText);
             const bodyBeginning = normalize(body).slice(0, 120);
             return {job, body, rendered: visible.includes(normalize(job.title)) && bodyBeginning.length > 40 && visible.includes(bodyBeginning)};
-        }""", id) as? Map<*, *> ?: error("쿠팡 상세 응답 형식 변경")
+        }""", job) as? Map<*, *> ?: error("쿠팡 상세 응답 형식 변경")
         val row = response["job"] as? Map<*, *> ?: error("쿠팡 상세 공고 정보 누락")
         val title = row["title"]?.toString().orEmpty()
         val departments = departmentNames(row)
@@ -96,6 +96,14 @@ class CoupangRecruitmentSite : RecruitmentSite {
         val closed = browser.evaluate("""() => Array.from(document.querySelectorAll('main h1, main h2, main [role="alert"], .job-closed, .job-expired')).some(e => /^(This job is no longer available|This job has expired|채용이 마감되었습니다|마감된 공고)[.!\s]*$/i.test(e.innerText.trim()))""") == true
         return ExtractedPosting(title, companyName(title, departments), (row["location"] as? Map<*, *>)?.get("name")?.toString().orEmpty().ifBlank { posting.location }, body,
             closed || deadline?.isBefore(Instant.now()) == true)
+    }
+
+    override fun prepareCapture(browser: BrowserPage, posting: DiscoveredPosting) {
+        // CAPTURE 체크포인트 재시도에서도 보안 확인 화면을 저장하지 않는다.
+        browser.waitFor("h1")
+        val expected = posting.title.replace(Regex("\\s+"), " ").trim()
+        val rendered = browser.text("h1").orEmpty().replace(Regex("\\s+"), " ").trim()
+        check(expected.isNotEmpty() && rendered == expected) { "쿠팡 캡처 화면에 실제 공고 제목이 없습니다: $rendered" }
     }
 
     override fun acceptsUrl(url: String): Boolean = runCatching {

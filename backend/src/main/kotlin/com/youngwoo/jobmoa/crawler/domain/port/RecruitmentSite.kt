@@ -5,6 +5,7 @@ import com.youngwoo.jobmoa.crawler.domain.model.*
 /** Site adapters contain discovery/extraction rules, never worker ownership. */
 interface RecruitmentSite {
     val definition: SourceDefinition
+    val requiresWindowedBrowser: Boolean get() = false
     val discoveryTargets: List<SourceDefinition> get() = listOf(definition)
     fun discover(browser: BrowserPage, emit: (DiscoveredPosting) -> Unit)
     fun discoverAt(browser: BrowserPage, listingUrl: String, emit: (DiscoveredPosting) -> Unit) { discover(browser, emit) }
@@ -17,6 +18,7 @@ interface RecruitmentSite {
 /** Keeps Playwright types out of the domain and adapters on their owning thread. */
 interface BrowserPage {
     fun navigate(url: String)
+    fun readJson(url: String): Any?
     fun text(selector: String): String?
     fun evaluate(script: String, argument: Any? = null): Any?
     fun waitFor(selector: String)

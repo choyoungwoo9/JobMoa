@@ -41,6 +41,7 @@ class CrawlerRuntime(private val properties: CrawlerProperties, private val task
 
     private fun workerLoop() {
         var browser: BrowserSession? = null
+        var browserHeadless: Boolean? = null
         var offset = 0
         try {
             while (running && !Thread.currentThread().isInterrupted) {
@@ -59,7 +60,16 @@ class CrawlerRuntime(private val properties: CrawlerProperties, private val task
                     val token = task.leaseToken!!
                     owned[task.id] = token
                     if (task.stage != CrawlStage.SAVE) {
-                        val session = browser ?: BrowserSession(properties, limiter).also { browser = it }
+                        val headless = properties.headless && !sources.adapter(task.sourceId).requiresWindowedBrowser
+                        // 사이트에 필요한 모드가 바뀌면 이전 브라우저를 정리한다. 작업자당 하나만 유지한다.
+                        if (browser != null && browserHeadless != headless) {
+                            browser.close()
+                            browser = null
+                        }
+                        val session = browser ?: BrowserSession(properties.copy(headless = headless), limiter).also {
+                            browser = it
+                            browserHeadless = headless
+                        }
                         session.withPage { page ->
                             page.navigate(task.url)
                             if (task.stage == CrawlStage.BODY) {
