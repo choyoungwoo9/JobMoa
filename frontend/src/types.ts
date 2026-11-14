@@ -17,6 +17,8 @@ export interface JobVersion {
   savedAt: string
   body: string
   captureAvailable: boolean
+  captureUrl?: string
+  bodyLoaded?: boolean
 }
 export interface Job {
   id: string
@@ -56,6 +58,9 @@ export interface SourceResult {
   failed: number | null
   recovered: number
   failures: Failure[]
+  succeeded?: number
+  total?: number
+  excluded?: number
 }
 export interface CollectionRun {
   id: string
@@ -64,6 +69,7 @@ export interface CollectionRun {
   results: SourceResult[]
   retryOf?: string
   retriedFailures?: string[]
+  progress?: { discoveryFinished: boolean; total: number; pending: number; processing: number; completed: number; failed: number; percent: number | null }
 }
 export interface DemoState {
   version: 1

@@ -53,7 +53,7 @@ export function JobDrawer({
       <div className="drawer-top">
         <span>
           <Icon name="file" size={17} />
-          저장된 공고<span className="sample-pill">샘플</span>
+          저장된 공고{!job.versions[0].captureUrl && <span className="sample-pill">샘플</span>}
         </span>
         <nav className="drawer-navigation" aria-label="공고 연속 탐색">
           <button
@@ -129,8 +129,7 @@ export function JobDrawer({
         <div className="inline-note">
           <Icon name="info" size={14} />
           <span>
-            열면 자동으로 읽음 처리해요. 샘플 링크는 기업의 공식 채용 홈으로
-            연결돼요.
+            열면 자동으로 읽음 처리해요. 원문은 새 탭에서 확인할 수 있어요.
           </span>
         </div>
         <div className="version-picker">
@@ -194,14 +193,14 @@ export function JobDrawer({
         >
           {tab === 'text' ? (
             <div className="saved-text">
-              {version.body ||
+              {version.bodyLoaded === false ? '저장된 본문을 불러오는 중이에요…' : version.body ||
                 '본문 추출에 실패했어요. 수집 기록에서 해당 단계를 재시도할 수 있어요.'}
             </div>
           ) : version.captureAvailable ? (
             <div className="capture-preview">
               <div>
                 <Icon name="image" size={15} />
-                <span>예시 이미지 · 실제 공고가 아니에요</span>
+                <span>{version.captureUrl ? '수집 시점의 원문 캡처' : '예시 이미지 · 실제 공고가 아니에요'}</span>
                 <button className="text-button" onClick={() => setZoomed(true)}>
                   캡처 확대
                   <Icon name="external" size={11} />
@@ -213,8 +212,8 @@ export function JobDrawer({
                 aria-label="캡처 이미지 확대"
               >
                 <img
-                  src={sampleCapture(job, version, revision)}
-                  alt={`${job.company} ${job.title} 버전 ${revision}의 예시 캡처 이미지`}
+                  src={version.captureUrl ?? sampleCapture(job, version, revision)}
+                  alt={`${job.company} ${job.title} 버전 ${revision} 캡처 이미지`}
                 />
               </button>
             </div>
@@ -241,7 +240,7 @@ export function JobDrawer({
         >
           <div className="drawer-top">
             <span id="capture-zoom-title">
-              {job.company} · 캡처 예시 v{revision}
+              {job.company} · 캡처 v{revision}
             </span>
             <button
               className="icon-button"
@@ -252,8 +251,8 @@ export function JobDrawer({
             </button>
           </div>
           <img
-            src={sampleCapture(job, version, revision)}
-            alt={`${job.title} 버전 ${revision} 확대 예시 이미지`}
+            src={version.captureUrl ?? sampleCapture(job, version, revision)}
+            alt={`${job.title} 버전 ${revision} 확대 이미지`}
           />
         </Modal>
       )}

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { SOURCES, dateLabel, sourceById, summarize } from './data'
 import type { FailureStage, SourceId } from './types'
 import { useCollection } from './useCollection'
@@ -11,7 +11,7 @@ import './App.css'
 
 const PAGE_SIZE = 8
 function App() {
-  const { data, notice, start, retryFailures, toggleRead, markRead, running } =
+  const { data, notice, start, retryFailures, toggleRead, markRead, running, demo, connected, error, availableSources, loadJob } =
     useCollection()
   const [view, setView] = useState<'jobs' | 'history'>('jobs')
   const [source, setSource] = useState<SourceId | 'all'>('all')
@@ -65,6 +65,9 @@ function App() {
     safePage * PAGE_SIZE,
   )
   const activeJob = data.jobs.find((job) => job.id === selectedJob)
+  useEffect(() => {
+    if (selectedJob) void loadJob(selectedJob)
+  }, [selectedJob, activeJob?.versions[0]?.id, loadJob])
   const changeSource = (id: SourceId | 'all') => {
     setSource(id)
     setView('jobs')
@@ -89,15 +92,15 @@ function App() {
     setView('history')
     setExpandedRuns((ids) => (ids.includes(id) ? ids : [id, ...ids]))
   }
-  const begin = (ids: SourceId[], failure: FailureStage | null) => {
-    const id = start(ids, failure)
+  const begin = async (ids: SourceId[], failure: FailureStage | null) => {
+    const id = await start(ids, failure)
     if (id) {
       setCollectOpen(false)
       setExpandedRuns((items) => [id, ...items])
     }
   }
-  const retry = (runId: string, ids?: string[]) => {
-    const id = retryFailures(runId, ids)
+  const retry = async (runId: string, ids?: string[]) => {
+    const id = await retryFailures(runId, ids)
     if (id) openRun(id)
   }
   const resetFilters = () => {
@@ -193,7 +196,7 @@ function App() {
           </div>
           <div className="sidebar-footer">
             <span>JobMoa</span>
-            <span>Frontend preview · v0.1</span>
+            <span>{demo ? 'Frontend preview' : 'Local workspace'} · v0.1</span>
           </div>
         </div>
       </aside>
@@ -208,8 +211,9 @@ function App() {
           <div className="topbar-right">
             <span className="preview-badge">
               <span />
-              화면 검토용 · 샘플 데이터
+              {demo ? '화면 검토용 · 샘플 데이터' : connected ? '로컬 DB 연결' : '백엔드 연결 중'}
             </span>
+            <a className="text-button" href={demo ? '/' : '/?demo=1'}>{demo ? '실제 공고' : '샘플 보기'}</a>
             <span className="avatar" aria-label="개인 워크스페이스">
               J
             </span>
@@ -237,7 +241,7 @@ function App() {
             </div>
             <button
               className="button primary collect-button"
-              disabled={running}
+              disabled={running || !connected}
               onClick={() => setCollectOpen(true)}
             >
               <Icon
@@ -249,6 +253,7 @@ function App() {
               {!running && <span className="button-plus">+</span>}
             </button>
           </div>
+          {error && <div className="backend-error" role="alert">{error} 연결을 자동으로 다시 확인하고 있어요.</div>}
           {view === 'jobs' ? (
             <>
               <section className="overview" aria-label="공고 요약">
@@ -300,7 +305,7 @@ function App() {
                       <Icon name="refresh" size={17} className="spin" />
                       <strong>새로운 공고를 모으고 있어요</strong>
                       <span>
-                        {latest.done} / {latestRun.results.length}개 기업군
+                        {latestRun.progress ? `${latestRun.progress.completed + latestRun.progress.failed} / ${latestRun.progress.total}개 공고 · ${latestRun.progress.discoveryFinished ? `${latestRun.progress.percent}%` : '목록 탐색 중'}` : `${latest.done} / ${latestRun.results.length}개 기업군`}
                       </span>
                       <button
                         className="text-button"
@@ -616,7 +621,7 @@ function App() {
                                   <span>
                                     캡처{' '}
                                     {job.versions[0].captureAvailable
-                                      ? '예시'
+                                      ? demo ? '예시' : '저장됨'
                                       : '미저장'}
                                   </span>
                                   <span className="saved-dot">·</span>
@@ -641,7 +646,7 @@ function App() {
                                   target="_blank"
                                   rel="noreferrer"
                                   aria-label={`${job.company} 공식 채용 사이트 열기`}
-                                  title="샘플: 공식 채용 홈으로 이동"
+                                  title={demo ? '샘플: 공식 채용 홈으로 이동' : '공고 원문 열기'}
                                 >
                                   <Icon name="external" size={16} />
                                 </a>
@@ -730,8 +735,7 @@ function App() {
               <div className="page-footnote">
                 <Icon name="info" size={14} />
                 <span>
-                  화면 검토용 샘플이며 실제 채용 여부와 무관해요. 마감 공고는
-                  보관되며 기본 목록에서 숨겨져요.
+                  {demo ? '화면 검토용 샘플이며 실제 채용 여부와 무관해요.' : '저장된 본문과 캡처를 보관해요. 최신 내용은 원문에서도 확인할 수 있어요.'} 마감 공고는 보관되며 기본 목록에서 숨겨져요.
                 </span>
               </div>
             </>
@@ -773,8 +777,7 @@ function App() {
               <div className="page-footnote">
                 <Icon name="info" size={14} />
                 <span>
-                  현재 기록은 샘플 시뮬레이션이에요. 공고·읽음 표시·수집 이력은
-                  이 브라우저에 저장돼요.
+                  {demo ? '현재 기록은 샘플 시뮬레이션이며 이 브라우저에 저장돼요.' : '공고·읽음 표시·수집 이력은 로컬 DB에 저장돼요. 성공한 결과는 일부 실패와 관계없이 보관해요.'}
                 </span>
               </div>
             </section>
@@ -787,7 +790,7 @@ function App() {
           </footer>
         </main>
       </div>
-      {collectOpen && <CollectDialog onClose={closeCollect} onStart={begin} />}
+      {collectOpen && <CollectDialog onClose={closeCollect} onStart={begin} demo={demo} availableSources={availableSources} />}
       {notice && (
         <div className="toast" role="status">
           <Icon name="check" size={17} />

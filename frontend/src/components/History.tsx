@@ -60,7 +60,7 @@ export function RunCard({
           <strong>
             {dateLabel(run.startedAt, true)}
             <span className="sample-pill">
-              {run.retryOf ? '재시도' : '샘플'}
+              {run.retryOf ? '재시도' : run.progress ? '실제 수집' : '샘플'}
             </span>
           </strong>
           <small>
@@ -97,12 +97,17 @@ export function RunCard({
               </button>
             </div>
           )}
+          {run.progress && <div className="collection-progress">
+            <div><strong>{run.progress.discoveryFinished ? '공고 처리' : '공고 목록 탐색 중'}</strong><span>{run.progress.completed + run.progress.failed} / {run.progress.total}개 · 처리 중 {run.progress.processing} · 대기 {run.progress.pending}</span></div>
+            <progress aria-label="전체 수집 진행률" max={100} value={run.progress.percent ?? undefined} />
+          </div>}
           <div className="table-scroll">
             <table className="results-table">
               <thead>
                 <tr>
                   <th>기업군</th>
                   <th>결과</th>
+                  {run.progress && <th>성공</th>}
                   <th>신규</th>
                   <th>변경</th>
                   <th>동일</th>
@@ -131,6 +136,7 @@ export function RunCard({
                         </small>
                       )}
                     </td>
+                    {run.progress && <td>{result.status === 'failed' && !result.total ? '—' : result.succeeded ?? 0}{!!result.excluded && <small> · {result.excluded} 제외</small>}</td>}
                     <td>{result.added ?? '—'}</td>
                     <td>{result.changed ?? '—'}</td>
                     <td>{result.identical ?? '—'}</td>
@@ -240,7 +246,7 @@ export function RunCard({
                         </div>
                       </dl>
                       <span className="error-message-label">
-                        오류 메시지 원문 · 샘플
+                        오류 메시지 원문{!run.progress && ' · 샘플'}
                       </span>
                       <pre>{failure.error}</pre>
                       <div className="failure-actions">

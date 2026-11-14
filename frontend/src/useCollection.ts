@@ -1,300 +1,90 @@
-import { useEffect, useRef, useState } from 'react'
-import {
-  emptyResult,
-  loadDemo,
-  makeSampleJob,
-  sampleBody,
-  saveDemo,
-  sourceById,
-} from './data'
-import type { CollectionRun, Failure, FailureStage, SourceId } from './types'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { DemoState, FailureStage, Job, SourceId } from './types'
+import { useDemoCollection } from './useDemoCollection'
 
-// Frontend-only simulator. The later API implementation can replace this hook.
-export function useCollection() {
-  const [data, setData] = useState(loadDemo)
+interface BackendState extends DemoState {
+  sources: { id: SourceId; available: boolean }[]
+}
+const initial: BackendState = { version: 1, jobs: [], runs: [], sources: [] }
+function merge(next: BackendState, previous: BackendState): BackendState {
+  const loaded = new Map(previous.jobs.flatMap(job => job.versions.filter(v => v.bodyLoaded).map(v => [v.id, v] as const)))
+  return { ...next, jobs: next.jobs.map(job => ({ ...job, versions: job.versions.map(v => loaded.has(v.id) ? { ...v, body: loaded.get(v.id)!.body, bodyLoaded: true } : v) })) }
+}
+async function request<T>(url: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(url, { ...options, headers: { 'Content-Type': 'application/json', ...options?.headers } })
+  if (!response.ok) {
+    const body = await response.json().catch(() => null)
+    throw new Error(body?.message ?? `요청 실패 (${response.status})`)
+  }
+  return response.status === 204 ? undefined as T : response.json()
+}
+
+function useBackendCollection() {
+  const [data, setData] = useState<BackendState>(initial)
+  const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [connected, setConnected] = useState(false)
+  const [busy, setBusy] = useState(false)
   const locked = useRef(false)
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const loading = useRef(new Set<string>())
+  const loadJob = useCallback(async (id: string) => {
+    if (loading.current.has(id)) return
+    loading.current.add(id)
+    try {
+      const job = await request<Job>(`/api/postings/${id}`)
+      setData(current => ({ ...current, jobs: current.jobs.map(existing => existing.id === id ? { ...job, read: existing.read, latestChange: existing.latestChange } : existing) }))
+    } catch (e) { setNotice(e instanceof Error ? e.message : '본문을 불러오지 못했어요.') }
+    finally { loading.current.delete(id) }
+  }, [])
   useEffect(() => {
-    saveDemo(data)
-  }, [data])
-  useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current)
-    },
-    [],
-  )
+    let disposed = false
+    let timer: ReturnType<typeof setTimeout>
+    const controller = new AbortController()
+    async function poll() {
+      try {
+        const state = await request<BackendState>('/api/state', { signal: controller.signal })
+        if (!disposed) { setData(current => merge(state, current)); setError(''); setConnected(true) }
+      } catch (e) {
+        if (!disposed) { setConnected(false); setError(`백엔드에 연결하지 못했어요. ${e instanceof Error ? e.message : ''}`) }
+      } finally { if (!disposed) timer = setTimeout(poll, 1000) }
+    }
+    void poll()
+    return () => { disposed = true; controller.abort(); clearTimeout(timer) }
+  }, [])
   useEffect(() => {
     if (!notice) return
-    const t = setTimeout(() => setNotice(''), 4500)
-    return () => clearTimeout(t)
+    const timer = setTimeout(() => setNotice(''), 4500)
+    return () => clearTimeout(timer)
   }, [notice])
-
-  function start(
-    ids: SourceId[],
-    failureStage: FailureStage | null = null,
-    retry?: { runId: string; failures: Failure[] },
-  ) {
-    if (locked.current || !ids.length) {
-      setNotice('현재 수집이 끝난 뒤 다시 시도해주세요.')
-      return null
-    }
-    locked.current = true
-    const runId = String(Date.now())
-    const run: CollectionRun = {
-      id: runId,
-      startedAt: new Date().toISOString(),
-      results: ids.map(emptyResult),
-      ...(retry
-        ? {
-            retryOf: retry.runId,
-            retriedFailures: retry.failures.map((f) => f.id),
-          }
-        : {}),
-    }
-    setData((current) => ({
-      ...current,
-      jobs: current.jobs.map((job) => ({ ...job, latestChange: null })),
-      runs: [run, ...current.runs],
-    }))
-    function process(index: number) {
-      const sourceId = ids[index]
-      setData((current) => ({
-        ...current,
-        runs: current.runs.map((item) =>
-          item.id === runId
-            ? {
-                ...item,
-                results: item.results.map((r) =>
-                  r.sourceId === sourceId ? { ...r, status: 'running' } : r,
-                ),
-              }
-            : item,
-        ),
-      }))
-      timer.current = setTimeout(() => {
-        const at = new Date().toISOString()
-        setData((current) => {
-          let jobs = current.jobs
-          const recovered =
-            retry?.failures.filter((f) => f.sourceId === sourceId) ?? []
-          const result = {
-            ...emptyResult(sourceId),
-            status: 'success' as const,
-            added: 0,
-            changed: 0,
-            identical: 0,
-            failed: 0,
-            recovered: recovered.length,
-          }
-          let finalResult: (typeof run.results)[number] = result
-          if (retry) {
-            for (const failure of recovered) {
-              if (failure.stage === 'list' || failure.stage === 'save') {
-                // A save retry reuses the already rendered/extracted assets.
-                const job =
-                  failure.pendingJob ??
-                  makeSampleJob(
-                    sourceId,
-                    `${runId}-${failure.id}`,
-                    failure.stage === 'save' ? failure.at : at,
-                  )
-                if (!failure.pendingJob && failure.title) {
-                  job.title = failure.title
-                  job.versions[0].body = sampleBody(job.company, job.title)
-                }
-                jobs = [job, ...jobs]
-                result.added += 1
-              } else {
-                jobs = jobs.map((job) =>
-                  job.id !== failure.jobId
-                    ? job
-                    : {
-                        ...job,
-                        versions: job.versions.map((version) =>
-                          version.id !== failure.versionId
-                            ? version
-                            : {
-                                ...version,
-                                captureAvailable: true,
-                                ...(failure.stage === 'body'
-                                  ? { body: sampleBody(job.company, job.title) }
-                                  : {}),
-                              },
-                        ),
-                      },
-                )
-              }
-            }
-          } else {
-            // One source can fail without discarding the other successful sources.
-            const stage =
-              failureStage && index === 0
-                ? failureStage
-                : failureStage && ids.length > 1 && index === ids.length - 1
-                  ? 'list'
-                  : null
-            if (stage === 'list') {
-              const failure: Failure = {
-                id: `${runId}-${sourceId}-list`,
-                sourceId,
-                company: sourceById(sourceId).name,
-                url: sourceById(sourceId).url,
-                stage,
-                at,
-                attempts: 1,
-                resolved: false,
-                error:
-                  'HTTP 503 Service Unavailable\nStage: list\nSample diagnostic — no request was sent.',
-              }
-              finalResult = {
-                ...emptyResult(sourceId),
-                status: 'failed',
-                failures: [failure],
-              }
-            } else {
-              const newJob = makeSampleJob(
-                sourceId,
-                runId,
-                at,
-                stage !== 'body' && stage !== 'capture',
-              )
-              if (stage === 'body') newJob.versions[0].body = ''
-              const existing = jobs.filter(
-                (j) => j.sourceId === sourceId && !j.closed,
-              )
-              const changedJob = existing[0]
-              jobs = jobs.map((job) =>
-                job.id !== changedJob?.id
-                  ? job
-                  : {
-                      ...job,
-                      latestChange: 'changed',
-                      versions: [
-                        {
-                          id: `${runId}-${job.id}-v${job.versions.length + 1}`,
-                          savedAt: at,
-                          captureAvailable: true,
-                          body: sampleBody(
-                            job.company,
-                            job.title,
-                            job.versions.length + 1,
-                          ),
-                        },
-                        ...job.versions,
-                      ],
-                    },
-              )
-              if (stage !== 'save') jobs = [newJob, ...jobs]
-              finalResult = {
-                ...result,
-                status: stage ? 'partial' : 'success',
-                added: stage === 'save' ? 0 : 1,
-                changed: changedJob ? 1 : 0,
-                identical: Math.max(0, existing.length - (changedJob ? 1 : 0)),
-                failed: stage ? 1 : 0,
-                failures: stage
-                  ? [
-                      {
-                        id: `${runId}-${sourceId}-${stage}`,
-                        sourceId,
-                        company: newJob.company,
-                        title: newJob.title,
-                        url: newJob.url,
-                        stage,
-                        at,
-                        attempts: 1,
-                        resolved: false,
-                        ...(stage === 'save'
-                          ? { pendingJob: newJob }
-                          : {
-                              jobId: newJob.id,
-                              versionId: newJob.versions[0].id,
-                            }),
-                        error: `${stage === 'capture' ? 'TimeoutError: page.screenshot: Timeout 30000ms exceeded.' : stage === 'body' ? 'ExtractionError: Main content selector returned no text.' : 'StorageError: Asset write failed.'}\nStage: ${stage}\nSample diagnostic — no request was sent.`,
-                      },
-                    ]
-                  : [],
-              }
-            }
-          }
-          const resolvedIds = new Set(recovered.map((f) => f.id))
-          return {
-            ...current,
-            jobs,
-            runs: current.runs.map((item) =>
-              item.id === runId
-                ? {
-                    ...item,
-                    ...(index === ids.length - 1 ? { finishedAt: at } : {}),
-                    results: item.results.map((r) =>
-                      r.sourceId === sourceId ? finalResult : r,
-                    ),
-                  }
-                : retry && item.id === retry.runId
-                  ? {
-                      ...item,
-                      results: item.results.map((r) => ({
-                        ...r,
-                        failures: r.failures.map((f) =>
-                          resolvedIds.has(f.id)
-                            ? { ...f, resolved: true, attempts: f.attempts + 1 }
-                            : f,
-                        ),
-                      })),
-                    }
-                  : item,
-            ),
-          }
-        })
-        if (index + 1 < ids.length) process(index + 1)
-        else {
-          locked.current = false
-          timer.current = null
-          setNotice(
-            retry
-              ? '실패한 단계부터 재시도했어요. 수집 기록에서 결과를 확인하세요.'
-              : '수집 미리보기를 마쳤어요. 샘플 공고와 버전이 추가됐어요.',
-          )
-        }
-      }, 750)
-    }
-    process(0)
-    return runId
+  async function launch(url: string, body: object) {
+    if (locked.current) return null
+    locked.current = true; setBusy(true)
+    try {
+      const result = await request<{ id: string }>(url, { method: 'POST', body: JSON.stringify(body) })
+      const state = await request<BackendState>('/api/state')
+      setData(current => merge(state, current))
+      return result.id
+    } catch (e) { setNotice(e instanceof Error ? e.message : '실행에 실패했어요.'); return null }
+    finally { locked.current = false; setBusy(false) }
   }
-  function retryFailures(runId: string, ids?: string[]) {
-    const failures =
-      data.runs
-        .find((run) => run.id === runId)
-        ?.results.flatMap((r) => r.failures)
-        .filter((f) => !f.resolved && (!ids || ids.includes(f.id))) ?? []
-    if (!failures.length) return null
-    return start([...new Set(failures.map((f) => f.sourceId))], null, {
-      runId,
-      failures,
-    })
+  async function read(id: string, value: boolean) {
+    try {
+      await request(`/api/postings/${id}/read`, { method: 'PATCH', body: JSON.stringify({ read: value }) })
+      const state = await request<BackendState>('/api/state')
+      setData(current => merge(state, current))
+    } catch (e) { setNotice(e instanceof Error ? e.message : '읽음 저장에 실패했어요.') }
   }
-  const toggleRead = (id: string) =>
-    setData((current) => ({
-      ...current,
-      jobs: current.jobs.map((job) =>
-        job.id === id ? { ...job, read: !job.read } : job,
-      ),
-    }))
-  const markRead = (id: string) =>
-    setData((current) => ({
-      ...current,
-      jobs: current.jobs.map((job) =>
-        job.id === id ? { ...job, read: true } : job,
-      ),
-    }))
   return {
-    data,
-    notice,
-    start,
-    retryFailures,
-    toggleRead,
-    markRead,
-    running: Boolean(data.runs[0] && !data.runs[0].finishedAt),
+    data, notice, connected, error, demo: false, loadJob,
+    availableSources: data.sources.filter(s => s.available).map(s => s.id),
+    start: (ids: SourceId[], _failure: FailureStage | null = null) => launch('/api/collections', { sourceIds: ids }),
+    retryFailures: (id: string, ids?: string[]) => launch(`/api/collections/${id}/retry`, { failureIds: ids }),
+    toggleRead: (id: string) => { void read(id, !data.jobs.find(j => j.id === id)?.read) },
+    markRead: (id: string) => { if (!data.jobs.find(j => j.id === id)?.read) void read(id, true) },
+    running: busy || data.runs.some(r => !r.finishedAt),
   }
 }
+
+// 명시적으로 선택한 샘플 화면만 기존 시뮬레이터를 사용한다.
+export const useCollection = new URLSearchParams(window.location.search).get('demo') === '1'
+  ? useDemoCollection : useBackendCollection
