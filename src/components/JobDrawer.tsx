@@ -40,7 +40,7 @@ export function JobDrawer({
   onPrevious: () => void
   onNext: () => void
 }) {
-  const [tab, setTab] = useState<'capture' | 'text'>('capture')
+  const [tab, setTab] = useState<'capture' | 'text'>('text')
   const [versionId, setVersionId] = useState(job.versions[0].id)
   const [zoomed, setZoomed] = useState(false)
   const closeZoom = useCallback(() => setZoomed(false), [])
@@ -122,7 +122,7 @@ export function JobDrawer({
             target="_blank"
             rel="noreferrer"
           >
-            원문 보기
+            원문 새 탭
             <Icon name="external" size={14} />
           </a>
         </div>
@@ -163,17 +163,6 @@ export function JobDrawer({
         >
           <button
             role="tab"
-            id="capture-tab"
-            aria-selected={tab === 'capture'}
-            aria-controls="saved-content"
-            className={tab === 'capture' ? 'active' : ''}
-            onClick={() => setTab('capture')}
-          >
-            <Icon name="image" size={17} />
-            캡처 이미지
-          </button>
-          <button
-            role="tab"
             id="text-tab"
             aria-selected={tab === 'text'}
             aria-controls="saved-content"
@@ -181,7 +170,18 @@ export function JobDrawer({
             onClick={() => setTab('text')}
           >
             <Icon name="file" size={17} />
-            본문 텍스트
+            저장된 본문
+          </button>
+          <button
+            role="tab"
+            id="capture-tab"
+            aria-selected={tab === 'capture'}
+            aria-controls="saved-content"
+            className={tab === 'capture' ? 'active' : ''}
+            onClick={() => setTab('capture')}
+          >
+            <Icon name="image" size={17} />
+            캡처 보기
           </button>
           <span>
             v{revision} · {dateLabel(version.savedAt)}

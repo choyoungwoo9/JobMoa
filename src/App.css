@@ -3265,3 +3265,15 @@ dialog::backdrop {
     scroll-behavior: auto !important;
   }
 }
+
+/* Link retries back to their original collection record. */
+.retry-note {
+  flex-wrap: wrap;
+}
+.retry-note .text-button {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.run-card {
+  scroll-margin-top: 16px;
+}
