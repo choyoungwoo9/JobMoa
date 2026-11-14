@@ -67,6 +67,7 @@ class CrawlerRuntime(private val properties: CrawlerProperties, private val task
                                 taskService.body(task.id, token, extracted)
                             }
                             // 캡처 재시도는 저장된 본문을 유지하고 렌더링·캡처만 수행한다.
+                            sources.adapter(task.sourceId).prepareCapture(page, DiscoveredPosting(task.url, task.company, task.title, task.location))
                             val path = captures.save(page.capture())
                             taskService.captured(task.id, token, path)
                         }

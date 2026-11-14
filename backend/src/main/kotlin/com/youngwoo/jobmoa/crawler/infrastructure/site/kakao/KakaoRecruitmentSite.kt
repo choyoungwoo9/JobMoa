@@ -70,6 +70,10 @@ class KakaoRecruitmentSite : RecruitmentSite {
             job["locationName"]?.toString().orEmpty(), body, job["closeFlag"] == true || job["statusCode"] == "CLOSED")
     }
 
+    override fun prepareCapture(browser: BrowserPage, posting: DiscoveredPosting) {
+        KakaoAffiliatePortals.prepareCapture(browser, posting)
+    }
+
     override fun canonicalizeUrl(url: String): String = runCatching {
         val uri = URI(url)
         val legacyHosts = setOf("career.kakaostyle.com", "kakaovxrecruiter.ninehire.site")

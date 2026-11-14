@@ -9,6 +9,7 @@ interface RecruitmentSite {
     fun discover(browser: BrowserPage, emit: (DiscoveredPosting) -> Unit)
     fun discoverAt(browser: BrowserPage, listingUrl: String, emit: (DiscoveredPosting) -> Unit) { discover(browser, emit) }
     fun extract(browser: BrowserPage, posting: DiscoveredPosting): ExtractedPosting
+    fun prepareCapture(browser: BrowserPage, posting: DiscoveredPosting) {}
     fun canonicalizeUrl(url: String): String = url
     fun acceptsUrl(url: String): Boolean
 }

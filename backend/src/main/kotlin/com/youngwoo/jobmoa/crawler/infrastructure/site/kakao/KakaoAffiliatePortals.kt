@@ -208,24 +208,32 @@ internal object KakaoAffiliatePortals {
         if (!ninehireDeveloper(target.id, job)) throw PostingExcluded("${target.name} 직무 규칙에서 제외: ${job["externalTitle"]}")
         val body = htmlText(browser, result["html"]?.toString().orEmpty())
         check(body.length >= 120) { "Ninehire 본문 누락" }
-        // Ninehire는 본문을 내부 스크롤 영역에 넣는다. 전체 페이지 캡처에 본문 전체가 포함되도록 펼친다.
-        browser.evaluate("""() => {
-            for (const element of document.querySelectorAll('*')) {
-                const style = getComputedStyle(element);
-                if (element.clientHeight > 100 && element.scrollHeight > element.clientHeight + 50 && /auto|scroll/.test(style.overflowY)) {
-                    const height = element.scrollHeight;
-                    element.style.setProperty('height', height + 'px', 'important');
-                    element.style.setProperty('min-height', height + 'px', 'important');
-                    element.style.setProperty('max-height', 'none', 'important');
-                    element.style.setProperty('flex', '0 0 auto', 'important');
-                    element.style.setProperty('overflow', 'visible', 'important');
-                }
-            }
-            document.documentElement.style.setProperty('overflow', 'visible', 'important');
-            document.body.style.setProperty('overflow', 'visible', 'important');
-        }""")
         val closed = job["status"] in setOf("closed", "finished", "ended") || job["closedAt"] != null || deadlinePassed(job["endAt"]?.toString())
         return ExtractedPosting(job["externalTitle"].toString(), target.name, securitiesLocations(job), body, closed)
+    }
+
+    /** 새 수집과 CAPTURE 단계 재시도 모두 같은 원본 화면 변형을 적용한다. */
+    fun prepareCapture(browser: BrowserPage, posting: DiscoveredPosting) {
+        if (target(posting.url)?.id !in ninehireIds) return
+        browser.waitFor("#__NEXT_DATA__")
+        browser.evaluate("""() => {
+            // Ninehire 본문은 absolute 내부 스크롤 + overflow:hidden 조상 안에 있다.
+            // 본문과 조상을 함께 펼쳐야 전체 페이지 PNG가 마지막 문단까지 포함된다.
+            const panes = [...document.querySelectorAll('*')].filter(element => {
+                const style = getComputedStyle(element);
+                return element.clientHeight > 100 && element.scrollHeight > element.clientHeight + 50 && /auto|scroll/.test(style.overflowY);
+            });
+            for (const pane of panes) {
+                pane.style.setProperty('position', 'relative', 'important');
+                for (let element = pane; element; element = element.parentElement) {
+                    element.style.setProperty('height', 'auto', 'important');
+                    element.style.setProperty('min-height', '0', 'important');
+                    element.style.setProperty('max-height', 'none', 'important');
+                    element.style.setProperty('overflow', 'visible', 'important');
+                    element.style.setProperty('flex', '0 0 auto', 'important');
+                }
+            }
+        }""")
     }
 
     private fun ninehireDeveloper(portal: String, job: Map<*, *>): Boolean {
