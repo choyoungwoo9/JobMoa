@@ -20,7 +20,7 @@ class PostingRepositoryImpl(
     override fun versions(id: Long): List<PostingVersion> = versions.findAllByPostingIdOrderBySavedAtDescIdDesc(id).map { it.domain() }
     override fun saveVersion(version: PostingVersion): PostingVersion = versions.saveAndFlush(version.entity()).domain()
     override fun markRead(id: Long, read: Boolean) {
-        val entity = postings.findById(id).orElseThrow { ResourceNotFound("공고를 찾을 수 없습니다.") }
+        val entity = postings.lockById(id) ?: throw ResourceNotFound("공고를 찾을 수 없습니다.")
         entity.read = read
     }
 }
