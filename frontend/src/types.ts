@@ -6,6 +6,16 @@ export type SourceId =
   | 'daangn'
   | 'line'
   | 'woowa'
+export interface Category {
+  id: string
+  name: string
+}
+export interface Company {
+  id: string
+  sourceId: SourceId
+  name: string
+  supportedCategoryIds: string[]
+}
 export interface Source {
   id: SourceId
   name: string
@@ -21,6 +31,7 @@ export interface JobVersion {
   bodyLoaded?: boolean
 }
 export interface Job {
+  categories?: string[]
   id: string
   sourceId: SourceId
   company: string
@@ -63,6 +74,8 @@ export interface SourceResult {
   excluded?: number
 }
 export interface CollectionRun {
+  categoryId?: string
+  companyIds?: string[]
   id: string
   startedAt: string
   finishedAt?: string

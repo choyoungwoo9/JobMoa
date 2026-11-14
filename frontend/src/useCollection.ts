@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { DemoState, FailureStage, Job, SourceId } from './types'
+import type { Category, Company, DemoState, FailureStage, Job, SourceId } from './types'
 import { useDemoCollection } from './useDemoCollection'
+import { CATEGORIES } from './data'
 
 interface BackendState extends DemoState {
+  categories?: Category[]
+  companies?: Company[]
   sources: { id: SourceId; available: boolean }[]
 }
 const initial: BackendState = { version: 1, jobs: [], runs: [], sources: [] }
@@ -77,7 +80,9 @@ function useBackendCollection() {
   return {
     data, notice, connected, error, demo: false, loadJob,
     availableSources: data.sources.filter(s => s.available).map(s => s.id),
-    start: (ids: SourceId[], _failure: FailureStage | null = null) => launch('/api/collections', { sourceIds: ids }),
+    categories: data.categories ?? CATEGORIES,
+    companies: data.companies ?? [],
+    start: (ids: SourceId[], _failure: FailureStage | null = null, categoryId = 'all', companyIds?: string[]) => launch('/api/collections', { sourceIds: ids, categoryId, companyIds }),
     retryFailures: (id: string, ids?: string[]) => launch(`/api/collections/${id}/retry`, { failureIds: ids }),
     toggleRead: (id: string) => { void read(id, !data.jobs.find(j => j.id === id)?.read) },
     markRead: (id: string) => { if (!data.jobs.find(j => j.id === id)?.read) void read(id, true) },

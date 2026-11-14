@@ -384,3 +384,6 @@ export function summarize(run: CollectionRun) {
           : 'success',
   } as const
 }
+
+export const CATEGORIES = [{ id: 'all', name: '전체 개발 공고' }, { id: 'web-backend', name: '웹 백엔드' }]
+export const categoryName = (id = 'all') => CATEGORIES.find(category => category.id === id)?.name ?? id

@@ -1,4 +1,5 @@
 import {
+  categoryName,
   dateLabel,
   durationLabel,
   sourceById,
@@ -64,7 +65,7 @@ export function RunCard({
             </span>
           </strong>
           <small>
-            {run.results.length}개 기업군 · {durationLabel(run)}
+            {categoryName(run.categoryId)} · {run.results.length}개 기업군{run.companyIds?.length ? ` · ${run.companyIds.length}개 기업` : ''} · {durationLabel(run)}
             {!run.finishedAt && ` · ${summary.done}/${run.results.length} 완료`}
           </small>
         </span>

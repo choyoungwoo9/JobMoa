@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { SOURCES, dateLabel, sourceById, summarize } from './data'
+import { SOURCES, categoryName, dateLabel, sourceById, summarize } from './data'
 import type { FailureStage, SourceId } from './types'
 import { useCollection } from './useCollection'
 import { BrandMark } from './components/BrandMark'
@@ -11,9 +11,10 @@ import './App.css'
 
 const PAGE_SIZE = 8
 function App() {
-  const { data, notice, start, retryFailures, toggleRead, markRead, running, demo, connected, error, availableSources, loadJob } =
+  const { data, notice, start, retryFailures, toggleRead, markRead, running, demo, connected, error, availableSources, categories, companies, loadJob } =
     useCollection()
   const [view, setView] = useState<'jobs' | 'history'>('jobs')
+  const [categoryId, setCategoryId] = useState('all')
   const [source, setSource] = useState<SourceId | 'all'>('all')
   const [tab, setTab] = useState<'all' | 'unread' | 'new'>('all')
   const [query, setQuery] = useState('')
@@ -28,16 +29,18 @@ function App() {
   const closeJob = useCallback(() => setSelectedJob(null), [])
   const latestRun = data.runs[0]
   const latest = latestRun ? summarize(latestRun) : null
-  const available = data.jobs.filter((job) => includeClosed || !job.closed)
+  const categoryJobs = data.jobs.filter(job => categoryId === 'all' || job.categories?.includes(categoryId))
+  const available = categoryJobs.filter((job) => includeClosed || !job.closed)
   const unread = available.filter((job) => !job.read).length
   const newCount = available.filter((job) => job.latestChange === 'new').length
-  const closedCount = data.jobs.filter((job) => job.closed).length
+  const closedCount = categoryJobs.filter((job) => job.closed).length
 
   const filtered = useMemo(
     () =>
       data.jobs
         .filter(
           (job) =>
+            (categoryId === 'all' || !!job.categories?.includes(categoryId)) &&
             (includeClosed || !job.closed) &&
             (source === 'all' || job.sourceId === source) &&
             (tab !== 'unread' || !job.read) &&
@@ -53,7 +56,7 @@ function App() {
               ? a.firstSeen.localeCompare(b.firstSeen)
               : b.firstSeen.localeCompare(a.firstSeen),
         ),
-    [data.jobs, includeClosed, source, tab, query, sort],
+    [data.jobs, categoryId, includeClosed, source, tab, query, sort],
   )
   const listJobs = selectedJob
     ? browseQueue.flatMap((id) => data.jobs.find((job) => job.id === id) ?? [])
@@ -92,8 +95,8 @@ function App() {
     setView('history')
     setExpandedRuns((ids) => (ids.includes(id) ? ids : [id, ...ids]))
   }
-  const begin = async (ids: SourceId[], failure: FailureStage | null) => {
-    const id = await start(ids, failure)
+  const begin = async (ids: SourceId[], failure: FailureStage | null, selectedCategory: string, companyIds: string[]) => {
+    const id = await start(ids, failure, selectedCategory, companyIds)
     if (id) {
       setCollectOpen(false)
       setExpandedRuns((items) => [id, ...items])
@@ -228,7 +231,7 @@ function App() {
               <h1>
                 {view === 'jobs'
                   ? source === 'all'
-                    ? '공고 모아보기'
+                    ? categoryId === 'all' ? '공고 모아보기' : `${categoryName(categoryId)} 공고`
                     : `${sourceById(source).name} 공고`
                   : '수집 기록'}
                 <span className="heading-dot">.</span>
@@ -249,13 +252,16 @@ function App() {
                 size={18}
                 className={running ? 'spin' : ''}
               />
-              {running ? '공고 수집 중' : '공고 수집'}
+              {running ? '공고 수집 중' : categoryId === 'all' ? '공고 수집' : `${categoryName(categoryId)} 수집`}
               {!running && <span className="button-plus">+</span>}
             </button>
           </div>
           {error && <div className="backend-error" role="alert">{error} 연결을 자동으로 다시 확인하고 있어요.</div>}
           {view === 'jobs' ? (
             <>
+              <div className="category-tabs" role="tablist" aria-label="공고 분야">
+                {categories.map(category => <button key={category.id} role="tab" aria-selected={categoryId === category.id} className={categoryId === category.id ? 'active' : ''} onClick={() => { setCategoryId(category.id); setPage(1); setSelectedJob(null) }}>{category.name}<span>{data.jobs.filter(job => (includeClosed || !job.closed) && (category.id === 'all' || job.categories?.includes(category.id))).length}</span></button>)}
+              </div>
               <section className="overview" aria-label="공고 요약">
                 <div className="overview-intro">
                   <span className="overview-art">
@@ -275,7 +281,7 @@ function App() {
                 <div className="overview-stat">
                   <span>모아둔 공고</span>
                   <strong>
-                    {data.jobs.length}
+                    {categoryJobs.length}
                     <small>개</small>
                   </strong>
                 </div>
@@ -303,7 +309,7 @@ function App() {
                   >
                     <div>
                       <Icon name="refresh" size={17} className="spin" />
-                      <strong>새로운 공고를 모으고 있어요</strong>
+                      <strong>{categoryName(latestRun.categoryId)}를 모으고 있어요</strong>
                       <span>
                         {latestRun.progress ? `${latestRun.progress.completed + latestRun.progress.failed} / ${latestRun.progress.total}개 공고 · ${latestRun.progress.discoveryFinished ? `${latestRun.progress.percent}%` : '목록 탐색 중'}` : `${latest.done} / ${latestRun.results.length}개 기업군`}
                       </span>
@@ -339,7 +345,7 @@ function App() {
                     <div className="progress-track">
                       <div
                         style={{
-                          width: `${Math.max(3, (latest.done / latestRun.results.length) * 100)}%`,
+                          width: `${Math.max(3, latestRun.progress?.percent ?? (latest.done / latestRun.results.length) * 100)}%`,
                         }}
                       />
                     </div>
@@ -353,7 +359,7 @@ function App() {
                       <span
                         className={`tiny-dot ${latest.failed ? 'warning' : ''}`}
                       />
-                      마지막 수집 <b>{dateLabel(latestRun.startedAt, true)}</b>
+                      {categoryName(latestRun.categoryId)} · 마지막 수집 <b>{dateLabel(latestRun.startedAt, true)}</b>
                       <i />
                       신규 <strong>{latest.added}</strong> · 변경{' '}
                       <strong>{latest.changed}</strong>
@@ -627,6 +633,7 @@ function App() {
                                   <span className="saved-dot">·</span>
                                   <Icon name="file" size={12} />
                                   <span>본문</span>
+                                  {job.categories?.map(id => <span className="job-category" key={id}>{categoryName(id)}</span>)}
                                   {job.versions.length > 1 && (
                                     <>
                                       <span className="saved-dot">·</span>
@@ -663,7 +670,7 @@ function App() {
                         <Icon name="search" size={28} />
                       </span>
                       <h3>조건에 맞는 공고가 없어요</h3>
-                      <p>검색어나 선택한 기업군을 바꿔보세요.</p>
+                      <p>{!categoryJobs.length ? `${categoryName(categoryId)} 수집을 시작해 공고를 모아보세요.` : '검색어나 선택한 기업군을 바꿔보세요.'}</p>
                       <button
                         className="button secondary small"
                         onClick={resetFilters}
@@ -790,7 +797,7 @@ function App() {
           </footer>
         </main>
       </div>
-      {collectOpen && <CollectDialog onClose={closeCollect} onStart={begin} demo={demo} availableSources={availableSources} />}
+      {collectOpen && <CollectDialog onClose={closeCollect} onStart={begin} demo={demo} availableSources={availableSources} categories={categories} companies={companies} initialCategoryId={categoryId} />}
       {notice && (
         <div className="toast" role="status">
           <Icon name="check" size={17} />

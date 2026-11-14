@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
+  CATEGORIES,
+  SOURCES,
   emptyResult,
   loadDemo,
   makeSampleJob,
@@ -34,6 +36,8 @@ export function useDemoCollection() {
   function start(
     ids: SourceId[],
     failureStage: FailureStage | null = null,
+    categoryId = 'all',
+    companyIds?: string[],
     retry?: { runId: string; failures: Failure[] },
   ) {
     if (locked.current || !ids.length) {
@@ -45,6 +49,8 @@ export function useDemoCollection() {
     const run: CollectionRun = {
       id: runId,
       startedAt: new Date().toISOString(),
+      categoryId,
+      companyIds,
       results: ids.map(emptyResult),
       ...(retry
         ? {
@@ -160,6 +166,7 @@ export function useDemoCollection() {
                 at,
                 stage !== 'body' && stage !== 'capture',
               )
+              newJob.categories = categoryId === 'all' ? [] : [categoryId]
               if (stage === 'body') newJob.versions[0].body = ''
               const existing = jobs.filter(
                 (j) => j.sourceId === sourceId && !j.closed,
@@ -270,7 +277,8 @@ export function useDemoCollection() {
         ?.results.flatMap((r) => r.failures)
         .filter((f) => !f.resolved && (!ids || ids.includes(f.id))) ?? []
     if (!failures.length) return null
-    return start([...new Set(failures.map((f) => f.sourceId))], null, {
+    const original = data.runs.find(run => run.id === runId)
+    return start([...new Set(failures.map((f) => f.sourceId))], null, original?.categoryId, original?.companyIds, {
       runId,
       failures,
     })
@@ -291,6 +299,8 @@ export function useDemoCollection() {
     }))
   return {
     data,
+    categories: CATEGORIES,
+    companies: SOURCES.map(source => ({ id: source.id, sourceId: source.id, name: source.name, supportedCategoryIds: CATEGORIES.map(category => category.id) })),
     notice,
     start,
     retryFailures,
