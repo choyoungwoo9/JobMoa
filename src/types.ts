@@ -44,6 +44,7 @@ export interface Failure {
   error: string
   jobId?: string
   versionId?: string
+  pendingJob?: Job
   resolved: boolean
 }
 export interface SourceResult {

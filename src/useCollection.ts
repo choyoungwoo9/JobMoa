@@ -91,12 +91,15 @@ export function useCollection() {
           if (retry) {
             for (const failure of recovered) {
               if (failure.stage === 'list' || failure.stage === 'save') {
-                const job = makeSampleJob(
-                  sourceId,
-                  `${runId}-${failure.id}`,
-                  at,
-                )
-                if (failure.title) {
+                // A save retry reuses the already rendered/extracted assets.
+                const job =
+                  failure.pendingJob ??
+                  makeSampleJob(
+                    sourceId,
+                    `${runId}-${failure.id}`,
+                    failure.stage === 'save' ? failure.at : at,
+                  )
+                if (!failure.pendingJob && failure.title) {
                   job.title = failure.title
                   job.versions[0].body = sampleBody(job.company, job.title)
                 }
@@ -150,7 +153,12 @@ export function useCollection() {
                 failures: [failure],
               }
             } else {
-              const newJob = makeSampleJob(sourceId, runId, at, !stage)
+              const newJob = makeSampleJob(
+                sourceId,
+                runId,
+                at,
+                stage !== 'body' && stage !== 'capture',
+              )
               if (stage === 'body') newJob.versions[0].body = ''
               const existing = jobs.filter(
                 (j) => j.sourceId === sourceId && !j.closed,
@@ -198,7 +206,7 @@ export function useCollection() {
                         attempts: 1,
                         resolved: false,
                         ...(stage === 'save'
-                          ? {}
+                          ? { pendingJob: newJob }
                           : {
                               jobId: newJob.id,
                               versionId: newJob.versions[0].id,

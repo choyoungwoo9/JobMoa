@@ -759,6 +759,14 @@ function App() {
                     )
                   }
                   onRetry={(ids) => retry(run.id, ids)}
+                  onOpenOriginal={(id) => {
+                    openRun(id)
+                    requestAnimationFrame(() =>
+                      document
+                        .getElementById(`run-${id}`)
+                        ?.scrollIntoView({ block: 'start' }),
+                    )
+                  }}
                   busy={running}
                 />
               ))}

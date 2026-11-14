@@ -16,19 +16,28 @@ export function RunCard({
   onToggle,
   onRetry,
   busy,
+  onOpenOriginal,
 }: {
   run: CollectionRun
   expanded: boolean
   onToggle: () => void
   onRetry: (ids?: string[]) => void
   busy: boolean
+  onOpenOriginal: (id: string) => void
 }) {
   const summary = summarize(run)
   const unresolved = run.results
     .flatMap((r) => r.failures)
     .filter((f) => !f.resolved)
+  const openFailure = (id: string) => {
+    const element = document.getElementById(`failure-${id}`)
+    if (element instanceof HTMLDetailsElement) element.open = true
+  }
   return (
-    <article className={`run-card ${expanded ? 'expanded' : ''}`}>
+    <article
+      id={`run-${run.id}`}
+      className={`run-card ${expanded ? 'expanded' : ''}`}
+    >
       <button
         className="run-summary"
         onClick={onToggle}
@@ -79,6 +88,13 @@ export function RunCard({
               <Icon name="refresh" size={14} />
               실패한 단계부터 이어서 실행한 기록이에요. 성공한 단계의 결과는
               다시 가져오지 않아요.
+              <button
+                className="text-button"
+                onClick={() => onOpenOriginal(run.retryOf!)}
+              >
+                원래 실행 보기
+                <Icon name="chevron" size={12} />
+              </button>
             </div>
           )}
           <div className="table-scroll">
@@ -124,6 +140,7 @@ export function RunCard({
                           <a
                             className="failure-count"
                             href={`#failure-${result.failures[0].id}`}
+                            onClick={() => openFailure(result.failures[0].id)}
                           >
                             — <Icon name="info" size={11} />
                           </a>
@@ -134,6 +151,7 @@ export function RunCard({
                         <a
                           className="failure-count"
                           href={`#failure-${result.failures[0].id}`}
+                          onClick={() => openFailure(result.failures[0].id)}
                         >
                           {result.failed}
                           <Icon name="chevron" size={11} />
