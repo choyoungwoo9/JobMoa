@@ -300,7 +300,7 @@ export function useDemoCollection() {
   return {
     data,
     categories: CATEGORIES,
-    companies: SOURCES.map(source => ({ id: source.id, sourceId: source.id, name: source.name, supportedCategoryIds: CATEGORIES.map(category => category.id) })),
+    companies: SOURCES.map(source => ({ id: source.id, sourceId: source.id, name: source.name, supportedCategoryIds: CATEGORIES.filter(category => source.id === 'bucketplace' || !['planning', 'product-management', 'design', 'marketing', 'sales'].includes(category.id)).map(category => category.id) })),
     notice,
     start,
     retryFailures,
@@ -311,6 +311,6 @@ export function useDemoCollection() {
     loadJob,
     connected: true,
     error: '',
-    availableSources: ['naver', 'toss', 'kakao', 'coupang', 'daangn', 'line', 'woowa'] as SourceId[],
+    availableSources: SOURCES.map(source => source.id),
   }
 }
