@@ -40,7 +40,7 @@ MySQL 격리 수준은 `READ_COMMITTED`입니다. 여러 작업자가 서로 다
 | GET | `/api/collections` | 최근 실행 30개 |
 | GET | `/api/collections/{id}` | 기업별 결과와 실패 항목 |
 | GET | `/api/collections/{id}/tasks` | 작업별 상태·실패 단계 |
-| POST | `/api/collections` | `{ "sourceIds": ["naver"] }` |
+| POST | `/api/collections` | `{ "sourceIds": ["kakao"], "categoryId": "web-backend", "companyIds": ["kakaostyle"] }` |
 | POST | `/api/collections/{id}/retry` | `{ "failureIds": ["..."] }`, 생략 시 미해결 실패 전체 |
 
 수집기는 7개 기업군별로 구현되어 있으며, 판별 규칙은 각 수집기 내부에 있습니다. 공통 실행부에는 개발 직군 키워드 필터가 없습니다.
@@ -64,3 +64,14 @@ MySQL 격리 수준은 `READ_COMMITTED`입니다. 여러 작업자가 서로 다
 목록·진행률 조회에는 본문을 포함하지 않습니다. `/api/postings/{id}`에서 본문을 읽고, 캡처는 `/api/captures/{해시}.png`에서 선택적으로 불러옵니다. 변경된 공고만 새 버전을 저장하고 이전 버전은 보관합니다. 저장된 진행 중 공고도 다음 수집에 다시 확인하며, 명시적인 마감만 보관 처리합니다.
 
 설정은 `src/main/resources/application.yaml`을 참고하세요. DB 스키마는 Flyway가 관리하며 JPA는 `validate`만 수행합니다. DB Docker 볼륨과 `backend/storage/captures`는 일반 종료 시 삭제하지 않습니다.
+
+
+### 분야별 수집
+
+`/api/state`의 `categories`와 `companies`에서 지원 분야·계열사 조합을 확인합니다. `all`은 전체 개발 직무이며 별도 공고 태그로 저장하지 않습니다. `web-backend`는 회사별 후보 제목과 본문 업무 근거를 함께 판별합니다. 풀스택·DevOps·SRE·데이터 엔지니어·게임 서버·불명확한 Software Engineer는 제외합니다.
+
+회사 카탈로그는 `CompanyRegistry`, 회사 × 분야 판별은 `CategoryClassifier`에 선언합니다. 통합 포털은 한 번 탐색하고 선택한 계열사의 공고만 큐에 넣습니다. 수집 실행과 작업에 분야·계열사 정보를 저장하므로 재시도에도 동일한 범위가 유지됩니다.
+
+`posting_category`는 공고와 분야의 다중 연결입니다. 다른 분야에서 같은 URL의 공고를 발견해도 원문 공고는 공유합니다. 본문 해시가 기존 최신 버전과 같으면 `reused_version_id`로 기존 캡처를 재사용하고 곧바로 SAVE 단계로 넘어갑니다. 완료 작업의 임시 본문은 비워 본문 원본은 버전에만 보관합니다.
+
+화면 버튼 검증: 카카오스타일 전체 5건 → 웹 백엔드 동일 4건(본문·캡처 추가 저장 0, MLOps 제외) → 쿠팡파이낸셜 웹 백엔드 신규 1건. 세 실행 모두 성공했으며 최종 공고·버전·캡처는 각각 6개입니다. 등록된 전체 회사에 대한 실수집을 반복하지 않고 표본 계열사로 검증했습니다.
