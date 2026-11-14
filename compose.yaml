@@ -19,6 +19,7 @@ services:
     restart: unless-stopped
   backend:
     build: ./backend
+    shm_size: "1gb"
     environment:
       MYSQL_URL: jdbc:mysql://mysql:3306/jobmoa?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-jobmoa-local}

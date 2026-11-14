@@ -11,12 +11,36 @@ import java.time.OffsetDateTime
 @Component
 class CoupangRecruitmentSite : RecruitmentSite {
     override val definition = SourceDefinition("coupang", "쿠팡", "https://www.coupang.jobs/en/jobs/")
-    private val boardUrl = "https://boards-api.greenhouse.io/v1/boards/coupang/jobs?content=true"
+    private val boardUrl = "https://boards-api.greenhouse.io/v1/boards/coupang"
 
     override fun discover(browser: BrowserPage, emit: (DiscoveredPosting) -> Unit) {
         browser.navigate(boardUrl)
-        val response = browser.evaluate("() => JSON.parse(document.body.innerText)") as? Map<*, *>
-            ?: error("쿠팡 공개 채용 보드 응답 형식 변경")
+        // content=true 목록은 12MB 이상 본문을 JSON DOM으로 렌더링해 브라우저 메모리를 급증시킨다.
+        // 31바이트 보드 정보만 탐색하고, 본문 없는 목록과 부서별 ID 매핑을 메모리에서 합친다.
+        val response = browser.evaluate("""async () => {
+            const get = async path => {
+                const response = await fetch('/v1/boards/coupang/' + path);
+                if (!response.ok) throw new Error('쿠팡 공개 API 응답 오류: ' + response.status + ' ' + path);
+                return response.json();
+            };
+            const listing = await get('jobs');
+            const organization = await get('departments');
+            if (!Array.isArray(listing.jobs) || !Array.isArray(organization.departments)) throw new Error('쿠팡 공개 API 목록 구조 변경');
+            const byId = new Map();
+            for (const department of organization.departments) {
+                if (!Array.isArray(department.jobs) || typeof department.name !== 'string') throw new Error('쿠팡 부서별 목록 구조 변경');
+                for (const job of department.jobs) {
+                    const key = String(job.id);
+                    if (!byId.has(key)) byId.set(key, []);
+                    byId.get(key).push({name: department.name});
+                }
+            }
+            return {meta: listing.meta, jobs: listing.jobs.map(job => {
+                const departments = byId.get(String(job.id));
+                if (!departments) throw new Error('쿠팡 공고 부서 정보 누락: ' + job.id);
+                return {id: job.id, title: job.title, absolute_url: job.absolute_url, location: job.location, departments};
+            })};
+        }""") as? Map<*, *> ?: error("쿠팡 공개 채용 보드 응답 형식 변경")
         val rows = response["jobs"] as? List<*> ?: error("쿠팡 채용 목록이 없습니다.")
         val total = ((response["meta"] as? Map<*, *>)?.get("total") as? Number)?.toInt()
             ?: error("쿠팡 전체 공고 수를 확인하지 못했습니다.")
