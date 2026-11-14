@@ -34,6 +34,7 @@ class CollectionRepositoryImpl(
         source.status = DiscoveryStatus.RUNNING.name
         return source.domain()
     }
+    override fun recoverDiscovery(): Int = sources.recoverInterrupted()
     override fun saveSource(source: RunSource) { sources.save(source.entity()) }
     override fun finishIfReady(runId: String, now: Instant) {
         val run = runs.lockById(runId) ?: return

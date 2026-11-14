@@ -53,7 +53,7 @@ class WorkspaceQuery(private val runs: CollectionRepository, private val tasks: 
                     "attempts" to t.attempts, "error" to t.error, "resolved" to (t.resolvedAt != null)) } +
                     if (failedList) listOf(mapOf("id" to "list:${source.id}", "sourceId" to source.sourceId,
                         "company" to sites.definition(source.sourceId).name, "url" to sites.definition(source.sourceId).listingUrl,
-                        "stage" to "list", "at" to source.failedAt, "attempts" to source.retryCount + 1, "error" to source.error, "resolved" to false)) else emptyList()
+                        "stage" to "list", "at" to source.failedAt, "attempts" to source.retryCount + 1, "error" to source.error, "resolved" to (source.resolvedAt != null))) else emptyList()
                 mapOf("sourceId" to source.sourceId, "status" to when {
                     pending -> if (source.status == DiscoveryStatus.PENDING) "waiting" else "running"
                     unknown -> "failed"
@@ -63,7 +63,8 @@ class WorkspaceQuery(private val runs: CollectionRepository, private val tasks: 
                     "changed" to if (unknown) null else group.count { it.outcome == TaskOutcome.CHANGED },
                     "identical" to if (unknown) null else group.count { it.outcome == TaskOutcome.IDENTICAL },
                     "failed" to if (unknown) null else failures.size,
-                    "succeeded" to group.count { it.status == TaskStatus.COMPLETED }, "total" to group.size,
+                    "succeeded" to group.count { it.status == TaskStatus.COMPLETED && it.outcome != TaskOutcome.EXCLUDED },
+                    "excluded" to group.count { it.outcome == TaskOutcome.EXCLUDED }, "total" to group.size,
                     "recovered" to group.count { it.status == TaskStatus.COMPLETED && it.retryOfTaskId != null }, "failures" to failures)
             })
     }

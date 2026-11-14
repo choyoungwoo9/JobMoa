@@ -10,6 +10,7 @@ interface CollectionRepository {
     fun recentRuns(limit: Int = 30): List<CollectionRun>
     fun sources(runId: String): List<RunSource>
     fun nextDiscovery(): RunSource?
+    fun recoverDiscovery(): Int
     fun saveSource(source: RunSource)
     fun finishIfReady(runId: String, now: Instant)
 }

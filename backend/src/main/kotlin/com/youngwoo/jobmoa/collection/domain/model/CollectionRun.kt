@@ -23,4 +23,6 @@ data class RunSource(
     val error: String? = null,
     val failedAt: Instant? = null,
     val retryCount: Int = 0,
+    val retryOfSourceId: String? = null,
+    val resolvedAt: Instant? = null,
 )

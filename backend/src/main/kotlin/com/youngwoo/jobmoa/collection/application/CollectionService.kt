@@ -47,17 +47,32 @@ class CollectionService(
         val previous = runs.findRun(runId) ?: throw ResourceNotFound("수집 실행을 찾을 수 없습니다.")
         require(!previous.active) { "실행이 끝난 뒤 재시도할 수 있습니다." }
         val failures = tasks.tasks(runId).filter { it.status == TaskStatus.FAILED && it.resolvedAt == null && (failureIds == null || it.id in failureIds) }
-        val sourceFailures = runs.sources(runId).filter { it.status == DiscoveryStatus.FAILED && (failureIds == null || "list:${it.id}" in failureIds) }
+        val sourceFailures = runs.sources(runId).filter { it.status == DiscoveryStatus.FAILED && it.resolvedAt == null && (failureIds == null || "list:${it.id}" in failureIds) }
         require(failures.isNotEmpty() || sourceFailures.isNotEmpty()) { "재시도할 실패 항목이 없습니다." }
         val id = UUID.randomUUID().toString()
         val sourceIds = (failures.map { it.sourceId } + sourceFailures.map { it.sourceId }).distinct()
         runs.activate(CollectionRun(id, Instant.now(), retryOf = runId), sourceIds.map { source ->
             RunSource("$id:$source", id, source,
                 if (sourceFailures.any { it.sourceId == source }) DiscoveryStatus.PENDING else DiscoveryStatus.COMPLETED,
-                retryCount = (sourceFailures.find { it.sourceId == source }?.retryCount ?: 0) + 1)
+                retryCount = (sourceFailures.find { it.sourceId == source }?.retryCount ?: 0) + 1,
+                retryOfSourceId = sourceFailures.find { it.sourceId == source }?.id)
         })
         failures.forEach { tasks.enqueue(it.retry(id, UUID.randomUUID().toString())) }
         return id
+    }
+
+    @Transactional
+    fun discovered(source: RunSource) {
+        val now = Instant.now()
+        runs.saveSource(source.copy(status = DiscoveryStatus.COMPLETED))
+        var previousId = source.retryOfSourceId
+        val visited = mutableSetOf<String>()
+        while (previousId != null && visited.add(previousId)) {
+            val previousRun = previousId.substringBefore(':')
+            val previous = runs.sources(previousRun).find { it.id == previousId } ?: break
+            runs.saveSource(previous.copy(resolvedAt = now))
+            previousId = previous.retryOfSourceId
+        }
     }
 }
 

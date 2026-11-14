@@ -31,10 +31,12 @@ open class RunSourceEntity(
     @field:Column(columnDefinition = "longtext") open var error: String? = null,
     @field:Column(name = "failed_at") open var failedAt: Instant? = null,
     @field:Column(name = "retry_count", nullable = false) open var retryCount: Int = 0,
+    @field:Column(name = "retry_of_source_id") open var retryOfSourceId: String? = null,
+    @field:Column(name = "resolved_at") open var resolvedAt: Instant? = null,
 ) {
-    fun domain() = RunSource(id, runId, sourceId, DiscoveryStatus.valueOf(status), error, failedAt, retryCount)
+    fun domain() = RunSource(id, runId, sourceId, DiscoveryStatus.valueOf(status), error, failedAt, retryCount, retryOfSourceId, resolvedAt)
 }
-fun RunSource.entity() = RunSourceEntity(id, runId, sourceId, status.name, error, failedAt, retryCount)
+fun RunSource.entity() = RunSourceEntity(id, runId, sourceId, status.name, error, failedAt, retryCount, retryOfSourceId, resolvedAt)
 
 @Entity @Table(name = "crawl_task")
 open class CrawlTaskEntity(
