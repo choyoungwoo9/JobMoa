@@ -60,7 +60,8 @@ class CrawlerRuntime(private val properties: CrawlerProperties, private val task
                     val token = task.leaseToken!!
                     owned[task.id] = token
                     if (task.stage != CrawlStage.SAVE) {
-                        val headless = properties.headless && !sources.adapter(task.sourceId).requiresWindowedBrowser
+                        val adapter = sources.adapter(task.sourceId)
+                        val headless = properties.headless && !adapter.requiresWindowedBrowser
                         // 사이트에 필요한 모드가 바뀌면 이전 브라우저를 정리한다. 작업자당 하나만 유지한다.
                         if (browser != null && browserHeadless != headless) {
                             browser.close()
@@ -72,12 +73,14 @@ class CrawlerRuntime(private val properties: CrawlerProperties, private val task
                         }
                         session.withPage { page ->
                             page.navigate(task.url)
+                            var posting = DiscoveredPosting(task.url, task.company, task.title, task.location)
                             if (task.stage == CrawlStage.BODY) {
-                                val extracted = sources.adapter(task.sourceId).extract(page, DiscoveredPosting(task.url, task.company, task.title, task.location))
-                                taskService.body(task.id, token, extracted)
+                                val extracted = adapter.extract(page, posting)
+                                val checkpoint = taskService.body(task.id, token, extracted)
+                                posting = DiscoveredPosting(checkpoint.url, checkpoint.company, checkpoint.title, checkpoint.location)
                             }
                             // 캡처 재시도는 저장된 본문을 유지하고 렌더링·캡처만 수행한다.
-                            sources.adapter(task.sourceId).prepareCapture(page, DiscoveredPosting(task.url, task.company, task.title, task.location))
+                            adapter.prepareCapture(page, posting)
                             val path = captures.save(page.capture())
                             taskService.captured(task.id, token, path)
                         }
