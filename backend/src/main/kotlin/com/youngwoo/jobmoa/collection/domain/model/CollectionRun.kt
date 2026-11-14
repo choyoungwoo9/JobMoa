@@ -25,4 +25,6 @@ data class RunSource(
     val retryCount: Int = 0,
     val retryOfSourceId: String? = null,
     val resolvedAt: Instant? = null,
+    val listingUrl: String = "",
+    val label: String = "",
 )

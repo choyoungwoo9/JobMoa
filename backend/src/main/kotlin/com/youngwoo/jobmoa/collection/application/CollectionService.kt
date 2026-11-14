@@ -25,8 +25,12 @@ class CollectionService(
         sources.forEach { sites.adapter(it) }
         require(targets.all { it.sourceId in sources }) { "직접 지정한 공고의 기업군이 수집 대상에 포함되어야 합니다." }
         val run = CollectionRun(UUID.randomUUID().toString(), Instant.now())
-        runs.activate(run, sources.map { source -> RunSource("${run.id}:$source", run.id, source,
-            if (targets.isEmpty()) DiscoveryStatus.PENDING else DiscoveryStatus.COMPLETED) })
+        runs.activate(run, sources.flatMap { source ->
+            val portals = if (targets.isEmpty()) sites.adapter(source).discoveryTargets else listOf(sites.definition(source))
+            portals.map { portal -> RunSource("${run.id}:${portal.id}", run.id, source,
+                if (targets.isEmpty()) DiscoveryStatus.PENDING else DiscoveryStatus.COMPLETED,
+                listingUrl = portal.listingUrl, label = portal.name) }
+        })
         targets.forEach { enqueue(run.id, it.sourceId, DiscoveredPosting(it.url, it.company.ifBlank { sites.definition(it.sourceId).name }, it.title, it.location)) }
         if (targets.isEmpty()) postings.list().filter { !it.closed && it.sourceId in sources }.forEach {
             enqueue(run.id, it.sourceId, DiscoveredPosting(it.url, it.company, it.title, it.location))
@@ -56,12 +60,14 @@ class CollectionService(
         require(failures.isNotEmpty() || sourceFailures.isNotEmpty()) { "재시도할 실패 항목이 없습니다." }
         val id = UUID.randomUUID().toString()
         val sourceIds = (failures.map { it.sourceId } + sourceFailures.map { it.sourceId }).distinct()
-        runs.activate(CollectionRun(id, Instant.now(), retryOf = runId), sourceIds.map { source ->
-            RunSource("$id:$source", id, source,
-                if (sourceFailures.any { it.sourceId == source }) DiscoveryStatus.PENDING else DiscoveryStatus.COMPLETED,
-                retryCount = (sourceFailures.find { it.sourceId == source }?.retryCount ?: 0) + 1,
-                retryOfSourceId = sourceFailures.find { it.sourceId == source }?.id)
-        })
+        val retrySources = sourceFailures.mapIndexed { index, previousSource ->
+            previousSource.copy(id = "$id:retry-$index", runId = id, status = DiscoveryStatus.PENDING,
+                error = null, failedAt = null, retryCount = previousSource.retryCount + 1,
+                retryOfSourceId = previousSource.id, resolvedAt = null)
+        } + sourceIds.filter { source -> sourceFailures.none { it.sourceId == source } }.map { source ->
+            RunSource("$id:$source", id, source, DiscoveryStatus.COMPLETED)
+        }
+        runs.activate(CollectionRun(id, Instant.now(), retryOf = runId), retrySources)
         failures.forEach { tasks.enqueue(it.retry(id, UUID.randomUUID().toString())) }
         return id
     }

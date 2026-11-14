@@ -2,6 +2,8 @@ package com.youngwoo.jobmoa.posting.domain.model
 
 import java.time.Instant
 
+data class VersionSummary(val id: Long, val postingId: Long, val savedAt: Instant, val capturePath: String)
+
 data class PostingVersion(
     val id: Long = 0,
     val postingId: Long,

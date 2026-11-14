@@ -35,8 +35,19 @@ interface RunSourceJpaRepository : JpaRepository<RunSourceEntity, String> {
 }
 
 interface TaskStatusCount { val status: String; val total: Long }
+interface TaskSummaryProjection {
+    val id: String; val sourceId: String; val company: String; val title: String
+    val url: String; val urlHash: String; val status: String; val stage: String
+    val attempts: Int; val failedAt: Instant?; val error: String?; val outcome: String?
+    val resolvedAt: Instant?; val retryOfTaskId: String?
+}
 
 interface CrawlTaskJpaRepository : JpaRepository<CrawlTaskEntity, String> {
+    @Query("""select t.id as id, t.sourceId as sourceId, t.company as company, t.title as title,
+        t.url as url, t.urlHash as urlHash, t.status as status, t.stage as stage, t.attempts as attempts,
+        t.failedAt as failedAt, t.error as error, t.outcome as outcome, t.resolvedAt as resolvedAt,
+        t.retryOfTaskId as retryOfTaskId from CrawlTaskEntity t where t.runId = :id order by t.discoveredAt, t.id""")
+    fun summaries(@Param("id") runId: String): List<TaskSummaryProjection>
     fun findAllByRunIdOrderByDiscoveredAtAscIdAsc(runId: String): List<CrawlTaskEntity>
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select t from CrawlTaskEntity t where t.id = :id")

@@ -1,0 +1,3 @@
+ALTER TABLE collection_run_source
+    ADD COLUMN listing_url VARCHAR(2048) NOT NULL DEFAULT '',
+    ADD COLUMN label VARCHAR(255) NOT NULL DEFAULT '';

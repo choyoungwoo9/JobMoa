@@ -5,7 +5,9 @@ import com.youngwoo.jobmoa.crawler.domain.model.*
 /** Site adapters contain discovery/extraction rules, never worker ownership. */
 interface RecruitmentSite {
     val definition: SourceDefinition
+    val discoveryTargets: List<SourceDefinition> get() = listOf(definition)
     fun discover(browser: BrowserPage, emit: (DiscoveredPosting) -> Unit)
+    fun discoverAt(browser: BrowserPage, listingUrl: String, emit: (DiscoveredPosting) -> Unit) { discover(browser, emit) }
     fun extract(browser: BrowserPage, posting: DiscoveredPosting): ExtractedPosting
     fun acceptsUrl(url: String): Boolean
 }

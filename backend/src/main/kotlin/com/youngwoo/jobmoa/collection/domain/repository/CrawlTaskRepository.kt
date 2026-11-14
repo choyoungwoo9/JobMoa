@@ -1,6 +1,7 @@
 package com.youngwoo.jobmoa.collection.domain.repository
 
 import com.youngwoo.jobmoa.collection.domain.model.CrawlTask
+import com.youngwoo.jobmoa.collection.domain.model.TaskSummary
 import java.time.Duration
 import java.time.Instant
 
@@ -14,4 +15,5 @@ interface CrawlTaskRepository {
     fun renew(id: String, token: String, duration: Duration): Boolean
     fun recoverExpired(now: Instant): Int
     fun tasks(runId: String): List<CrawlTask>
+    fun summaries(runId: String): List<TaskSummary>
 }

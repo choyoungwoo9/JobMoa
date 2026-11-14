@@ -18,6 +18,8 @@ class PostingRepositoryImpl(
     override fun list(): List<Posting> = postings.findAllByOrderByFirstSeenDescIdDesc().map { it.domain() }
     override fun save(posting: Posting): Posting = postings.saveAndFlush(posting.entity()).domain()
     override fun versions(id: Long): List<PostingVersion> = versions.findAllByPostingIdOrderBySavedAtDescIdDesc(id).map { it.domain() }
+    override fun versionSummaries(postingIds: List<Long>): List<VersionSummary> =
+        if (postingIds.isEmpty()) emptyList() else versions.summaries(postingIds).map { VersionSummary(it.id, it.postingId, it.savedAt, it.capturePath) }
     override fun saveVersion(version: PostingVersion): PostingVersion = versions.saveAndFlush(version.entity()).domain()
     override fun markRead(id: Long, read: Boolean) {
         val entity = postings.lockById(id) ?: throw ResourceNotFound("공고를 찾을 수 없습니다.")

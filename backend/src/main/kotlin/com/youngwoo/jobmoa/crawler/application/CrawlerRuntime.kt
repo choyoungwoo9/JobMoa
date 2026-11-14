@@ -100,14 +100,8 @@ class CrawlerRuntime(private val properties: CrawlerProperties, private val task
                     if (source == null) { Thread.sleep(700); continue }
                     discovering = source.id
                     val adapter = sources.adapter(source.sourceId)
-                    val host = PostingUrl.siteKey(adapter.definition.listingUrl)
-                    var permit: AutoCloseable? = null
-                    while (running && permit == null) { permit = limiter.tryAcquire(host); if (permit == null) Thread.sleep(200) }
-                    if (!running) break
-                    permit!!.use {
-                        val session = browser ?: BrowserSession(properties, limiter).also { browser = it }
-                        session.withPage { page -> adapter.discover(page) { collections.enqueue(source.runId, source.sourceId, it) } }
-                    }
+                    val session = browser ?: BrowserSession(properties, limiter, manageSitePermit = true).also { browser = it }
+                    session.withPage { page -> adapter.discoverAt(page, source.listingUrl.ifBlank { adapter.definition.listingUrl }) { collections.enqueue(source.runId, source.sourceId, it) } }
                     collections.discovered(source)
                 } catch (e: InterruptedException) { Thread.currentThread().interrupt() }
                 catch (e: Exception) {

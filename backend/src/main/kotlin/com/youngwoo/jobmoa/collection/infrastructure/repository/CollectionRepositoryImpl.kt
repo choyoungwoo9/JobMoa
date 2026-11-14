@@ -47,7 +47,8 @@ class CollectionRepositoryImpl(
         val failures = sourceResults.count { it.status == DiscoveryStatus.FAILED } + (counts[TaskStatus.FAILED.name] ?: 0)
         run.status = when {
             failures == 0L -> RunStatus.COMPLETED.name
-            (counts[TaskStatus.COMPLETED.name] ?: 0) > 0 || sourceResults.any { it.status == DiscoveryStatus.COMPLETED } -> RunStatus.PARTIAL_FAILED.name
+            (counts[TaskStatus.COMPLETED.name] ?: 0) > 0 -> RunStatus.PARTIAL_FAILED.name
+            (counts[TaskStatus.FAILED.name] ?: 0) == 0L && sourceResults.any { it.status == DiscoveryStatus.COMPLETED } -> RunStatus.PARTIAL_FAILED.name
             else -> RunStatus.FAILED.name
         }
         run.finishedAt = now

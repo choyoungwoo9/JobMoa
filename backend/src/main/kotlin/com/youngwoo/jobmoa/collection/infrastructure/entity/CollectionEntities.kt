@@ -33,10 +33,12 @@ open class RunSourceEntity(
     @field:Column(name = "retry_count", nullable = false) open var retryCount: Int = 0,
     @field:Column(name = "retry_of_source_id") open var retryOfSourceId: String? = null,
     @field:Column(name = "resolved_at") open var resolvedAt: Instant? = null,
+    @field:Column(name = "listing_url", nullable = false, length = 2048) open var listingUrl: String = "",
+    @field:Column(nullable = false) open var label: String = "",
 ) {
-    fun domain() = RunSource(id, runId, sourceId, DiscoveryStatus.valueOf(status), error, failedAt, retryCount, retryOfSourceId, resolvedAt)
+    fun domain() = RunSource(id, runId, sourceId, DiscoveryStatus.valueOf(status), error, failedAt, retryCount, retryOfSourceId, resolvedAt, listingUrl, label)
 }
-fun RunSource.entity() = RunSourceEntity(id, runId, sourceId, status.name, error, failedAt, retryCount, retryOfSourceId, resolvedAt)
+fun RunSource.entity() = RunSourceEntity(id, runId, sourceId, status.name, error, failedAt, retryCount, retryOfSourceId, resolvedAt, listingUrl, label)
 
 @Entity @Table(name = "crawl_task")
 open class CrawlTaskEntity(

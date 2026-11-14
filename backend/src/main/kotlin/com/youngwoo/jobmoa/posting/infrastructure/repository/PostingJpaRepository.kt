@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
+import java.time.Instant
 
 interface PostingJpaRepository : JpaRepository<PostingEntity, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -20,5 +21,12 @@ interface PostingJpaRepository : JpaRepository<PostingEntity, Long> {
 }
 
 interface PostingVersionJpaRepository : JpaRepository<PostingVersionEntity, Long> {
+    @Query("""select v.id as id, v.postingId as postingId, v.savedAt as savedAt, v.capturePath as capturePath
+        from PostingVersionEntity v where v.postingId in :ids order by v.savedAt desc, v.id desc""")
+    fun summaries(@Param("ids") postingIds: List<Long>): List<VersionSummaryProjection>
     fun findAllByPostingIdOrderBySavedAtDescIdDesc(postingId: Long): List<PostingVersionEntity>
+}
+
+interface VersionSummaryProjection {
+    val id: Long; val postingId: Long; val savedAt: Instant; val capturePath: String
 }

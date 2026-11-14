@@ -32,4 +32,8 @@ class CrawlTaskRepositoryImpl(private val tasks: CrawlTaskJpaRepository) : Crawl
     }
     override fun recoverExpired(now: Instant): Int = tasks.recoverExpired(now)
     override fun tasks(runId: String): List<CrawlTask> = tasks.findAllByRunIdOrderByDiscoveredAtAscIdAsc(runId).map { it.domain() }
+    override fun summaries(runId: String): List<TaskSummary> = tasks.summaries(runId).map {
+        TaskSummary(it.id, it.sourceId, it.company, it.title, it.url, it.urlHash, TaskStatus.valueOf(it.status),
+            CrawlStage.valueOf(it.stage), it.attempts, it.failedAt, it.error, it.outcome?.let(TaskOutcome::valueOf), it.resolvedAt, it.retryOfTaskId)
+    }
 }
