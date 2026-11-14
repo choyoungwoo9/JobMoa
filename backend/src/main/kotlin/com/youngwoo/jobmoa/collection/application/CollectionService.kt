@@ -5,6 +5,7 @@ import com.youngwoo.jobmoa.collection.domain.repository.*
 import com.youngwoo.jobmoa.crawler.application.SourceRegistry
 import com.youngwoo.jobmoa.crawler.domain.model.*
 import com.youngwoo.jobmoa.shared.*
+import com.youngwoo.jobmoa.posting.domain.repository.PostingRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -15,6 +16,7 @@ class CollectionService(
     private val runs: CollectionRepository,
     private val tasks: CrawlTaskRepository,
     private val sites: SourceRegistry,
+    private val postings: PostingRepository,
 ) {
     @Transactional
     fun start(sourceIds: List<String>, targets: List<DirectTarget> = emptyList()): String {
@@ -26,6 +28,9 @@ class CollectionService(
         runs.activate(run, sources.map { source -> RunSource("${run.id}:$source", run.id, source,
             if (targets.isEmpty()) DiscoveryStatus.PENDING else DiscoveryStatus.COMPLETED) })
         targets.forEach { enqueue(run.id, it.sourceId, DiscoveredPosting(it.url, it.company.ifBlank { sites.definition(it.sourceId).name }, it.title, it.location)) }
+        if (targets.isEmpty()) postings.list().filter { !it.closed && it.sourceId in sources }.forEach {
+            enqueue(run.id, it.sourceId, DiscoveredPosting(it.url, it.company, it.title, it.location))
+        }
         return run.id
     }
 
