@@ -9,7 +9,7 @@ RUN --mount=type=cache,target=/root/.gradle ./gradlew bootJar copyRuntimeLibs --
 FROM eclipse-temurin:21-jre-noble
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN --mount=from=build,source=/app/build/runtime-libs,target=/tmp/playwright-libs \
-    apt-get update && apt-get install -y --no-install-recommends curl fonts-noto-cjk \
+    apt-get update && apt-get install -y --no-install-recommends curl fonts-noto-cjk libatomic1 \
     && java -cp '/tmp/playwright-libs/*' com.microsoft.playwright.CLI install --with-deps chromium --only-shell \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
