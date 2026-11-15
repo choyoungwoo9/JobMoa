@@ -223,7 +223,7 @@ JobMoa/
 
 [프론트엔드 안내](frontend/README.md) · [백엔드·API 안내](backend/README.md) · [제품 스펙](docs/spec.md) · [직무 분류 기준](docs/job-categories.md)
 
-제품 적용: [직군 분류 개선안](docs/classification-proposal.md) · [공고별 고정 검토표](docs/analysis/classification-440-2026-11-15.md). 전체 수집을 포함해 21개 직군을 자동 판정하고 복수 매핑·미분류 탭을 지원합니다. 구현 검증 후 기존 운영 데이터는 사용자 요청으로 초기화합니다.
+제품 적용: [직군 분류 개선안](docs/classification-proposal.md) · [공고별 고정 검토표](docs/analysis/classification-440-2026-11-15.md). 전체 수집을 포함해 21개 직군을 자동 판정하고 복수 매핑·미분류 탭을 지원합니다. 2026-11-15 구현 검증 후 기존 운영 데이터는 사용자 요청으로 초기화했습니다. 현재 공고 수는 실행 중인 화면/API를 기준으로 확인합니다.
 
 분류 규칙 검토: [신규 공고에도 적용할 일반 판정 규칙](docs/classification-rules.md) · [고정 정답셋 440개와의 비교 평가](docs/analysis/classification-evaluation-v0.5.md). 기존 AI 검토 라벨을 고정한 채 별도 규칙의 누락·오분류를 평가합니다. 오프라인 평가 도구는 제품 코드나 DB를 변경하지 않습니다.
 

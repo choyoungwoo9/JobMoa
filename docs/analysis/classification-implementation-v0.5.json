@@ -1,0 +1,80 @@
+{
+  "verificationDate": "2026-11-15",
+  "rulesVersion": "0.5",
+  "rulesSha256": "e21ff287d1683f11aef629b4fe8c14582dbdb6991a9fc8e6d0b7a655ff6a3c78",
+  "goldVersion": "gold-v1",
+  "goldSha256": "3c2b069746856baa9ae4133e978477abb641675871ba04b9ebf6f33fa9fca927",
+  "snapshotPostingCount": 440,
+  "kotlinPythonCategoryParity": 440,
+  "kotlinPythonParserParity": 440,
+  "exactGoldMatches": 378,
+  "tp": 530,
+  "fp": 47,
+  "fn": 24,
+  "predictedAssignments": 577,
+  "predictedUnclassified": 8,
+  "byCategory": {
+    "web-backend": 129,
+    "web-frontend": 39,
+    "android": 13,
+    "ios": 7,
+    "fullstack": 9,
+    "data-engineer": 51,
+    "ml-engineer": 37,
+    "devops-sre": 53,
+    "planning": 18,
+    "product-management": 33,
+    "design": 35,
+    "marketing": 14,
+    "sales": 20,
+    "ai-application": 31,
+    "ml-platform": 31,
+    "cloud-infrastructure": 38,
+    "database": 4,
+    "embedded-system": 5,
+    "robotics": 7,
+    "qa-test": 2,
+    "data-analysis-bi": 1
+  },
+  "databaseRebuildCompleted": 440,
+  "databaseRebuildFailures": 0,
+  "repeatedRebuildAssignments": 577,
+  "staleTagRemoved": true,
+  "postingMetadataAndVersionSummariesPreserved": true,
+  "versionBodyHashesAndCapturePathsPreserved": true,
+  "taskSaveModesVerified": [
+    "new",
+    "changed",
+    "identical"
+  ],
+  "externalCollectionRunsDuringVerification": 0,
+  "viewportsVerified": [
+    {
+      "width": 1440,
+      "height": 1000,
+      "horizontalOverflow": false
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "horizontalOverflow": false
+    }
+  ],
+  "reset": {
+    "requestedByUser": true,
+    "postings": 0,
+    "versions": 0,
+    "categoryLinks": 0,
+    "observations": 0,
+    "tasks": 0,
+    "runSources": 0,
+    "runs": 0,
+    "activeLocks": 0,
+    "captureFiles": 0,
+    "deletedCaptureFiles": 480,
+    "goldReferencePreserved": true,
+    "emptyStateAndStatisticsApiVerified": true,
+    "emptyUiVerified": true,
+    "servicesHealthy": true
+  }
+}
