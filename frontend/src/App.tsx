@@ -31,7 +31,8 @@ function App() {
   const closeJob = useCallback(() => setSelectedJob(null), [])
   const latestRun = data.runs[0]
   const latest = latestRun ? summarize(latestRun) : null
-  const categoryName = (id = 'all') => id === 'unclassified' ? '분야 미분류' : categories.find(category => category.id === id)?.name ?? '기타 분야'
+  const collectionCategoryId = categoryId === 'unclassified' || (!demo && !companies.some(company => company.supportedCategoryIds.includes(categoryId))) ? 'all' : categoryId
+  const categoryName = (id = 'all') => id === 'unclassified' ? '미분류' : categories.find(category => category.id === id)?.name ?? '기타 분야'
   const categoryJobs = data.jobs.filter(job => (categoryId === 'all' || (categoryId === 'unclassified' ? !job.categories?.length : job.categories?.includes(categoryId))) && (!companyFilter || job.companyId === companyFilter))
   const available = categoryJobs.filter((job) => includeClosed || !job.closed)
   const unread = available.filter((job) => !job.read).length
@@ -271,7 +272,7 @@ function App() {
                 size={18}
                 className={running ? 'spin' : ''}
               />
-              {running ? '공고 수집 중' : categoryId === 'all' ? '공고 수집' : `${categoryName(categoryId)} 수집`}
+              {running ? '공고 수집 중' : collectionCategoryId === 'all' ? '공고 수집' : `${categoryName(categoryId)} 수집`}
               {!running && <span className="button-plus">+</span>}
             </button>
           </div>
@@ -279,8 +280,22 @@ function App() {
           {view === 'jobs' ? (
             <>
               {companyFilter && <div className="stats-job-scope">{companies.find(c => c.id === companyFilter)?.name} 공고 <button className="text-button" onClick={() => setCompanyFilter(null)}>회사 필터 해제</button></div>}
-              <div className="category-tabs" role="tablist" aria-label="공고 분야">
-                {categories.map(category => <button key={category.id} role="tab" aria-selected={categoryId === category.id} className={categoryId === category.id ? 'active' : ''} onClick={() => { setCategoryId(category.id); setPage(1); setSelectedJob(null) }}>{category.name}<span>{data.jobs.filter(job => (includeClosed || !job.closed) && (category.id === 'all' || job.categories?.includes(category.id))).length}</span></button>)}
+              <div className="classification-filters">
+                <div className="category-tabs" role="tablist" aria-label="공고 분류">
+                  {[{ id: 'all', name: '전체 공고' }, { id: 'unclassified', name: '미분류' }].map(category => <button key={category.id} role="tab" aria-selected={categoryId === category.id} className={categoryId === category.id ? 'active' : ''} onClick={() => { setCategoryId(category.id); setPage(1); setSelectedJob(null) }}>{category.name}<span>{data.jobs.filter(job => (includeClosed || !job.closed) && (source === 'all' || job.sourceId === source) && (!companyFilter || job.companyId === companyFilter) && (category.id === 'all' || !job.categories?.length)).length}</span></button>)}
+                </div>
+                <select aria-label="세부 직군 선택" value={categoryId === 'all' || categoryId === 'unclassified' ? '' : categoryId} onChange={event => { setCategoryId(event.target.value); setPage(1); setSelectedJob(null) }}>
+                  <option value="" disabled>직군별로 보기</option>
+                  {[
+                    { name: '서비스·시스템 개발', ids: ['web-backend', 'web-frontend', 'android', 'ios', 'fullstack', 'embedded-system', 'robotics', 'qa-test'] },
+                    { name: '데이터·AI·인프라', ids: ['data-engineer', 'ml-engineer', 'ai-application', 'ml-platform', 'devops-sre', 'cloud-infrastructure', 'database', 'data-analysis-bi'] },
+                    { name: '기획·비즈니스·디자인', ids: ['planning', 'product-management', 'design', 'marketing', 'sales'] },
+                  ].map(group => <optgroup label={group.name} key={group.name}>{group.ids.flatMap(id => {
+                    const category = categories.find(item => item.id === id)
+                    return category ? <option key={id} value={id}>{category.name} · {data.jobs.filter(job => (includeClosed || !job.closed) && (source === 'all' || job.sourceId === source) && (!companyFilter || job.companyId === companyFilter) && job.categories?.includes(id)).length}</option> : []
+                  })}</optgroup>)}
+                </select>
+                <span className="classification-hint">한 공고가 여러 직군에 포함될 수 있어요.</span>
               </div>
               <section className="overview" aria-label="공고 요약">
                 <div className="overview-intro">
@@ -654,6 +669,7 @@ function App() {
                                   <Icon name="file" size={12} />
                                   <span>본문</span>
                                   {job.categories?.map(id => <span className="job-category" key={id}>{categoryName(id)}</span>)}
+                                  {!job.categories?.length && <span className="job-category unmapped">미분류</span>}
                                   {job.versions.length > 1 && (
                                     <>
                                       <span className="saved-dot">·</span>
@@ -690,7 +706,7 @@ function App() {
                         <Icon name="search" size={28} />
                       </span>
                       <h3>조건에 맞는 공고가 없어요</h3>
-                      <p>{!categoryJobs.length ? `${categoryName(categoryId)} 수집을 시작해 공고를 모아보세요.` : '검색어나 선택한 기업군을 바꿔보세요.'}</p>
+                      <p>{categoryId === 'unclassified' ? '현재 조건에서 직군이 매핑되지 않은 공고가 없어요.' : !categoryJobs.length ? '공고를 수집하면 저장된 본문을 기준으로 직군을 자동 분류해요.' : '검색어나 선택한 기업군을 바꿔보세요.'}</p>
                       <button
                         className="button secondary small"
                         onClick={resetFilters}
@@ -750,6 +766,7 @@ function App() {
                   <JobDrawer
                     key={activeJob.id}
                     job={activeJob}
+                    categories={categories}
                     onClose={closeJob}
                     onToggleRead={() => toggleRead(activeJob.id)}
                     position={browseQueue.indexOf(activeJob.id)}
@@ -819,7 +836,7 @@ function App() {
           </footer>
         </main>
       </div>
-      {collectOpen && <CollectDialog onClose={closeCollect} onStart={begin} demo={demo} availableSources={availableSources} categories={categories} companies={companies} initialCategoryId={categoryId === 'unclassified' ? 'all' : categoryId} />}
+      {collectOpen && <CollectDialog onClose={closeCollect} onStart={begin} demo={demo} availableSources={availableSources} categories={categories} companies={companies} initialCategoryId={collectionCategoryId} />}
       {notice && (
         <div className="toast" role="status">
           <Icon name="check" size={17} />

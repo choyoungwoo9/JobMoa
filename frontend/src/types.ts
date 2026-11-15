@@ -34,6 +34,13 @@ export interface JobVersion {
 }
 export interface Job {
   companyId?: string
+  classification?: {
+    rulesVersion: string
+    parserMode: string
+    evidence: Record<string, string[]>
+    classifiedAt: string
+    unclassifiedReason?: string | null
+  } | null
   categories?: string[]
   id: string
   sourceId: SourceId

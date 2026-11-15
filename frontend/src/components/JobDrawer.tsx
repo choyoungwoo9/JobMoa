@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { dateLabel, sourceById } from '../data'
-import type { Job, JobVersion } from '../types'
+import type { Category, Job, JobVersion } from '../types'
 import { BrandMark } from './BrandMark'
 import { Icon } from './Icon'
 import { Modal } from './Modal'
@@ -25,6 +25,7 @@ function sampleCapture(job: Job, version: JobVersion, revision: number) {
 
 export function JobDrawer({
   job,
+  categories,
   onClose,
   onToggleRead,
   position,
@@ -33,6 +34,7 @@ export function JobDrawer({
   onNext,
 }: {
   job: Job
+  categories: Category[]
   onClose: () => void
   onToggleRead: () => void
   position: number
@@ -108,6 +110,18 @@ export function JobDrawer({
             <dd>{job.versions.length}개</dd>
           </div>
         </dl>
+        <section className="classification-detail" aria-label="직군 분류">
+          <div className="classification-tags">{job.categories?.length ? job.categories.map(id => <span className="job-category" key={id}>{categories.find(category => category.id === id)?.name ?? id}</span>) : <span className="job-category unmapped">미분류</span>}</div>
+          {job.classification ? <details>
+            <summary>분류 근거 · 규칙 v{job.classification.rulesVersion}</summary>
+            <p>최신 저장 본문 기준 · {dateLabel(job.classification.classifiedAt, true)} 분류</p>
+            {job.classification.unclassifiedReason && <p>{job.classification.unclassifiedReason}</p>}
+            {job.categories?.map(id => <div key={id}>
+              <strong>{categories.find(category => category.id === id)?.name ?? id}</strong>
+              {job.classification!.evidence[id]?.length ? job.classification!.evidence[id].map((text, index) => <blockquote key={index}>{text}</blockquote>) : <p>{id === 'web-backend' || id === 'web-frontend' ? '직군 조건 충족 또는 풀스택의 프론트엔드·백엔드 동시 담당 규칙을 적용했어요.' : '직함과 본문의 직군 조건에 부합해요.'}</p>}
+            </div>)}
+          </details> : <p>아직 자동 분류를 실행하지 않은 공고예요.</p>}
+        </section>
         <div className="drawer-actions">
           <button
             className={`button ${job.read ? 'read-button' : 'secondary'}`}

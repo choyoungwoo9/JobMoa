@@ -47,7 +47,7 @@ export function CollectDialog({ onClose, onStart, demo, availableSources, catego
           {categories.map(item => (
             <label key={item.id} className={`category-choice ${categoryId === item.id ? 'selected' : ''}`}>
               <input type="radio" name="collection-category" value={item.id} checked={categoryId === item.id} onChange={() => chooseCategory(item.id)} />
-              <span><strong>{item.name}</strong><small>{item.description ?? '해당 분야의 수집을 지원하는 기업에서 공고를 모아요.'}</small></span>
+              <span><strong>{item.name}</strong><small>{!companies.some(company => company.supportedCategoryIds.includes(item.id)) && '조회·자동 분류 지원 · '}{item.description ?? '해당 분야의 수집을 지원하는 기업에서 공고를 모아요.'}</small></span>
               <span className="category-support-count">{companies.filter(company => availableSources.includes(company.sourceId) && company.supportedCategoryIds.includes(item.id)).length}개 기업</span>
             </label>
           ))}
@@ -79,10 +79,10 @@ export function CollectDialog({ onClose, onStart, demo, availableSources, catego
                 </details>
               )
             })}
-            {!supported.length && <p className="company-empty">이 분야의 수집을 지원하는 기업이 아직 없어요.</p>}
+            {!supported.length && <p className="company-empty">이 직군은 전체 공고 수집 후 자동 분류로 확인할 수 있어요. 직군별 수집을 지원하는 기업은 아직 없어요.</p>}
           </div>
           <div className="collection-rule"><Icon name="check" size={16} /><span>지원 여부는 수집 기능 기준이에요. 현재 공고가 없으면 0건으로 기록해요.</span></div>
-          <div className="demo-note"><Icon name="info" size={17} /><div><strong>{demo ? '화면 검토용 샘플 수집이에요' : '같은 공고는 함께 관리해요'}</strong><p>{demo ? '실제 사이트에 접속하지 않고 샘플 공고를 추가해요.' : '이미 저장한 공고는 분야를 추가하고, 내용이 같으면 캡처와 본문을 중복 저장하지 않아요.'}</p>
+          <div className="demo-note"><Icon name="info" size={17} /><div><strong>{demo ? '화면 검토용 샘플 수집이에요' : '같은 공고는 함께 관리해요'}</strong><p>{demo ? '실제 사이트에 접속하지 않고 샘플 공고를 추가해요.' : '저장할 때 전체 직군 규칙을 적용해요. 내용이 같으면 캡처와 본문을 중복 저장하지 않아요.'}</p>
             {demo && <><label className="failure-option"><input type="checkbox" checked={failure} onChange={event => setFailure(event.target.checked)} />일부 수집 실패 상황도 보기</label>{failure && <label className="failure-stage-select">실패 단계<select value={stage} onChange={event => setStage(event.target.value as FailureStage)}>{Object.entries(STAGES).map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select></label>}</>}
           </div></div>
         </>

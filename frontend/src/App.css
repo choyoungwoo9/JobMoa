@@ -3349,3 +3349,15 @@ dialog::backdrop {
 @media (max-width: 720px) {
   .main-nav { position: static; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 }
+
+.classification-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 20px; }
+.classification-filters .category-tabs { margin: 0; }
+.classification-filters > select { min-width: 225px; max-width: 100%; border: 1px solid #dce5d4; border-radius: 8px; padding: 12px; background: #fff; color: #3e5630; font: inherit; font-size: 13px; }
+.classification-hint { font-size: 12px; color: #7d8875; }
+.classification-detail { margin: 16px 0; padding: 12px; background: #f6f8f3; border-radius: 8px; font-size: 12px; line-height: 1.7; }
+.classification-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.classification-detail summary { margin-top: 8px; cursor: pointer; color: #567246; }
+.classification-detail p { color: #7b8275; }
+.classification-detail blockquote { margin: 8px 0; padding-left: 10px; border-left: 2px solid #c8d8ba; color: #59664f; overflow-wrap: anywhere; }
+.job-category.unmapped { background: #f2ece0; color: #927848; }
+.saved-indicator { flex-wrap: wrap; }
