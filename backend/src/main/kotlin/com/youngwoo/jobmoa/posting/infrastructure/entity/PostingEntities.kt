@@ -20,7 +20,8 @@ open class PostingEntity(
     @field:Column(nullable = false) open var closed: Boolean = false,
     @field:Column(name = "last_change") open var lastChange: String? = null,
 ) {
-    fun domain(categories: Set<String> = emptySet()) = Posting(id!!, sourceId, company, title, location, url, urlHash, firstSeen, lastSeen, read, closed, lastChange, categories)
+    @field:Column(name = "classification_json", columnDefinition = "longtext") open var classificationJson: String? = null
+    fun domain(categories: Set<String> = emptySet(), classification: com.youngwoo.jobmoa.classification.domain.model.Classification? = null) = Posting(id!!, sourceId, company, title, location, url, urlHash, firstSeen, lastSeen, read, closed, lastChange, categories, classification)
 }
 fun Posting.entity() = PostingEntity(id.takeIf { it != 0L }, sourceId, company, title, location, url, urlHash, firstSeen, lastSeen, read, closed, lastChange)
 

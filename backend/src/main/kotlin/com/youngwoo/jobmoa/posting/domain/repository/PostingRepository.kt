@@ -8,6 +8,7 @@ import com.youngwoo.jobmoa.posting.domain.model.PostingVersion
 interface PostingRepository {
     fun findByHashForUpdate(hash: String): Posting?
     fun find(id: Long): Posting?
+    fun lock(id: Long): Posting?
     fun list(): List<Posting>
     fun save(posting: Posting): Posting
     fun versions(id: Long): List<PostingVersion>

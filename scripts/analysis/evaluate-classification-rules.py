@@ -80,7 +80,7 @@ if __name__=='__main__':
  parser=argparse.ArgumentParser(description='저장 본문에 일반 직군 규칙을 적용하고 고정 정답과 비교한다. DB/네트워크 쓰기 없음.')
  root=pathlib.Path(__file__).resolve().parents[2]
  parser.add_argument('--corpus',required=True,type=pathlib.Path,help='최신 본문 JSONL: id, title, body, company, source')
- parser.add_argument('--rules',type=pathlib.Path,default=root/'docs/classification-rules.v0.5.json')
+ parser.add_argument('--rules',type=pathlib.Path,default=root/'backend/src/main/resources/classification/rules-v0.5.json')
  parser.add_argument('--gold',type=pathlib.Path,default=root/'docs/analysis/classification-440-2026-11-15.json')
  parser.add_argument('--manifest',type=pathlib.Path,default=root/'docs/analysis/classification-gold-v1.json')
  parser.add_argument('--output',required=True,type=pathlib.Path)

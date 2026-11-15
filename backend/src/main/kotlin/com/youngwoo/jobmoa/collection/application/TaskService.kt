@@ -12,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 
 @Service
-class TaskService(private val tasks: CrawlTaskRepository, private val postings: PostingRepository, private val observations: ObservationRepository) {
+class TaskService(private val tasks: CrawlTaskRepository, private val postings: PostingRepository, private val observations: ObservationRepository, private val classifier: com.youngwoo.jobmoa.classification.domain.model.PostingClassifier) {
     @Transactional
     fun body(id: String, token: String, body: ExtractedPosting): CrawlTask {
         val task = tasks.lock(id).also { it.requireOwnership(token, Instant.now()) }
@@ -62,12 +62,12 @@ class TaskService(private val tasks: CrawlTaskRepository, private val postings: 
             latest?.contentHash == task.contentHash -> TaskOutcome.IDENTICAL
             else -> TaskOutcome.CHANGED
         }
-        val category = task.categoryId.takeUnless { it == "all" }?.let { setOf(it) }.orEmpty()
+        val classification = classifier.classify(task.title, task.bodyText ?: checkNotNull(reused ?: latest).bodyText)
         val posting = postings.save(old?.copy(title = task.title, company = task.company, location = task.location,
-            lastSeen = now, closed = task.closed, lastChange = outcome.name.lowercase(), categories = old.categories + category) ?: Posting(
+            lastSeen = now, closed = task.closed, lastChange = outcome.name.lowercase(), categories = classification.categories, classification = classification.details) ?: Posting(
             sourceId = task.sourceId, company = task.company, title = task.title, location = task.location,
             url = task.url, urlHash = task.urlHash, firstSeen = task.discoveredAt, lastSeen = now,
-            closed = task.closed, lastChange = "new", categories = category))
+            closed = task.closed, lastChange = "new", categories = classification.categories, classification = classification.details))
         if (outcome != TaskOutcome.IDENTICAL) postings.saveVersion(PostingVersion(postingId = posting.id,
             taskId = task.id, contentHash = task.contentHash, bodyText = checkNotNull(task.bodyText), capturePath = task.capturePath, savedAt = now))
         observations.append(PostingObservation(postingId = posting.id, taskId = task.id, observedAt = now, closed = task.closed))

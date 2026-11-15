@@ -163,7 +163,7 @@ Python 표준 라이브러리만 필요하다. 본문 스냅샷 JSONL 한 줄의
 ```sh
 python3 scripts/analysis/evaluate-classification-rules.py \
   --corpus /tmp/jobmoa-corpus-440.jsonl \
-  --rules docs/classification-rules.v0.5.json \
+  --rules backend/src/main/resources/classification/rules-v0.5.json \
   --gold docs/analysis/classification-440-2026-11-15.json \
   --manifest docs/analysis/classification-gold-v1.json \
   --output /tmp/jobmoa-evaluation-replay.json
@@ -179,3 +179,5 @@ python3 scripts/analysis/evaluate-classification-rules.py \
 - 평가 도구 SHA-256: `cea88193f78ec0c471c01a9f5a1cc60b125498c306dfea46b5f23abb1c5473de`
 
 검증 범위는 고정된 440개 전수 평가, 입력 해시·ID·메타데이터 검증, 지표/불일치 집계 재현이다. 애플리케이션 빌드·실제 수집·화면 검증은 이번 규칙 평가 범위에 포함하지 않았다.
+
+제품 승격 후 규칙 원본은 백엔드 리소스로 이동했고 버전/상태만 0.5로 변경했다. 이 문서와 JSON의 기존 SHA·v0.5-draft 표기는 당시 평가 이력이며, 조건 동일성/실제 Kotlin 대조는 [구현 검증 기록](classification-implementation-v0.5.md)을 따른다.

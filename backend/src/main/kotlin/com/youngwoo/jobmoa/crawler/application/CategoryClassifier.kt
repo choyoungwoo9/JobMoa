@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component
  * 회사 × 분야를 키로 전략을 등록하므로 새 회사/분야는 지원 범위와 규칙을 함께 추가해야 한다.
  */
 @Component
-class CategoryClassifier(private val companies: CompanyRegistry) {
+class CategoryClassifier(private val companies: CompanyRegistry, private val classifier: com.youngwoo.jobmoa.classification.domain.model.PostingClassifier) {
     private val strategies: Map<Pair<String, String>, JobPolicy> = companies.list().flatMap { company ->
         company.supportedCategoryIds.filter { it != "all" }.map { categoryId ->
             val policy = if (categoryId in BUSINESS_CATEGORIES && company.sourceId in setOf("toss", "daangn")) businessPolicy(company.sourceId, categoryId)
@@ -43,7 +43,7 @@ class CategoryClassifier(private val companies: CompanyRegistry) {
     fun accepts(categoryId: String, companyId: String, posting: ExtractedPosting): Boolean {
         if (!supports(companyId, categoryId)) return false
         if (categoryId == "all") return true
-        return strategies.getValue(companyId to categoryId).accepts(posting)
+        return categoryId in classifier.classify(posting.title, posting.bodyText).categories
     }
 }
 

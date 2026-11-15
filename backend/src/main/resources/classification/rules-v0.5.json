@@ -1,6 +1,6 @@
 {
-  "version": "0.5-draft",
-  "status": "승인 대기 — 오프라인 평가 전용",
+  "version": "0.5",
+  "status": "제품 적용 — 고정 정답 gold-v1로 회귀 평가",
   "normalization": [
     "Unicode NFKC",
     "공백/불릿 정규화",

@@ -70,7 +70,7 @@ MySQL 격리 수준은 `READ_COMMITTED`입니다. 여러 작업자가 서로 다
 
 ### 분야별 수집
 
-`/api/state`의 `categories`와 `companies`에서 지원 분야·계열사 조합을 확인합니다. `all`은 각 사이트 어댑터가 지원하는 전체 공고이며 별도 공고 태그로 저장하지 않습니다. 토스·당근 국내·오늘의집은 비개발도 지원하고 다른 포털의 개발 범위는 유지합니다. 개발 분야는 웹 백엔드·프론트엔드·Android·iOS·풀스택·데이터 엔지니어·ML 엔지니어·DevOps/SRE이며, 기획·PM·디자인·마케팅·영업은 토스 9개 계열사·당근·당근페이·오늘의집에서 지원합니다. [회사별 규칙](../docs/non-development-sources.md). 각 분야는 명확한 직함과 본문 업무 근거를 모두 요구합니다. 전체 63개 회사 × 분야 지원표와 제외 기준은 [분야 문서](../docs/job-categories.md), 기존 어댑터의 선행 필터는 [네이버·토스·카카오](../docs/adapter-role-coverage.md), [쿠팡·당근·LINE·우형](../docs/adapter-role-coverage-extra.md)을 참고하세요.
+`/api/state`의 `categories`와 `companies`에서 지원 분야·계열사 조합을 확인합니다. `all`은 각 사이트 어댑터가 지원하는 전체 공고이며 별도 공고 태그로 저장하지 않습니다. 토스·당근 국내·오늘의집은 비개발도 지원하고 다른 포털의 개발 범위는 유지합니다. 개발 분야는 웹 백엔드·프론트엔드·Android·iOS·풀스택·데이터 엔지니어·ML 엔지니어·DevOps/SRE이며, 기획·PM·디자인·마케팅·영업은 토스 9개 계열사·당근·당근페이·오늘의집에서 지원합니다. [회사별 규칙](../docs/non-development-sources.md). 분야별 후보 탐색은 회사별 전략을 유지하고, 최종 본문 판정과 저장 직군은 일반 규칙 v0.5를 적용합니다. 전체 63개 회사 × 분야 지원표와 제외 기준은 [분야 문서](../docs/job-categories.md), 기존 어댑터의 선행 필터는 [네이버·토스·카카오](../docs/adapter-role-coverage.md), [쿠팡·당근·LINE·우형](../docs/adapter-role-coverage-extra.md)을 참고하세요.
 
 회사 카탈로그는 `CompanyRegistry`, 회사 × 분야 판별은 `CategoryClassifier`에 선언합니다. 통합 포털은 한 번 탐색하고 선택한 계열사의 공고만 큐에 넣습니다. 수집 실행과 작업에 분야·계열사 정보를 저장하므로 재시도에도 동일한 범위가 유지됩니다.
 
@@ -86,3 +86,15 @@ MySQL 격리 수준은 `READ_COMMITTED`입니다. 여러 작업자가 서로 다
 `analytics` 도메인의 `StatisticsQuery`가 목록 메타데이터와 상태 관측만 읽어 통계를 계산합니다. 읽기 전용 REPEATABLE_READ 트랜잭션으로 공고·관측의 일관된 스냅샷을 사용합니다. 본문·캡처를 읽거나 외부 수집을 시작하지 않습니다.
 
 Flyway V6은 기존 공고의 마지막 상태를 기준점으로 보존합니다. 이후 `TaskService.finish`가 공고·버전·작업 완료와 관측을 한 트랜잭션으로 저장하며, 동일 본문 재사용도 관측을 남깁니다. 실패·제외는 성공한 관측으로 세지 않습니다. 마감·재오픈 전이, 미완료 기간 제외, 표본 없는 평균의 `null` 처리, 필터·기간 정의는 [채용 통계](../docs/statistics.md)를 따릅니다.
+
+## 자동 직군 판정과 저장 본문 재분류
+
+`classification/domain`의 `PostingClassifier` 계약, `classification/infrastructure/RulePostingClassifier`가 단일 [JSON 규칙](src/main/resources/classification/rules-v0.5.json)을 해석합니다. 정답 ID/URL/공고명 목록은 런타임에 포함하지 않습니다. 본문 구역 추출과 문장 단위 조건·직함 보강·직군 의존 순서를 사용합니다. 전체 21개 직군의 포함·제외는 [분류 규칙](../docs/classification-rules.md)을 참고하세요. 새 8개 분류 분야는 회사별 개별 수집을 지원한다고 표시하지 않습니다.
+
+`TaskService.finish`는 변경/동일 여부와 선택한 수집 분야에 관계없이 전체 직군을 판정합니다. 동일 본문은 저장 버전을 재사용합니다. `posting_category` 연결을 결과 집합과 일치시키므로 이전 오분류도 제거됩니다. `posting.classification_json`에는 규칙 버전·판정 시각·입력 해시·본문 구역 모드·직군별 근거 문장·미분류 이유가 저장됩니다. 본문 버전이 아닌 최신 공고의 현재 분류입니다.
+
+- `POST /api/classifications/rebuild`: 저장된 모든 공고의 최신 본문만 재분류. 외부 접속·본문/캡처 추가 없음. 응답: `requested`, `completed`, `failedPostingIds`, `unclassified`, `assignments`.
+- `GET /api/state`, `/api/postings`, `/api/postings/{id}`: 각 공고의 `categories`(복수 가능)와 `classification` 제공. 아직 분류하지 않은 과거 데이터는 `classification: null`.
+- 공고별 비관적 잠금과 짧은 트랜잭션으로 최신 본문을 읽고 연결을 교체합니다. 수집·읽음 변경과 같은 공고 잠금을 사용하며, 개별 실패는 목록으로 반환합니다. 재분류는 브라우저를 만들지 않습니다.
+
+실제 Kotlin 결과 평가 도구: `java -cp 'backend/build/classes/kotlin/main:backend/build/resources/main:backend/build/runtime-libs/*' scripts/analysis/EvaluateKotlinClassifier.java /path/corpus.jsonl /tmp/predictions.json` (루트에서 빌드 후 JDK 21 이상). 고정 정답과 Python 해석기 대조 결과는 [구현 검증](../docs/analysis/classification-implementation-v0.5.md)에 기록합니다.

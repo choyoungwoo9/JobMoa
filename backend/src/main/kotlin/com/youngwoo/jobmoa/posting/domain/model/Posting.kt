@@ -28,4 +28,5 @@ data class Posting(
     val closed: Boolean = false,
     val lastChange: String? = null,
     val categories: Set<String> = emptySet(),
+    val classification: com.youngwoo.jobmoa.classification.domain.model.Classification? = null,
 )

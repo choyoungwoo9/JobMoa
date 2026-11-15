@@ -19,12 +19,21 @@ class CompanyRegistry(sources: SourceRegistry) {
         CategoryDefinition("data-engineer", "데이터 엔지니어", "데이터 파이프라인·수집·적재·처리 플랫폼 개발"),
         CategoryDefinition("ml-engineer", "ML 엔지니어", "머신러닝 모델 구현·서비스 적용·추론 시스템 개발"),
         CategoryDefinition("devops-sre", "DevOps/SRE", "배포 자동화·서비스 신뢰성·운영 인프라 엔지니어링"),
-        CategoryDefinition("planning", "기획", "서비스·사업의 요구사항, 운영 정책과 실행 계획 수립"),
+        CategoryDefinition("planning", "기획·전략", "서비스·사업의 요구사항, 운영 정책과 실행 계획 수립"),
         CategoryDefinition("product-management", "PM", "제품·프로젝트의 목표, 로드맵, 우선순위와 일정 관리"),
         CategoryDefinition("design", "디자인", "UX/UI·프로덕트·브랜드 등의 디자인과 사용자 경험 설계"),
         CategoryDefinition("marketing", "마케팅", "브랜드·콘텐츠·퍼포먼스 마케팅과 캠페인 기획·실행"),
-        CategoryDefinition("sales", "영업", "고객 영업·제휴·사업개발을 통한 신규 고객과 매출 확보"),
+        CategoryDefinition("sales", "영업·사업개발", "고객 영업·제휴·사업개발을 통한 신규 고객과 매출 확보"),
+        CategoryDefinition("ai-application", "AI 응용·에이전트 개발", "기존 AI 모델·LLM을 이용한 서비스와 에이전트 구현"),
+        CategoryDefinition("ml-platform", "ML 플랫폼/MLOps", "모델 학습·서빙·평가를 위한 공통 플랫폼"),
+        CategoryDefinition("cloud-infrastructure", "클라우드·시스템 인프라", "클라우드·컴퓨팅·네트워크·시스템 기반 구축"),
+        CategoryDefinition("database", "DBA/데이터베이스", "데이터베이스 운영·성능·가용성 및 엔진 개발"),
+        CategoryDefinition("embedded-system", "임베디드·시스템 SW", "펌웨어·OS·하드웨어 인접 소프트웨어 개발"),
+        CategoryDefinition("robotics", "로보틱스·자율주행", "로봇·자율주행의 인지·제어·경로 계획 개발"),
+        CategoryDefinition("qa-test", "QA·테스트 자동화", "품질 검증과 테스트 자동화 개발"),
+        CategoryDefinition("data-analysis-bi", "데이터 분석·BI", "데이터 분석·지표·실험과 BI 구축"),
     )
+    private val classificationOnly = setOf("ai-application", "ml-platform", "cloud-infrastructure", "database", "embedded-system", "robotics", "qa-test", "data-analysis-bi")
     private val definitions = buildList {
         fun company(id: String, sourceId: String, portalId: String, name: String, vararg aliases: String) {
             val portal = sources.adapter(sourceId).discoveryTargets.find { it.id == portalId }
@@ -137,10 +146,10 @@ class CompanyRegistry(sources: SourceRegistry) {
         if (companyOverride != null) return companyOverride
         return when (sourceId) {
             "naver" -> setOf("all", "web-backend", "web-frontend", "android", "ios", "fullstack", "data-engineer", "ml-engineer", "devops-sre")
-            "toss" -> categories.map { it.id }.toSet()
+            "toss" -> categories.map { it.id }.toSet() - classificationOnly
             "kakao" -> setOf("all", "web-backend", "web-frontend", "android", "ios", "fullstack", "data-engineer", "ml-engineer", "devops-sre")
             "coupang" -> setOf("all", "web-backend", "web-frontend", "android", "ios", "fullstack", "data-engineer", "ml-engineer", "devops-sre")
-            "daangn" -> if (companyId in setOf("daangn", "daangn-pay")) categories.map { it.id }.toSet()
+            "daangn" -> if (companyId in setOf("daangn", "daangn-pay")) categories.map { it.id }.toSet() - classificationOnly
                 else setOf("all", "web-backend", "web-frontend", "android", "ios", "fullstack", "data-engineer", "ml-engineer", "devops-sre")
             "line" -> setOf("all", "web-backend", "web-frontend", "android", "ios", "fullstack", "data-engineer", "ml-engineer", "devops-sre")
             "woowa" -> setOf("all", "web-backend", "web-frontend", "android", "ios", "fullstack", "data-engineer", "ml-engineer", "devops-sre")

@@ -13,17 +13,24 @@ class PostingRepositoryImpl(
     private val postings: PostingJpaRepository,
     private val versions: PostingVersionJpaRepository,
     private val categories: PostingCategoryJpaRepository,
+    private val mapper: tools.jackson.databind.json.JsonMapper,
 ) : PostingRepository {
     override fun findByHashForUpdate(hash: String): Posting? = postings.findByUrlHash(hash)?.let { withCategories(listOf(it)).single() }
+    override fun lock(id: Long): Posting? = postings.lockById(id)?.let { withCategories(listOf(it)).single() }
     override fun find(id: Long): Posting? = postings.findById(id).orElse(null)?.let { withCategories(listOf(it)).single() }
     override fun list(): List<Posting> = withCategories(postings.findAllByOrderByFirstSeenDescIdDesc())
     override fun save(posting: Posting): Posting {
-        val saved = postings.saveAndFlush(posting.entity())
-        val existing = categories.findAllByIdPostingIdIn(listOf(saved.id!!)).map { it.id.categoryId }.toSet()
-        val additions = posting.categories.filter { it != "all" && it !in existing }
+        val saved = postings.saveAndFlush(posting.entity().also { entity ->
+            entity.classificationJson = posting.classification?.let { mapper.writeValueAsString(it) }
+        })
+        val links = categories.findAllByIdPostingIdIn(listOf(saved.id!!))
+        val existing = links.map { it.id.categoryId }.toSet()
+        val desired = posting.categories - "all"
+        categories.deleteAll(links.filter { it.id.categoryId !in desired })
+        val additions = desired.filter { it !in existing }
         require(additions.all { it.isNotBlank() && it.length <= 64 }) { "잘못된 공고 분야입니다." }
         if (additions.isNotEmpty()) categories.saveAllAndFlush(additions.map { PostingCategoryEntity(PostingCategoryId(saved.id!!, it)) })
-        return saved.domain(existing + additions)
+        return saved.domain(desired, posting.classification)
     }
     override fun versions(id: Long): List<PostingVersion> = versions.findAllByPostingIdOrderBySavedAtDescIdDesc(id).map { it.domain() }
     override fun latestVersion(postingId: Long): PostingVersion? = versions.findFirstByPostingIdOrderBySavedAtDescIdDesc(postingId)?.domain()
@@ -40,6 +47,6 @@ class PostingRepositoryImpl(
         if (entities.isEmpty()) return emptyList()
         val byPosting = categories.findAllByIdPostingIdIn(entities.map { it.id!! })
             .groupBy({ it.id.postingId }, { it.id.categoryId })
-        return entities.map { it.domain(byPosting[it.id].orEmpty().toSet()) }
+        return entities.map { entity -> entity.domain(byPosting[entity.id].orEmpty().toSet(), entity.classificationJson?.let { mapper.readValue(it, com.youngwoo.jobmoa.classification.domain.model.Classification::class.java) }) }
     }
 }
