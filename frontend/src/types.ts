@@ -22,6 +22,7 @@ export interface Source {
   id: SourceId
   name: string
   mark: string
+  logo: string
   url: string
 }
 export interface JobVersion {

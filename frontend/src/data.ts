@@ -12,37 +12,42 @@ import type {
 export const SOURCES: Source[] = [
   {
     id: 'naver',
+    logo: '/logos/naver.ico',
     name: '네이버',
     mark: 'N',
     url: 'https://recruit.navercorp.com/rcrt/list.do',
   },
-  { id: 'toss', name: '토스', mark: 't', url: 'https://toss.im/career/jobs' },
+  { id: 'toss', logo: '/logos/toss.png', name: '토스', mark: 't', url: 'https://toss.im/career/jobs' },
   {
     id: 'kakao',
+    logo: '/logos/kakao.ico',
     name: '카카오',
     mark: 'k',
     url: 'https://careers.kakao.com/jobs',
   },
-  { id: 'coupang', name: '쿠팡', mark: 'c', url: 'https://www.coupang.jobs/' },
+  { id: 'coupang', logo: '/logos/coupang.ico', name: '쿠팡', mark: 'c', url: 'https://www.coupang.jobs/' },
   {
     id: 'daangn',
+    logo: '/logos/daangn.svg',
     name: '당근',
     mark: '당',
     url: 'https://careers.daangn.com/jobs/',
   },
   {
     id: 'line',
+    logo: '/logos/line.png',
     name: 'LINE',
     mark: 'L',
     url: 'https://careers.linecorp.com/ko/jobs/',
   },
   {
     id: 'woowa',
+    logo: '/logos/woowa.ico',
     name: '우아한형제들',
     mark: '배',
     url: 'https://career.woowahan.com/',
   },
-  { id: 'bucketplace', name: '오늘의집', mark: '집', url: 'https://www.bucketplace.com/careers/' },
+  { id: 'bucketplace', logo: '/logos/bucketplace.ico', name: '오늘의집', mark: '집', url: 'https://www.bucketplace.com/careers/' },
 ]
 export const sourceById = (id: SourceId) =>
   SOURCES.find((source) => source.id === id)!
