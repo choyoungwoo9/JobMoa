@@ -324,6 +324,7 @@ private fun businessPolicy(sourceId: String, categoryId: String): JobPolicy {
             else -> base
         }
         "daangn" -> when (categoryId) {
+            "product-management" -> base.copy(bodyEvidence = regex(base.bodyEvidence.pattern + "|(?:제품|프로덕트)(?:의)?\\s*전략|제품\\s*실험\\s*(?:설계|기획)|가설(?:을)?\\s*검증"))
             "planning" -> base.copy(titleRoles = regex("(?:서비스|사업|비즈니스|광고)\\s*기획|(?:service|business)\\s*planner"))
             "sales" -> base.copy(titleRoles = regex("세일즈|영업|\\bsales\\b|business\\s*development|account\\s*(?:manager|executive)"))
             else -> base
