@@ -1,0 +1,1549 @@
+{
+  "version": "0.5-draft",
+  "status": "승인 대기 — 오프라인 평가 전용",
+  "normalization": [
+    "Unicode NFKC",
+    "공백/불릿 정규화",
+    "case-insensitive regex",
+    "ASCII 약어는 영문/숫자 경계로 매칭"
+  ],
+  "parser": {
+    "dutiesStart": "(?im)^\\s*[\\W_]{0,12}(?:주요\\s*업무|담당\\s*업무|업무\\s*내용|팀 소개 및 업무 내용|담당할 업무|다음 업무를 통해 목표를 달성해요|합류하시면 함께\\s*할 업무[예에]요|합류하시면 함께 할 업무입니다\\.?|합류하게 되면 이런 일을 하게 됩니다|함께 하시면 담당하게 될 업무|당신이 책임지게 될 임팩트|합류하면\\s*함께\\s*할?\\s*업무(?:[예에]요|는)|이런\\s*일을\\s*(?:해요|담당해요)|하실\\s*일|진행할 프로젝트|Responsibilit(?:ies|y)|(?:Key\\s*)?(?:Job\\s*|Roles and\\s*)?Responsibilities[^\\n]*|What\\s+You(?:\\s+Will|[’\\']ll)\\s*Do|主な業務内容|業務詳細|工作內容|職務內容)[^\\n]*\\n",
+    "requiredStart": "(?im)^\\s*[\\W_]{0,12}(?:자격\\s*요건|지원\\s*자격|필요 역량[^\\n]*|필수 경험과 역량|이런 경험을 가진 분을 찾습니다|이런 역량을 가진 분이 필요해요|필수\\s*(?:요건|사항)|이런\\s*분과\\s*함께하고 싶어요|이런\\s*분을\\s*(?:기다|찾)|이런\\s*동료를\\s*기다|우리가 함께 일하고 싶은 사람|Qualifications|Basic\\s*Qualifications|Essential\\s*Qualifications|Required\\s*(?:Qualifications|Skills)|Requirements|必要な経験[^\\n]*|必要條件|基本條件)[^\\n]*\\n",
+    "preferredStart": "(?im)^\\s*[\\W_]{0,12}(?:우대\\s*사항|이런 경험을 우대합니다|선호 역량|선호 역량/경험|이런\\s*분이면|이런\\s*경험이 있다면|이런 분이라면|あると望ましい|Preferred\\s*Qualifications|Preferred Qualification|Nice to have|加分條件|What We’re Looking For)[^\\n]*\\n",
+    "contentStop": "(?im)^\\s*[\\W_]{0,12}(?:토스로의\\s*합류|채용\\s*절차|전형\\s*절차|지원\\s*및\\s*진행|지원 및 진행 절차|지원서류|채용 프로세스|서류 지원 가이드|이력서는|함께할 동료를 위한|더 알아보기|꼭 확인해|報酬|求める人物像|プロダクトを知る|本ポジションの魅力|組織や人を知る|関連ポジション|※変更の範囲|Pay & Benefits|Privacy Notice|전형 안내|福利厚生|개발 환경|우리가 사용하는 기술과 도구|이런 기술을 사용하고|[^\\n]{0,35}사용하는 기술이에요|[^\\n]{0,35}어떤 성장을 기대|[^\\n]{0,35}기술 스택|Required Skills)[^\\n]*",
+    "positionStart": "(?im)^\\s*[\\W_]{0,12}(?:직무 소개|Role Overview[^\\n]*|Role Description|Job Overview|포지션 소개|ポジション概要|Team/Position Description|팀 소개|합류하게 될 포지션[^\\n]*|[^\\n]{0,65}(?:이렇게 일해요|이렇게 일해요\\.)|토스[^\\n]{0,65}합류하시면 이런 경험[^\\n]*)[^\\n]*\\n"
+  },
+  "actions": "개발|구현|설계|구축|만들|운영|개선|고도화|최적화|개발해|담당|책임|제공|개발합니다|build|develop|implement|design|architect|maintain|operat|optimi[sz]|own|create|deliver|manage|開発|設計|構築|実装|運用|改善|开发|设计|构建|优化|主导|交付|구성|유지|넘나들",
+  "rules": {
+    "qa-test": {
+      "description": "테스트 전략·자동화 프레임워크를 독립적인 업무 산출물로 개발",
+      "when": {
+        "any": [
+          {
+            "unit": {
+              "all": [
+                "테스트\\s*전략|Test Strategy",
+                "개발|구현|설계|구축|만들|운영|개선|고도화|최적화|개발해|담당|책임|제공|개발합니다|build|develop|implement|design|architect|maintain|operat|optimi[sz]|own|create|deliver|manage|開発|設計|構築|実装|運用|改善|开发|设计|构建|优化|主导|交付"
+              ],
+              "none": []
+            }
+          },
+          {
+            "unit": {
+              "all": [
+                "(?:테스트|test|E2E|비주얼)[^\\n]{0,35}(?:프레임워크|framework)",
+                "개발|구현|설계|구축|만들|운영|개선|고도화|최적화|개발해|담당|책임|제공|개발합니다|build|develop|implement|design|architect|maintain|operat|optimi[sz]|own|create|deliver|manage|開発|設計|構築|実装|運用|改善|开发|设计|构建|优化|主导|交付"
+              ],
+              "none": []
+            }
+          },
+          {
+            "all": [
+              {
+                "match": {
+                  "field": "title",
+                  "pattern": "QA|SDET|test(?:ing)? engineer|테스트\\s*엔지니어"
+                }
+              },
+              {
+                "unit": {
+                  "all": [
+                    "테스트|test",
+                    "개발|구현|설계|구축|만들|운영|개선|고도화|최적화|개발해|담당|책임|제공|개발합니다|build|develop|implement|design|architect|maintain|operat|optimi[sz]|own|create|deliver|manage|開発|設計|構築|実装|運用|改善|开发|设计|构建|优化|主导|交付"
+                  ],
+                  "none": []
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "ml-platform": {
+      "description": "全社/공통 ML 플랫폼 또는 전담 모델 학습·배포·서빙 기반",
+      "when": {
+        "all": [
+          {
+            "any": [
+              {
+                "unit": {
+                  "all": [
+                    "MLOps|LLMOps|MLプラットフォーム|機械学習プラットフォーム|ML/LLM\\s*플랫폼|머신러닝\\s*플랫폼|MLflow|Kubeflow",
+                    "개발|구현|설계|구축|만들|운영|개선|고도화|최적화|개발해|담당|책임|제공|개발합니다|build|develop|implement|design|architect|maintain|operat|optimi[sz]|own|create|deliver|manage|開発|設計|構築|実装|運用|改善|开发|设计|构建|优化|主导|交付|구성|유지|넘나들"
+                  ],
+                  "none": [
+                    "using.*Kubeflow|사용하는\\s*기술|활용한\\s*경험"
+                  ]
+                }
+              },
+              {
+                "unit": {
+                  "all": [
+                    "모델|ML|LLM|model|machine learning|AI infrastructure",
+                    "학습\\s*파이프라인|배포\\s*(?:시스템|플랫폼|프로세스)|서빙|inference|serving|deployment|productionization",
+                    "개발|구축|설계|시스템|서버|환경|architect|design|develop|build|end.to.end|own"
+                  ],
+                  "none": [
+                    "자체\\s*모델|학습된\\s*모델|본인의|학습-서빙\\s*정합성|환경에\\s*모델을\\s*배포|서빙/운영\\s*지원|model.*quality|모델의\\s*정확도"
+                  ]
+                }
+              },
+              {
+                "all": [
+                  {
+                    "match": {
+                      "field": "title",
+                      "pattern": "MLOps|ML.*Ops|AI 플랫폼|AI Platform|ML Data Platform"
+                    }
+                  },
+                  {
+                    "unit": {
+                      "all": [
+                        "학습|서빙|GPU|추론|serving|ML\\s*인프라|ML\\s*파이프라인",
+                        "개발|구현|설계|구축|만들|운영|개선|고도화|최적화|개발해|담당|책임|제공|개발합니다|build|develop|implement|design|architect|maintain|operat|optimi[sz]|own|create|deliver|manage|開発|設計|構築|実装|運用|改善|开发|设计|构建|优化|主导|交付|구성|유지|넘나들"
+                      ],
+                      "none": []
+                    }
+                  }
+                ]
+              },
+              {
+                "unit": {
+                  "all": [
+                    "피쳐\\s*스토어|feature store",
+                    "개발|구축|운영|설계"
+                  ],
+                  "none": []
+                }
+              },
+              {
+                "unit": {
+                  "all": [
+                    "machine learning pipelines|model development lifecycle|模型训练与评估的基础设施",
+                    "architecture|architect|design|설계|构建"
+                  ],
+                  "none": []
+                }
+              },
+              {
+                "all": [
+                  {
+                    "match": {
+                      "field": "title",
+                      "pattern": "Inference Pipeline"
+                    }
+                  },
+                  {
+                    "unit": {
+                      "all": [
+                        "모델|ML|LLM",
+                        "파이프라인|비동기|배치",
+                        "개발|구현|설계|구축|만들|운영|개선|고도화|최적화|개발해|담당|책임|제공|개발합니다|build|develop|implement|design|architect|maintain|operat|optimi[sz]|own|create|deliver|manage|開発|設計|構築|実装|運用|改善|开发|设计|构建|优化|主导|交付|구성|유지|넘나들"
+                      ],
+                      "none": []
+                    }
+                  }
+                ]
+              },
+              {
+                "unit": {
+                  "all": [
+                    "ML model development lifecycle",
+                    "define|design|develop"
+                  ],
+                  "none": []
+                }
+              }
+            ]
+          },
+          {
+            "not": {
+              "all": [
+                {
+                  "taggedAny": [
+                    "ml-engineer"
+                  ]
+                },
+                {
+                  "not": {
+                    "match": {
+                      "field": "title",
+                      "pattern": "AI Platform|AI 플랫폼|ML.*Ops|MLOps|AI.*추론|AI領域"
+                    }
+                  }
+                },
+                {
+                  "not": {
+                    "unit": {
+                      "all": [
+                        "공통|전사|여러.*팀|표준|standardized|feature store integration",
+                        "플랫폼|배포|개발|model|feature"
+                      ],
+                      "none": []
+                    }
+                  }
+                },
+                {
+                  "not": {
+                    "unit": {
+                      "all": [
+                        "모델\\s*학습.*학습\\s*파이프라인",
+                        "플랫폼"
+                      ],
+                      "none": []
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "embedded-system": {
+      "description": "디바이스 펌웨어/RTOS/HAL/BSP 또는 기기 맥락의 커널·OTA 개발",
+      "when": {
+        "any": [
+          {
+            "unit": {
+              "all": [
+                "펌웨어|\\bRTOS\\b|\\bHAL\\b|\\bBSP\\b|firmware",
+                "개발|구현|설계|구축|만들|운영|개선|고도화|최적화|개발해|담당|책임|제공|개발합니다|build|develop|implement|design|architect|maintain|operat|optimi[sz]|own|create|deliver|manage|開発|設計|構築|実装|運用|改善|开发|设计|构建|优化|主导|交付|구성|유지|넘나들"
+              ],
+              "none": []
+            }
+          },
+          {
+            "all": [
+              {
+                "match": {
+                  "field": "title",
+                  "pattern": "embedded|임베디드|로봇|robot|자율주행|디바이스|Device"
+                }
+              },
+              {
+                "unit": {
+                  "all": [
+                    "시스템\\s*소프트웨어|커널|드라이버|OTA|Yocto|C\\+\\+/(?<![A-Za-z0-9])ROS2(?![A-Za-z0-9])|system software",
+                    "개발|구현|설계|구축|만들|운영|개선|고도화|최적화|개발해|담당|책임|제공|개발합니다|build|develop|implement|design|architect|maintain|operat|optimi[sz]|own|create|deliver|manage|開発|設計|構築|実装|運用|改善|开发|设计|构建|优化|主导|交付|구성|유지|넘나들"
+                  ],
+                  "none": []
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "robotics": {
+      "description": "로봇/차량 소프트웨어·자율주행 알고리즘 개발",
+      "when": {
+        "any": [
+          {
+            "unit": {
+              "all": [
+                "로봇|자율주행|(?<![A-Za-z0-9])SLAM(?![A-Za-z0-9])|(?<![A-Za-z0-9])VIO(?![A-Za-z0-9])|(?<![A-Za-z0-9])LIO(?![A-Za-z0-9])|(?<![A-Za-z0-9])ADCU(?![A-Za-z0-9])|(?<![A-Za-z0-9])ECU(?![A-Za-z0-9])|(?<![A-Za-z0-9])ROS2(?![A-Za-z0-9])",
+                "개발|구현|설계|구축|만들|운영|개선|고도화|최적화|개발해|담당|책임|제공|개발합니다|build|develop|implement|design|architect|maintain|operat|optimi[sz]|own|create|deliver|manage|開発|設計|構築|実装|運用|改善|开发|设计|构建|优化|主导|交付"
+              ],
+              "none": []
+            }
+          },
+          {
+            "all": [
+              {
+                "match": {
+                  "field": "title",
+                  "pattern": "로봇|Robot|자율주행"
+                }
+              },
+              {
+                "unit": {
+                  "all": [
+                    "펌웨어|커널|시스템|센서|Linux|RTOS|(?<![A-Za-z0-9])SLAM(?![A-Za-z0-9])",
+                    "개발|구현|설계|구축|만들|운영|개선|고도화|최적화|개발해|담당|책임|제공|개발합니다|build|develop|implement|design|architect|maintain|operat|optimi[sz]|own|create|deliver|manage|開発|設計|構築|実装|運用|改善|开发|设计|构建|优化|主导|交付"
+                  ],
+                  "none": []
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "android": {
+      "description": "Android 앱·SDK·시스템 SW 구현",
+      "when": {
+        "any": [
+          {
+            "unit": {
+              "all": [
+                "Android|안드로이드",
+                "앱|app|(?<![A-Za-z0-9])SDK(?![A-Za-z0-9])|Framework|(?<![A-Za-z0-9])HAL(?![A-Za-z0-9])|개발|설계|development|feature|アプリ|設計|開発"
+              ],
+              "none": [
+                "웹뷰|webview|프론트엔드|(?<![A-Za-z0-9])UI(?![A-Za-z0-9]) 디자인|(?<![A-Za-z0-9])UX(?![A-Za-z0-9]) 설계|디자이너",
+                "(?:iOS|Android).*開発チーム.*連携"
+              ]
+            }
+          },
+          {
+            "all": [
+              {
+                "match": {
+                  "field": "title",
+                  "pattern": "Android|안드로이드"
+                }
+              },
+              {
+                "unit": {
+                  "all": [
+                    "앱|애플리케이션|모바일\\s*제품|mobile|\\bapps?\\b|アプリ",
+                    "개발|구현|설계|구축|만들|운영|개선|고도화|최적화|개발해|담당|책임|제공|개발합니다|build|develop|implement|design|architect|maintain|operat|optimi[sz]|own|create|deliver|manage|開発|設計|構築|実装|運用|改善|开发|设计|构建|优化|主导|交付"
+                  ],
+                  "none": [
+                    "(?:iOS|Android).*開発チーム.*連携"
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "ios": {
+      "description": "iOS 앱·SDK 구현",
+      "when": {
+        "any": [
+          {
+            "unit": {
+              "all": [
+                "iOS|Swift|UIKit",
+                "앱|app|(?<![A-Za-z0-9])SDK(?![A-Za-z0-9])|개발|설계|development|feature|アプリ|設計|開発"
+              ],
+              "none": [
+                "웹뷰|webview|(?<![A-Za-z0-9])UI(?![A-Za-z0-9]) 디자인|(?<![A-Za-z0-9])UX(?![A-Za-z0-9]) 설계|디자이너",
+                "(?:iOS|Android).*開発チーム.*連携"
+              ]
+            }
+          },
+          {
+            "all": [
+              {
+                "match": {
+                  "field": "title",
+                  "pattern": "\\biOS\\b"
+                }
+              },
+              {
+                "unit": {
+                  "all": [
+                    "앱|애플리케이션|모바일\\s*제품|mobile|\\bapps?\\b|アプリ",
+                    "개발|구현|설계|구축|만들|운영|개선|고도화|최적화|개발해|담당|책임|제공|개발합니다|build|develop|implement|design|architect|maintain|operat|optimi[sz]|own|create|deliver|manage|開発|設計|構築|実装|運用|改善|开发|设计|构建|优化|主导|交付"
+                  ],
+                  "none": [
+                    "(?:iOS|Android).*開発チーム.*連携"
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "ml-engineer": {
+      "description": "모델 자체 학습/설계·추천 알고리즘 개선 또는 추론 엔진 최적화",
+      "when": {
+        "any": [
+          {
+            "unit": {
+              "all": [
+                "모델|model|モデル|模型",
+                "직접\\s*학습|학습시켜|설계.*학습|학습\\s*및\\s*평가|fine[ -]?tun|파인튜닝|contrastive learning|graph representation|분류\\s*모델.*개발"
+              ],
+              "none": [
+                "플랫폼|파이프라인"
+              ]
+            }
+          },
+          {
+            "unit": {
+              "all": [
+                "post[ -]?training|continual learning|NLU\\s*태스크|(?:AI|ML|추천|랭킹|플래닝|딥러닝|인지|언어)\\s*모델|기계학습|機械学習|machine learning|deep learning",
+                "개발|학습|고도화|설계|develop|build|train|学習|開発"
+              ],
+              "none": [
+                "인프라|infrastructure|파이프라인|pipelines?|플랫폼|platform|서빙|serving|캐싱|비용|조합해|운영\\s*지원|개발팀.*연계|エンジニア.*連携|サイエンスチーム.*連携"
+              ]
+            }
+          },
+          {
+            "unit": {
+              "all": [
+                "추론|inference",
+                "양자화|커널\\s*최적화|quantization|kernel"
+              ],
+              "none": []
+            }
+          },
+          {
+            "unit": {
+              "all": [
+                "AI/ML\\s*系统",
+                "离线训练"
+              ],
+              "none": []
+            }
+          },
+          {
+            "all": [
+              {
+                "match": {
+                  "field": "title",
+                  "pattern": "\\bML\\b|Machine Learning|機械学習"
+                }
+              },
+              {
+                "not": {
+                  "match": {
+                    "field": "title",
+                    "pattern": "ML.*(?:백엔드|Backend|인프라|Infra|Ops|Data Platform)"
+                  }
+                }
+              },
+              {
+                "unit": {
+                  "all": [
+                    "추천|랭킹|리트리벌|입찰|경매|recommen|ranking|retrieval|predictive|OCR",
+                    "개선|설계|모델|고도화|학습|develop|model|build|design|train"
+                  ],
+                  "none": []
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "data-engineer": {
+      "description": "업무/분석 데이터 파이프라인·마트·분산 데이터 플랫폼 개발",
+      "when": {
+        "any": [
+          {
+            "unit": {
+              "all": [
+                "(?<![A-Za-z0-9])ETL(?![A-Za-z0-9])|(?<![A-Za-z0-9])ELT(?![A-Za-z0-9])|(?<![A-Za-z0-9])CDC(?![A-Za-z0-9])|(?<![A-Za-z0-9])DWH(?![A-Za-z0-9])|데이터\\s*(?:파이프라인|웨어하우스|마트|레이크|입수|적재|처리\\s*시스템)|데이터\\s*모델링|분산\\s*데이터|data\\s*(?:processing|pipelines?|warehouse)|データ(?:モデル|要件定義|プラットフォーム基盤)|(?<![A-Za-z0-9])ETL(?![A-Za-z0-9])設計|分散処理基盤|공간정보\\s*데이터|수집/전처리/관리",
+                "개발|구현|설계|구축|만들|운영|개선|고도화|최적화|개발해|담당|책임|제공|개발합니다|build|develop|implement|design|architect|maintain|operat|optimi[sz]|own|create|deliver|manage|開発|設計|構築|実装|運用|改善|开发|设计|构建|优化|主导|交付|구성|유지|넘나들"
+              ],
+              "none": [
+                "모델\\s*학습|학습할 수 있는|학습\\s*데이터셋|학습\\s*파이프라인|이종 인프라 데이터|(?<![A-Za-z0-9])AI(?![A-Za-z0-9]) Agent가 활용"
+              ]
+            }
+          },
+          {
+            "all": [
+              {
+                "match": {
+                  "field": "title",
+                  "pattern": "data (?:engineer|analytics engineer|platform)|데이터.*(?:엔지니어|시스템\\s*개발)|analytics engineer|데이터엔지니어링|データエンジニア"
+                }
+              },
+              {
+                "unit": {
+                  "all": [
+                    "데이터|마트|워크플로|파이프라인|data|データ",
+                    "개발|구현|설계|구축|만들|운영|개선|고도화|최적화|개발해|담당|책임|제공|개발합니다|build|develop|implement|design|architect|maintain|operat|optimi[sz]|own|create|deliver|manage|開発|設計|構築|実装|運用|改善|开发|设计|构建|优化|主导|交付|구성|유지|넘나들"
+                  ],
+                  "none": []
+                }
+              },
+              {
+                "not": {
+                  "match": {
+                    "field": "title",
+                    "pattern": "(?<![A-Za-z0-9])AI(?![A-Za-z0-9])/Data"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "database": {
+      "description": "DB 엔진/클러스터 자체 운영·백업/복구·튜닝·가용성",
+      "when": {
+        "any": [
+          {
+            "all": [
+              {
+                "match": {
+                  "field": "title",
+                  "pattern": "\\bDBA\\b|Database (?:Administrator|Engineer)|데이터베이스|分散データベース"
+                }
+              },
+              {
+                "unit": {
+                  "all": [
+                    "MySQL|PostgreSQL|Redis|HBase|database|데이터베이스|データベース",
+                    "개발|구현|설계|구축|만들|운영|개선|고도화|최적화|개발해|담당|책임|제공|개발합니다|build|develop|implement|design|architect|maintain|operat|optimi[sz]|own|create|deliver|manage|開発|設計|構築|実装|運用|改善|开发|设计|构建|优化|主导|交付|구성|유지|넘나들|デプロイ|アップグレード"
+                  ],
+                  "none": []
+                }
+              }
+            ]
+          },
+          {
+            "unit": {
+              "all": [
+                "데이터베이스|database|データベース",
+                "백업|복구|backup|recovery|チューニング|데이터베이스\\s*운영\\s*표준"
+              ],
+              "none": [
+                "CDC|파이프라인|테이블|데이터 모델|스키마"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "cloud-infrastructure": {
+      "description": "직접 관리하는 서버/네트워크/스토리지·클라우드/클러스터 자원",
+      "when": {
+        "any": [
+          {
+            "unit": {
+              "all": [
+                "Linux servers|Linux\\s*서버|서버,?\\s*OS|가상화\\s*인프라|베어메탈|GPU\\s*(?:컴퓨팅\\s*)?클러스터|Kubernetes\\s*(?:클러스터|표준\\s*환경)|클라우드\\s*(?:전체\\s*)?인프라|cloud infrastructure|datacenter\\s*(?:infrastructure|services)|workload and service management infrastructure|인프라\\s*및\\s*플랫폼|infrastructure & platform|네트워크.*스토리지|network.*storage|하이브리드.*인프라",
+                "설계|구축|운영|프로비저닝|제공|확장|architecture|design|build|operat|provision"
+              ],
+              "none": [
+                "모델.*(?:환경에|배포)|가시성|관측성|클라우드.*서비스를 적극적으로 활용|투자|거버넌스를\\s*제안"
+              ]
+            }
+          },
+          {
+            "unit": {
+              "all": [
+                "클러스터|クラスタ",
+                "자원\\s*관리|스케줄링|프로비저닝|リソース管理|スケジューリング|数千台",
+                "개발|구현|설계|구축|만들|운영|개선|고도화|최적화|개발해|담당|책임|제공|개발합니다|build|develop|implement|design|architect|maintain|operat|optimi[sz]|own|create|deliver|manage|開発|設計|構築|実装|運用|改善|开发|设计|构建|优化|主导|交付|구성|유지|넘나들"
+              ],
+              "none": []
+            }
+          },
+          {
+            "all": [
+              {
+                "match": {
+                  "field": "title",
+                  "pattern": "Cloud|클라우드|Systems? Engineer|시스템\\s*엔지니어|Infrastructure|DevOps.*클러스터|쿠버네티스|Kubernetes Engine"
+                }
+              },
+              {
+                "unit": {
+                  "all": [
+                    "서버|OS|스토리지|network|server|Linux|datacenter|가상화|클러스터|cloud|クラスタ",
+                    "설계|구축|운영|관리|design|build|operat|provision"
+                  ],
+                  "none": []
+                }
+              },
+              {
+                "not": {
+                  "match": {
+                    "field": "title",
+                    "pattern": "로봇|자율주행"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "unit": {
+              "all": [
+                "클러스터|クラスタ|네트워크\\s*환경|콜\\s*인프라|네트워크,\\s*스토리지|네트워크\\s*환경|(?:클라우드|클러스터).*인프라|インフラ|GPU/CPU",
+                "설계|구축|운영|프로비저닝|증설|스케줄링|スケジューリング|リソース管理|設計|構築|アーキテクチャ"
+              ],
+              "none": [
+                "경험|개발\\s*팀과|가시성|관측|모델\\s*서빙|모델.*배포|MLOps|데이터.*활용|애플리케이션.*배포"
+              ]
+            }
+          },
+          {
+            "all": [
+              {
+                "match": {
+                  "field": "title",
+                  "pattern": "Cloud|시스템 엔지니어|Systems Engineer|Infra|인프라|K8\\b"
+                }
+              },
+              {
+                "unit": {
+                  "all": [
+                    "인프라|클러스터|서버|OS|네트워크|클라우드|infrastructure|cloud|workload",
+                    "설계|구축|운영|프로비저닝|관리|design|architect|build|operat"
+                  ],
+                  "none": [
+                    "협업|collaborat|데이터.*처리|메시징.*서버|이미지.*플랫폼"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "unit": {
+              "all": [
+                "Hadoop.*Spark.*Trino|クラスタ",
+                "基盤.*設計|リソース管理|スケジューリング|数千台"
+              ],
+              "none": []
+            }
+          }
+        ]
+      }
+    },
+    "ai-application": {
+      "description": "Agent/RAG 등 AI 자체가 산출물인 응용 로직과 워크플로 구현",
+      "when": {
+        "all": [
+          {
+            "any": [
+              {
+                "unit": {
+                  "all": [
+                    "RAG|(?:멀티|multi)[ -]?(?:에이전트|agent)|Agent\\s*(?:Workflow|Development|Runtime)|(?:에이전트|Agent).{0,25}(?:오케스트레이션|구성|시스템)|Tool (?:Use|Calling)|Function Calling|LangGraph|AIエージェント構築|LLMを活用したアプリケーション|Multi-Agent|自然言語インターフェース",
+                    "개발|설계|구현|구축|만들|연결|develop|build|design|implement|architect|implement|開発|設計|構築|개선"
+                  ],
+                  "none": [
+                    "코딩\\s*에이전트|코드\\s*리뷰|개발\\s*프로세스.*자동화|개발과\\s*운영\\s*과정|필요에\\s*따라|인프라를\\s*설계|플랫폼의\\s*인프라|배포\\s*시스템|요약, 추천, 분류|관심이 있|아키텍처.*우대|경험|메타데이터|학습\\s*데이터"
+                  ]
+                }
+              },
+              {
+                "unit": {
+                  "all": [
+                    "AI|LLM",
+                    "AI로 자동\\s*(?:추출|추론)|LLM\\s*기반으로.*자동\\s*생성|(?:장애|이상).*분석.*(?:봇|LLM)|Agent\\s*오케스트레이션|평가\\s*시스템|AI가 정확히 활용할 수 있는 형태로 연결",
+                    "개발|설계|구현|구축|만들|연결|develop|build|design|implement|architect|implement|開発|設計|構築|개선"
+                  ],
+                  "none": []
+                }
+              },
+              {
+                "all": [
+                  {
+                    "match": {
+                      "field": "title",
+                      "pattern": "AI\\s*(?:엔지니어|Engineer|Solution|솔루션)|AIOps|AI Platform|AI 플랫폼"
+                    }
+                  },
+                  {
+                    "unit": {
+                      "all": [
+                        "LLM|Agent|에이전트|AI\\s*(?:심사|리포트|워크플로)|비동기.*배치|모델\\s*API",
+                        "개발|설계|구현|구축|만들|연결|develop|build|design|implement|architect|implement|開発|設計|構築|개선"
+                      ],
+                      "none": [
+                        "코딩 에이전트|모델\\s*학습|학습\\s*파이프라인|데이터\\s*구축|서빙\\s*프레임워크|서빙\\s*환경|머신러닝\\s*플랫폼|메타데이터|배포\\s*시스템|GPU|네트워크|스토리지|NVIDIA|클러스터"
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "unit": {
+                  "all": [
+                    "RAG|LLM-based agents|AI\\s*agents|Multi-Agent|LLM\\s*기반으로|LLM으로|AI로",
+                    "개발|만들|구현|설계|구축|요약|추출|자동\\s*생성|develop|build|架构设计"
+                  ],
+                  "none": [
+                    "모델.*학습|학습.*모델|LLM으로 구조화|프롬프트 스튜디오|코딩\\s*에이전트|관심|우대|경험|모델의\\s*성능"
+                  ]
+                }
+              },
+              {
+                "all": [
+                  {
+                    "match": {
+                      "field": "title",
+                      "pattern": "AI\\s*Service|AI\\s*서비스|Applied AI|Inference Pipeline"
+                    }
+                  },
+                  {
+                    "unit": {
+                      "all": [
+                        "LLM|AI|AI-powered",
+                        "개발|구현|설계|구축|만들|develop|implement|build"
+                      ],
+                      "none": []
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "not": {
+              "all": [
+                {
+                  "match": {
+                    "field": "title",
+                    "pattern": "추론\\s*최적화|\\(Model\\)|ML\\s*인프라"
+                  }
+                },
+                {
+                  "not": {
+                    "unit": {
+                      "all": [
+                        "Multi.Agent|multi.agent|RAG",
+                        "개발|구현|design|develop"
+                      ],
+                      "none": []
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "devops-sre": {
+      "description": "공통 개발/배포 플랫폼·전담 SRE 또는 전사 관측성 구현",
+      "when": {
+        "all": [
+          {
+            "any": [
+              {
+                "unit": {
+                  "all": [
+                    "CI/CD|CICD|빌드.{0,10}배포|배포.{0,12}파이프라인|배포\\s*플랫폼|배포시스템|배포\\s*자동화|IaC.*(?:deployment|automation)|deployment automation",
+                    "개발|구축|설계|고도화|최적화|운영|개선|만들|implement|build|design|develop|architect|자동화"
+                  ],
+                  "none": [
+                    "직접\\s*배포하고|모델\\s*버전|머신러닝\\s*모델|model deploy|학습된 모델|model version|(?<![A-Za-z0-9])ML(?![A-Za-z0-9]) 플랫폼|모델이.*배포|gain hands.on|開発生産性向上"
+                  ]
+                }
+              },
+              {
+                "unit": {
+                  "all": [
+                    "관측성\\s*플랫폼|옵저버빌리티\\s*플랫폼|통합\\s*모니터링\\s*시스템|Monitoring.*Alert System|SLO|SLI|Self-Healing|관측\\s*플랫폼",
+                    "개발|구축|설계|구현|고도화|운영|정의|define|design|実装|定義|設計"
+                  ],
+                  "none": [
+                    "데이터\\s*품질|Data Quality|모델.*모니터링|학습된 모델|서빙 모니터링"
+                  ]
+                }
+              },
+              {
+                "unit": {
+                  "all": [
+                    "개발환경|개발\\s*워크플로|모노레포|빌드\\s*툴체인|리포지토리.{0,15}중앙\\s*관리",
+                    "개발|구현|설계|구축|만들|운영|개선|고도화|최적화|개발해|담당|책임|제공|개발합니다|build|develop|implement|design|architect|maintain|operat|optimi[sz]|own|create|deliver|manage|開発|設計|構築|実装|運用|改善|开发|设计|构建|优化|主导|交付|구성|유지|넘나들"
+                  ],
+                  "none": []
+                }
+              },
+              {
+                "all": [
+                  {
+                    "match": {
+                      "field": "title",
+                      "pattern": "dev[ -]?ops|\\bSRE\\b|Site Reliability|AIOps|플랫폼\\s*엔지니어"
+                    }
+                  },
+                  {
+                    "unit": {
+                      "all": [
+                        "운영|모니터링|장애|자동화|신뢰성|코드|Knowledge Base|LLM|build|CI/CD|infrastructure|SLO|信頼",
+                        "개발|구현|설계|구축|만들|운영|개선|고도화|최적화|개발해|담당|책임|제공|개발합니다|build|develop|implement|design|architect|maintain|operat|optimi[sz]|own|create|deliver|manage|開発|設計|構築|実装|運用|改善|开发|设计|构建|优化|主导|交付|구성|유지|넘나들"
+                      ],
+                      "none": []
+                    }
+                  }
+                ]
+              },
+              {
+                "unit": {
+                  "all": [
+                    "Observability|SRE|SLO|SLI|GitOps",
+                    "design|build|implement|설계|구축|운영|設計|定義"
+                  ],
+                  "none": []
+                }
+              }
+            ]
+          },
+          {
+            "not": {
+              "all": [
+                {
+                  "taggedAny": [
+                    "ml-platform"
+                  ]
+                },
+                {
+                  "not": {
+                    "match": {
+                      "field": "title",
+                      "pattern": "DevOps|SRE|DataOps"
+                    }
+                  }
+                },
+                {
+                  "not": {
+                    "unit": {
+                      "all": [
+                        "GitOps|ArgoCD|Operator|Kubernetes.*배포\\s*자동화",
+                        "구축|설계|개발|설계해|체계"
+                      ],
+                      "none": []
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "not": {
+              "all": [
+                {
+                  "taggedAny": [
+                    "qa-test"
+                  ]
+                },
+                {
+                  "not": {
+                    "match": {
+                      "field": "title",
+                      "pattern": "플랫폼|Platform|DevOps|SRE"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "web-backend": {
+      "description": "직접 서버/API 구현 또는 세부 직함·업무·필수 서버 역량; 다른 직군 협업/부가 가능성은 제외",
+      "when": {
+        "any": [
+          {
+            "any": [
+              {
+                "unit": {
+                  "all": [
+                    "백엔드|back[ -]?end|バックエンド|サーバーサイド|서버\\s*(?:아키텍처|서비스|API|시스템|개발|로직)|서버(?:를|와|부터|까지)|API|게이트웨이|microservices?",
+                    "설계|개발|구현|design|develop|build|implement|開発|設計|구축|넘나들"
+                  ],
+                  "none": [
+                    "개발자.{0,40}(?:협업|협의)|개발팀과.{0,20}협업|collaborat.{0,45}back[ -]?end|back[ -]?end.{0,45}collaborat|バックエンドエンジニア.*連携|API.{0,25}(?:테스트|Testing|활용|사용)|UI.*API|외부 모델 API|API로 열어|infrastructure\\s*recommendations|Cloud\\s*Infrastructure|인프라|네이티브|QA|microservices.*환경\\s*지원|프론트엔드\\s*서버|서버\\s*개발팀과"
+                  ]
+                }
+              },
+              {
+                "unit": {
+                  "all": [
+                    "Spring|Django|Nest\\.?js",
+                    "서비스\\s*개발|서비스\\s*개발\\s*및|Build|develop|server"
+                  ],
+                  "none": [
+                    "선호|우대|경험|years|협업"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "all": [
+              {
+                "any": [
+                  {
+                    "match": {
+                      "field": "title",
+                      "pattern": "back[ -]?end|백\\s*엔드|서버\\s*개발|server[ -]?(?:developer|engineer)|server[ -]side engineer|Node\\.?js\\s*(?:개발|developer)|バックエンド|サーバーサイド|full[ -]?stack|풀\\s*스택"
+                    }
+                  },
+                  {
+                    "all": [
+                      {
+                        "match": {
+                          "field": "title",
+                          "pattern": "software engineer|프로덕트 엔지니어"
+                        }
+                      },
+                      {
+                        "not": {
+                          "match": {
+                            "field": "title",
+                            "pattern": "Android|\\biOS\\b|front[ -]?end|Machine Learning|Software Engineer,? Data|Cloud|클라우드|인프라"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "all": [
+                      {
+                        "match": {
+                          "field": "title",
+                          "pattern": "시스템\\s*개발자"
+                        }
+                      },
+                      {
+                        "match": {
+                          "field": "required",
+                          "pattern": "Spring|Nest\\.?js|Django"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "unit": {
+                  "all": [
+                    "서비스|시스템|플랫폼|서버|분산|API|기능|구조|로직|도메인|검색|신용거래|매매|결제|system|services?|platform|distributed|バックエンド|サーバー|システム|サービス|機能|プロダクト",
+                    "개발|구현|설계|만들|운영|개선|build|develop|design|architect|maintain|operat|開発|設計|改善|運用"
+                  ],
+                  "none": []
+                }
+              },
+              {
+                "match": {
+                  "field": "required",
+                  "pattern": "Java|Kotlin|Spring|Node\\.?js|Nest\\.?js|Django|Python|Go|PHP|Ruby|JavaScript|backend|back.end|서버|백엔드|분산|distributed|socket|소켓|Webアプリケーション|プログラミング"
+                }
+              },
+              {
+                "not": {
+                  "taggedAny": [
+                    "qa-test",
+                    "embedded-system",
+                    "cloud-infrastructure",
+                    "ml-platform"
+                  ]
+                }
+              },
+              {
+                "not": {
+                  "match": {
+                    "field": "title",
+                    "pattern": "SRE|DevOps|Cloud.*Backend"
+                  }
+                }
+              },
+              {
+                "not": {
+                  "all": [
+                    {
+                      "taggedAny": [
+                        "data-engineer"
+                      ]
+                    },
+                    {
+                      "not": {
+                        "unit": {
+                          "all": [
+                            "고객\\s*금융|금융\\s*데이터|online serving|온라인\\s*서빙",
+                            "개발|구현|설계|구축|만들|운영|개선|고도화|최적화|개발해|담당|책임|제공|개발합니다|build|develop|implement|design|architect|maintain|operat|optimi[sz]|own|create|deliver|manage|開発|設計|構築|実装|運用|改善|开发|设计|构建|优化|主导|交付|구성|유지|넘나들"
+                          ],
+                          "none": []
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "not": {
+                  "unit": {
+                    "all": [
+                      "streaming data processing|data and ML infrastructure|ML.powered data platforms",
+                      "개발|구현|설계|구축|만들|운영|개선|고도화|최적화|개발해|담당|책임|제공|개발합니다|build|develop|implement|design|architect|maintain|operat|optimi[sz]|own|create|deliver|manage|開発|設計|構築|実装|運用|改善|开发|设计|构建|优化|主导|交付|구성|유지|넘나들"
+                    ],
+                    "none": []
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "web-frontend": {
+      "description": "웹/웹뷰 UI·프레임워크 구현; 부가적인 가능성·제품명·사용 도구는 제외",
+      "when": {
+        "all": [
+          {
+            "all": [
+              {
+                "any": [
+                  {
+                    "unit": {
+                      "all": [
+                        "프론트[\\s-]*(?:엔[드트])?|웹뷰|(?:웹|web)\\s*(?:(?<![A-Za-z0-9])UI(?![A-Za-z0-9])|화면|애플리케이션|앱|서비스|프레임워크)|마크업|브라우저\\s*확장|front[ -]?end|web applications?|HTML|CSS|React|Next\\.?js|フロントエンド|ブラウザ|ウェブ",
+                        "개발|구현|설계|구축|만들|운영|개선|고도화|최적화|개발해|담당|책임|제공|개발합니다|build|develop|implement|design|architect|maintain|operat|optimi[sz]|own|create|deliver|manage|開発|設計|構築|実装|運用|改善|开发|设计|构建|优化|主导|交付|구성|유지|넘나들"
+                      ],
+                      "none": [
+                        "(?:프론트엔드|프론트).*?(?:개발자|팀)(?:와|과|과의|와의)\\s*협업|collaborat[^.]*front[ -]?end|(?<![A-Za-z0-9])UI(?![A-Za-z0-9])\\s*디자인|디자이너|디자인\\s*시스템을\\s*설계|React Native Framework|Front.end Framework.*バックエンド|(?:Frontend|프론트).{0,15}단말"
+                      ]
+                    }
+                  },
+                  {
+                    "all": [
+                      {
+                        "match": {
+                          "field": "title",
+                          "pattern": "front[ -]?end|프론트엔[드트]|FE Platform|Markup Engineer|フロントエンド"
+                        }
+                      },
+                      {
+                        "unit": {
+                          "all": [
+                            "(?<![A-Za-z0-9])UI(?![A-Za-z0-9])|화면|제품|프로덕트|앱|웹|프레임워크|모노레포|product|app|service|서비스|フロント",
+                            "개발|구현|설계|구축|만들|운영|개선|고도화|최적화|개발해|담당|책임|제공|개발합니다|build|develop|implement|design|architect|maintain|operat|optimi[sz]|own|create|deliver|manage|開発|設計|構築|実装|運用|改善|开发|设计|构建|优化|主导|交付|구성|유지|넘나들"
+                          ],
+                          "none": []
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "all": [
+                      {
+                        "unit": {
+                          "all": [
+                            "클라이언트",
+                            "서버",
+                            "개발"
+                          ],
+                          "none": []
+                        }
+                      },
+                      {
+                        "unit": {
+                          "all": [
+                            "어드민|대시보드",
+                            "설계|구현"
+                          ],
+                          "none": []
+                        }
+                      },
+                      {
+                        "match": {
+                          "field": "skills",
+                          "pattern": "React|TypeScript|HTML|CSS"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "not": {
+                  "all": [
+                    {
+                      "match": {
+                        "field": "title",
+                        "pattern": "back[ -]?end|백\\s*엔드|서버\\s*개발|server[ -]?(?:developer|engineer)|Node\\.?js\\s*(?:개발|developer)|バックエンド|サーバーサイド"
+                      }
+                    },
+                    {
+                      "not": {
+                        "match": {
+                          "field": "duties",
+                          "pattern": "React|HTML|CSS|TypeScript|full.stack|フルスタック"
+                        }
+                      }
+                    },
+                    {
+                      "not": {
+                        "match": {
+                          "field": "skills",
+                          "pattern": "React|HTML|CSS|TypeScript"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "not": {
+              "all": [
+                {
+                  "match": {
+                    "field": "title",
+                    "pattern": "Android|\\biOS\\b|Product Owner"
+                  }
+                },
+                {
+                  "not": {
+                    "match": {
+                      "field": "duties",
+                      "pattern": "HTML|CSS|React|Next\\.?js|웹\\s*UI"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "product-management": {
+      "description": "PM/PO 직함+제품 목표·지표·로드맵·우선순위 책임",
+      "when": {
+        "all": [
+          {
+            "match": {
+              "field": "title",
+              "pattern": "product (?:owner|manager)|project manager|\\bPO\\b|\\bPM\\b|프로덕트\\s*오너|프로덕트\\s*매니저"
+            }
+          },
+          {
+            "unit": {
+              "all": [
+                "제품|프로덕트|프로젝트|로드맵|우선순위|지표|상품|목표|시스템|product|goals|roadmap",
+                "책임|오너십|목표|의사\\s*결정|수립|리드|리딩|설계|정의|결정|운영|개선|priorit|own|set|drive|define|lead|manage"
+              ],
+              "none": []
+            }
+          }
+        ]
+      }
+    },
+    "design": {
+      "description": "직함+실제 디자인 산출물 또는 명시적인 그래픽/시각 디자인 제작",
+      "when": {
+        "any": [
+          {
+            "all": [
+              {
+                "match": {
+                  "field": "title",
+                  "pattern": "\\bdesign(?:er| staff| assistant)?\\b|디자인|디자이너"
+                }
+              },
+              {
+                "unit": {
+                  "all": [
+                    "디자인|사용자\\s*경험|그래픽|시각|비주얼|화면|(?<![A-Za-z0-9])UX(?![A-Za-z0-9])|(?<![A-Za-z0-9])UI(?![A-Za-z0-9])|키비주얼|프로토타입",
+                    "디자인|설계|제작|시각화|구성|실행|구현|책임|개선|만들"
+                  ],
+                  "none": [
+                    "시스템 디자인|코드 리뷰|인테리어\\s*상담"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "unit": {
+              "all": [
+                "그래픽|시각\\s*디자인|(?<![A-Za-z0-9])UX(?![A-Za-z0-9])\\s*설계|(?<![A-Za-z0-9])UI(?![A-Za-z0-9])\\s*디자인",
+                "제작|직접\\s*디자인|시각화|프로토타입"
+              ],
+              "none": [
+                "개발자|엔지니어|시스템|코드|협업|함께"
+              ]
+            }
+          },
+          {
+            "all": [
+              {
+                "match": {
+                  "field": "title",
+                  "pattern": "Creative Assistant"
+                }
+              },
+              {
+                "unit": {
+                  "all": [
+                    "이미지|그래픽|디자인|배너",
+                    "제작|디자인|시각화"
+                  ],
+                  "none": []
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "marketing": {
+      "description": "마케팅 직함+획득/캠페인 업무 또는 직접 매체/예산·CRM 운영",
+      "when": {
+        "any": [
+          {
+            "all": [
+              {
+                "match": {
+                  "field": "title",
+                  "pattern": "marketing|마케팅|마케터|Brand Manager|브랜드 매니저"
+                }
+              },
+              {
+                "not": {
+                  "match": {
+                    "field": "title",
+                    "pattern": "designer|디자이너|design|디자인|creative assistant"
+                  }
+                }
+              },
+              {
+                "unit": {
+                  "all": [
+                    "브랜드|채널|광고|소재|콘텐츠|캠페인|유입|CRM|User Acquisition",
+                    "제작|기획|운영|전략|수립|집행|개선|유입|획득|진행|담당"
+                  ],
+                  "none": []
+                }
+              }
+            ]
+          },
+          {
+            "unit": {
+              "all": [
+                "마케팅|캠페인|CRM|Paid",
+                "매체.*집행|광고.*예산.*(?:관리|운영)|(?:캠페인|CRM).*(?:직접|자사|사내).*운영|고객\\s*획득.*(?:지표|목표).*(?:책임|관리)"
+              ],
+              "none": [
+                "디자인|컨설팅|집행\\s*중인|소프트웨어|개발"
+              ]
+            }
+          },
+          {
+            "all": [
+              {
+                "match": {
+                  "field": "title",
+                  "pattern": "marketer|마케터"
+                }
+              },
+              {
+                "unit": {
+                  "all": [
+                    "마케팅|캠페인|채널|브랜드",
+                    "기획|실행|운영|리딩|수립"
+                  ],
+                  "none": []
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "sales": {
+      "description": "고객 판매/수주·확장; 매입·발주·정산 운영은 제외",
+      "when": {
+        "any": [
+          {
+            "all": [
+              {
+                "any": [
+                  {
+                    "all": [
+                      {
+                        "match": {
+                          "field": "title",
+                          "pattern": "Account Manager|Business Development|\\bBDR\\b|영업|Sales|세일즈|Biz Lead"
+                        }
+                      },
+                      {
+                        "unit": {
+                          "all": [
+                            "고객|광고주|파트너|딜|매출|가맹점|브랜드|거래처",
+                            "설득|제안|발굴|세일즈|영업|협상|수주|계약|클로징|매출|성장"
+                          ],
+                          "none": [
+                            "매입|발주|재고|정산"
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "unit": {
+                      "all": [
+                        "영업을|영업\\s*(?:성과|전반|활동)|세일즈\\s*(?:영업|활동)|고객\\s*영업|거래처\\s*발굴",
+                        "직접|담당|수행|관리|영업|발굴|판매|계약"
+                      ],
+                      "none": [
+                        "설계사|개발|소프트웨어|시스템|협업|자동화|마케팅\\s*이벤트"
+                      ]
+                    }
+                  }
+                ]
+              },
+              {
+                "not": {
+                  "all": [
+                    {
+                      "match": {
+                        "field": "duties",
+                        "pattern": "매입\\s*조건|발주.*입고"
+                      }
+                    },
+                    {
+                      "not": {
+                        "unit": {
+                          "all": [
+                            "고객\\s*영업|상품\\s*판매|신규\\s*고객|수주",
+                            "담당|영업|계약|발굴|수행"
+                          ],
+                          "none": []
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "all": [
+              {
+                "match": {
+                  "field": "title",
+                  "pattern": "Business Development Representative|\\bBDR\\b"
+                }
+              },
+              {
+                "unit": {
+                  "all": [
+                    "광고주|고객",
+                    "찾고|찾|접근|발굴|미팅|연결"
+                  ],
+                  "none": []
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "planning": {
+      "description": "기획/전략 직함+정책·계획 또는 별도의 사업 손익 계획",
+      "when": {
+        "any": [
+          {
+            "all": [
+              {
+                "match": {
+                  "field": "title",
+                  "pattern": "기획|전략|Planner|Planning|Strategy"
+                }
+              },
+              {
+                "unit": {
+                  "all": [
+                    "정책|기준|계획|전략|프로세스|체계|우선순위|상품|물량|캐파|카테고리|목표|가설|모델",
+                    "기획|수립|정의|설계|예측|관리|운영|개선|검증|추진|수행"
+                  ],
+                  "none": []
+                }
+              }
+            ]
+          },
+          {
+            "unit": {
+              "all": [
+                "P&L|손익",
+                "직접\\s*통제|계획|관리"
+              ],
+              "none": []
+            }
+          }
+        ]
+      }
+    },
+    "data-analysis-bi": {
+      "description": "BI 대시보드·데이터 추출/시각화·분석 지원 산출물",
+      "when": {
+        "any": [
+          {
+            "unit": {
+              "all": [
+                "Tableau.*ダッシュボード|ダッシュボード.*Tableau|BIの開発|BI\\s*(?:대시보드|리포트)",
+                "작성|개발|제작|구축|만들|개선|設計|作成|改修|開発"
+              ],
+              "none": [
+                "플랫폼.*운영"
+              ]
+            }
+          },
+          {
+            "all": [
+              {
+                "match": {
+                  "field": "title",
+                  "pattern": "data analyst|데이터\\s*분석가|BI\\s*(?:개발|엔지니어)|BI開発"
+                }
+              },
+              {
+                "unit": {
+                  "all": [
+                    "데이터|data|データ",
+                    "분석|추출|시각화|리포트|分析|抽出|可視化"
+                  ],
+                  "none": []
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "fullstack": {
+      "description": "백엔드+프론트엔드 동일 담당; 선택 배치/OR를 제외",
+      "when": {
+        "all": [
+          {
+            "taggedAny": [
+              "web-backend"
+            ]
+          },
+          {
+            "taggedAny": [
+              "web-frontend"
+            ]
+          },
+          {
+            "not": {
+              "match": {
+                "field": "position",
+                "pattern": "front.end development, back.end development, or both|front.end or back.end"
+              }
+            }
+          },
+          {
+            "any": [
+              {
+                "match": {
+                  "field": "title",
+                  "pattern": "full[ -]?stack|풀\\s*스택|フルスタック"
+                }
+              },
+              {
+                "unit": {
+                  "all": [
+                    "front[ -]?end|프론트엔드|フロントエンド|클라이언트",
+                    "back[ -]?end|백엔드|バックエンド|서버",
+                    "모두|양쪽|함께|부터|가리지\\s*않고|Full-stack|\\band\\b|双方|まで|spanning|両方|End-to-End|넘나들"
+                  ],
+                  "none": [
+                    "front.end or back.end|프론트엔드 또는 백엔드|or both|developers|개발자와|개발팀과"
+                  ]
+                }
+              },
+              {
+                "all": [
+                  {
+                    "unit": {
+                      "all": [
+                        "UI|フロントエンド",
+                        "開発|設計"
+                      ],
+                      "none": []
+                    }
+                  },
+                  {
+                    "unit": {
+                      "all": [
+                        "バックエンド",
+                        "開発|設計"
+                      ],
+                      "none": []
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "ruleEvaluationOrder": [
+    "qa-test",
+    "ml-platform",
+    "embedded-system",
+    "robotics",
+    "android",
+    "ios",
+    "ml-engineer",
+    "data-engineer",
+    "database",
+    "cloud-infrastructure",
+    "ai-application",
+    "devops-sre",
+    "web-backend",
+    "web-frontend",
+    "product-management",
+    "design",
+    "marketing",
+    "sales",
+    "planning",
+    "data-analysis-bi",
+    "fullstack"
+  ],
+  "fullstackAdds": [
+    "web-backend",
+    "web-frontend"
+  ],
+  "forbiddenInputs": [
+    "postingId",
+    "url",
+    "goldLabels",
+    "completePostingTitleLookup"
+  ],
+  "bodyOnlyInputAvailable": true,
+  "postProcessing": {
+    "fullstackAdds": [
+      "web-backend",
+      "web-frontend"
+    ]
+  },
+  "shortTokens": [
+    "AI",
+    "ML",
+    "API",
+    "HAL",
+    "BSP",
+    "ROS2",
+    "ECU",
+    "ADCU",
+    "SLAM",
+    "LIO",
+    "VIO",
+    "NER",
+    "NLU",
+    "NLP",
+    "CV",
+    "OCR",
+    "SDK",
+    "OS",
+    "UX",
+    "UI",
+    "PO",
+    "PM",
+    "SRE",
+    "RCA",
+    "DW",
+    "DBA",
+    "CDC",
+    "DWH",
+    "ETL",
+    "ELT",
+    "RAG",
+    "LLM"
+  ]
+}

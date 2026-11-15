@@ -225,6 +225,8 @@ JobMoa/
 
 승인 대기: [저장 공고 440개를 바탕으로 한 직군 분류 개선안](docs/classification-proposal.md) · [공고별 전수 검토표](docs/analysis/classification-440-2026-11-15.md). 제안한 자동 분류·복수 매핑·미분류 탭은 아직 제품에 적용하지 않았습니다.
 
+분류 규칙 검토: [신규 공고에도 적용할 일반 판정 규칙](docs/classification-rules.md) · [고정 정답셋 440개와의 비교 평가](docs/analysis/classification-evaluation-v0.5.md). 기존 AI 검토 라벨을 고정한 채 별도 규칙의 누락·오분류를 평가합니다. 오프라인 평가 도구는 제품 코드나 DB를 변경하지 않습니다.
+
 
 ## 문서 갱신
 

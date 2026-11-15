@@ -1,0 +1,14 @@
+{
+  "version": "gold-v1",
+  "status": "사용자가 440개 AI 검토 분류안을 평가 정답으로 지정. 라벨 동결.",
+  "designatedOn": "2026-11-15",
+  "referenceFile": "classification-440-2026-11-15.json",
+  "referenceSha256": "3c2b069746856baa9ae4133e978477abb641675871ba04b9ebf6f33fa9fca927",
+  "labelsField": "postings[].proposedCategories",
+  "postingCount": 440,
+  "categoryCount": 21,
+  "assignmentCount": 554,
+  "heldCategoriesAreGold": false,
+  "reviewNotesAreLabels": false,
+  "policy": "평가용 규칙은 정답을 읽지 않는다. 설명과 라벨이 충돌해도 승인 없이 라벨을 수정하지 않는다. 정답 변경은 별도 버전으로 관리한다."
+}
