@@ -223,6 +223,8 @@ JobMoa/
 
 [프론트엔드 안내](frontend/README.md) · [백엔드·API 안내](backend/README.md) · [제품 스펙](docs/spec.md) · [직무 분류 기준](docs/job-categories.md)
 
+승인 대기: [저장 공고 440개를 바탕으로 한 직군 분류 개선안](docs/classification-proposal.md) · [공고별 전수 검토표](docs/analysis/classification-440-2026-11-15.md). 제안한 자동 분류·복수 매핑·미분류 탭은 아직 제품에 적용하지 않았습니다.
+
 
 ## 문서 갱신
 
