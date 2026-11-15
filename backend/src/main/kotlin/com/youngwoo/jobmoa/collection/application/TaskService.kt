@@ -1,5 +1,7 @@
 package com.youngwoo.jobmoa.collection.application
 
+import com.youngwoo.jobmoa.analytics.domain.model.PostingObservation
+import com.youngwoo.jobmoa.analytics.domain.repository.ObservationRepository
 import com.youngwoo.jobmoa.collection.domain.model.*
 import com.youngwoo.jobmoa.collection.domain.repository.CrawlTaskRepository
 import com.youngwoo.jobmoa.crawler.domain.model.*
@@ -10,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 
 @Service
-class TaskService(private val tasks: CrawlTaskRepository, private val postings: PostingRepository) {
+class TaskService(private val tasks: CrawlTaskRepository, private val postings: PostingRepository, private val observations: ObservationRepository) {
     @Transactional
     fun body(id: String, token: String, body: ExtractedPosting): CrawlTask {
         val task = tasks.lock(id).also { it.requireOwnership(token, Instant.now()) }
@@ -68,6 +70,7 @@ class TaskService(private val tasks: CrawlTaskRepository, private val postings: 
             closed = task.closed, lastChange = "new", categories = category))
         if (outcome != TaskOutcome.IDENTICAL) postings.saveVersion(PostingVersion(postingId = posting.id,
             taskId = task.id, contentHash = task.contentHash, bodyText = checkNotNull(task.bodyText), capturePath = task.capturePath, savedAt = now))
+        observations.append(PostingObservation(postingId = posting.id, taskId = task.id, observedAt = now, closed = task.closed))
         tasks.save(task.copy(status = TaskStatus.COMPLETED, outcome = outcome, bodyText = null, leaseToken = null, leaseExpiresAt = null))
         resolveParents(task, now)
     }
