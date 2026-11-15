@@ -24,4 +24,4 @@
 - 외부 사이트에 추가 요청하지 않고 기존 `/tmp/jobmoa-line-data.json`, `/tmp/jobmoa-ly-jobs-latest.html`, `/tmp/jobmoa-coupang.json`, `/tmp/jobmoa-woowa-jobs.json`을 확인했다.
 - Kotlin 메인 컴파일과 JShell에서 직접 호출한 회사별 판별 함수의 포함·제외 사례를 확인했다. 테스트 소스 파일은 추가하지 않았다.
 - 실제 수집 버튼을 통한 소량 검증은 루트 작업에서 수행한다. 후보 규칙을 추가했다고 모든 포털에 현재 그 직무 공고가 존재하는 것은 아니다.
-- 이 문서의 기존 4개 기업군 수집기는 개발 범위를 유지한다. 별도 추가한 오늘의집의 비개발 지원은 [오늘의집 수집기](source-bucketplace.md)를 참고한다. Scientist/Analyst/QA/Security 세부 분야는 지원하지 않는다.
+- 쿠팡·LINE·우아한형제들은 개발 범위를 유지한다. 당근 국내의 비개발 추가 범위는 [비개발 사이트 문서](non-development-sources.md), 오늘의집은 [오늘의집 수집기](source-bucketplace.md)를 참고한다. Scientist/Analyst/QA/Security 세부 분야는 지원하지 않는다.

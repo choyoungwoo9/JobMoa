@@ -11,6 +11,8 @@
 
 ## Toss
 
+현재 토스는 이 개발 규칙에 더해 공식 직군별 비개발 후보도 지원한다. 추가 범위는 [비개발 사이트 문서](non-development-sources.md)를 따른다. 아래 제외 조건은 개발 후보 경로의 조건이다.
+
 - 공식 Job Category의 Backend·Frontend·App·Data Engineering·ML·Infra·Device·병역특례와 개발자/엔지니어/DevOps/SRE 직함을 함께 확인하는 기존 구조를 유지한다. 이 분류에서 이미 신규 분야 후보 대부분을 발견할 수 있어 범용 본문 필터나 새로운 공식 카테고리를 가정하지 않았다.
 - 저장된 API에서 Android, Frontend/FE Platform, Data Engineer, ML Engineer, DevOps, SRE 공고가 각각 해당 공식 카테고리에 포함된 것을 확인했다. Backend 분류에도 DevOps/SRE가 있으므로 최종 분야를 공식 분류 하나로 단정하지 않는다.
 - 인재풀·게임 공고를 명시적으로 제외하고 QA·Scientist·Analyst·보안·IDC·네트워크·어시스턴트 등 기존 제외 조건을 유지한다.
