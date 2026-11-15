@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 const paths: Record<string, ReactNode> = {
+  chart: (<><path d="M4 3v17h17" /><path d="M8 15v-4m5 4V6m5 9V9" /></>),
   grid: (
     <>
       <rect x="3" y="3" width="7" height="7" rx="1.5" />

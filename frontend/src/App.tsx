@@ -7,15 +7,17 @@ import { Icon } from './components/Icon'
 import { CollectDialog } from './components/CollectDialog'
 import { JobDrawer } from './components/JobDrawer'
 import { RunCard } from './components/History'
+import { Statistics, type StatisticsScope } from './components/Statistics'
 import './App.css'
 
 const PAGE_SIZE = 8
 function App() {
   const { data, notice, start, retryFailures, toggleRead, markRead, running, demo, connected, error, availableSources, categories, companies, loadJob } =
     useCollection()
-  const [view, setView] = useState<'jobs' | 'history'>('jobs')
+  const [view, setView] = useState<'jobs' | 'history' | 'statistics'>('jobs')
   const [categoryId, setCategoryId] = useState('all')
   const [source, setSource] = useState<SourceId | 'all'>('all')
+  const [companyFilter, setCompanyFilter] = useState<string | null>(null)
   const [tab, setTab] = useState<'all' | 'unread' | 'new'>('all')
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState('newest')
@@ -29,8 +31,8 @@ function App() {
   const closeJob = useCallback(() => setSelectedJob(null), [])
   const latestRun = data.runs[0]
   const latest = latestRun ? summarize(latestRun) : null
-  const categoryName = (id = 'all') => categories.find(category => category.id === id)?.name ?? '기타 분야'
-  const categoryJobs = data.jobs.filter(job => categoryId === 'all' || job.categories?.includes(categoryId))
+  const categoryName = (id = 'all') => id === 'unclassified' ? '분야 미분류' : categories.find(category => category.id === id)?.name ?? '기타 분야'
+  const categoryJobs = data.jobs.filter(job => (categoryId === 'all' || (categoryId === 'unclassified' ? !job.categories?.length : job.categories?.includes(categoryId))) && (!companyFilter || job.companyId === companyFilter))
   const available = categoryJobs.filter((job) => includeClosed || !job.closed)
   const unread = available.filter((job) => !job.read).length
   const newCount = available.filter((job) => job.latestChange === 'new').length
@@ -41,7 +43,8 @@ function App() {
       data.jobs
         .filter(
           (job) =>
-            (categoryId === 'all' || !!job.categories?.includes(categoryId)) &&
+            (categoryId === 'all' || (categoryId === 'unclassified' ? !job.categories?.length : !!job.categories?.includes(categoryId))) &&
+            (!companyFilter || job.companyId === companyFilter) &&
             (includeClosed || !job.closed) &&
             (source === 'all' || job.sourceId === source) &&
             (tab !== 'unread' || !job.read) &&
@@ -57,7 +60,7 @@ function App() {
               ? a.firstSeen.localeCompare(b.firstSeen)
               : b.firstSeen.localeCompare(a.firstSeen),
         ),
-    [data.jobs, categoryId, includeClosed, source, tab, query, sort],
+    [data.jobs, categoryId, companyFilter, includeClosed, source, tab, query, sort],
   )
   const listJobs = selectedJob
     ? browseQueue.flatMap((id) => data.jobs.find((job) => job.id === id) ?? [])
@@ -74,6 +77,7 @@ function App() {
   }, [selectedJob, activeJob?.versions[0]?.id, loadJob])
   const changeSource = (id: SourceId | 'all') => {
     setSource(id)
+    setCompanyFilter(null)
     setView('jobs')
     setPage(1)
     setSelectedJob(null)
@@ -108,7 +112,20 @@ function App() {
     if (id) openRun(id)
   }
   const resetFilters = () => {
+    setCompanyFilter(null)
     setSource('all')
+    setTab('all')
+    setQuery('')
+    setPage(1)
+    setSelectedJob(null)
+  }
+
+  const browseStatistics = (scope: StatisticsScope) => {
+    setSource(scope.sourceId)
+    setCompanyFilter(scope.companyId)
+    setCategoryId(scope.categoryId)
+    setView('jobs')
+    setIncludeClosed(true)
     setTab('all')
     setQuery('')
     setPage(1)
@@ -152,6 +169,7 @@ function App() {
             <span>수집 기록</span>
             {running && <span className="live-dot" />}
           </button>
+          <button className={view === 'statistics' ? 'active' : ''} onClick={() => { setSelectedJob(null); setCategoryId('all'); setSource('all'); setCompanyFilter(null); setView('statistics') }}><Icon name="chart" size={18} /><span>채용 통계</span></button>
         </nav>
         <div className="source-section-heading">
           <span>관심 기업군</span>
@@ -210,7 +228,7 @@ function App() {
             <Icon name="layers" size={16} />
             <span>내 워크스페이스</span>
             <Icon name="chevron" size={12} />
-            <strong>{view === 'jobs' ? '공고 모아보기' : '수집 기록'}</strong>
+            <strong>{view === 'jobs' ? '공고 모아보기' : view === 'statistics' ? '채용 통계' : '수집 기록'}</strong>
           </div>
           <div className="topbar-right">
             <span className="preview-badge">
@@ -234,13 +252,13 @@ function App() {
                   ? source === 'all'
                     ? categoryId === 'all' ? '공고 모아보기' : `${categoryName(categoryId)} 공고`
                     : `${sourceById(source).name} 공고`
-                  : '수집 기록'}
+                  : view === 'statistics' ? '채용 통계' : '수집 기록'}
                 <span className="heading-dot">.</span>
               </h1>
               <p>
                 {view === 'jobs'
                   ? '관심 있는 회사와 직무의 채용공고를 한곳에 모아요.'
-                  : '언제, 어디에서, 얼마나 모았는지 확인해요.'}
+                  : view === 'statistics' ? '쌓아온 공고에서 채용의 흐름을 살펴봐요.' : '언제, 어디에서, 얼마나 모았는지 확인해요.'}
               </p>
             </div>
             <button
@@ -260,6 +278,7 @@ function App() {
           {error && <div className="backend-error" role="alert">{error} 연결을 자동으로 다시 확인하고 있어요.</div>}
           {view === 'jobs' ? (
             <>
+              {companyFilter && <div className="stats-job-scope">{companies.find(c => c.id === companyFilter)?.name} 공고 <button className="text-button" onClick={() => setCompanyFilter(null)}>회사 필터 해제</button></div>}
               <div className="category-tabs" role="tablist" aria-label="공고 분야">
                 {categories.map(category => <button key={category.id} role="tab" aria-selected={categoryId === category.id} className={categoryId === category.id ? 'active' : ''} onClick={() => { setCategoryId(category.id); setPage(1); setSelectedJob(null) }}>{category.name}<span>{data.jobs.filter(job => (includeClosed || !job.closed) && (category.id === 'all' || job.categories?.includes(category.id))).length}</span></button>)}
               </div>
@@ -747,7 +766,7 @@ function App() {
                 </span>
               </div>
             </>
-          ) : (
+          ) : view === 'statistics' ? <Statistics categories={categories} companies={companies} demo={demo} onBrowse={browseStatistics} /> : (
             <section className="history-view">
               <div className="section-heading">
                 <h2>
@@ -800,7 +819,7 @@ function App() {
           </footer>
         </main>
       </div>
-      {collectOpen && <CollectDialog onClose={closeCollect} onStart={begin} demo={demo} availableSources={availableSources} categories={categories} companies={companies} initialCategoryId={categoryId} />}
+      {collectOpen && <CollectDialog onClose={closeCollect} onStart={begin} demo={demo} availableSources={availableSources} categories={categories} companies={companies} initialCategoryId={categoryId === 'unclassified' ? 'all' : categoryId} />}
       {notice && (
         <div className="toast" role="status">
           <Icon name="check" size={17} />

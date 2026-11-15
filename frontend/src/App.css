@@ -3343,3 +3343,9 @@ dialog::backdrop {
 .category-tabs button { flex: 0 0 auto; white-space: nowrap; }
 
 .brand-bucketplace { background: #27c3d7; color: #fff; }
+
+/* Keep all three workspace pages reachable on short and narrow screens. */
+.sidebar { overflow-y: auto; }
+@media (max-width: 720px) {
+  .main-nav { position: static; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+}

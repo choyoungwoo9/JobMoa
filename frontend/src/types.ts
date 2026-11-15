@@ -33,6 +33,7 @@ export interface JobVersion {
   bodyLoaded?: boolean
 }
 export interface Job {
+  companyId?: string
   categories?: string[]
   id: string
   sourceId: SourceId
