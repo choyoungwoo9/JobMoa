@@ -53,8 +53,11 @@ class WorkspaceService(private val repository: WorkspaceSnapshotRepository, priv
                 val names = repository.captureNames().sorted()
                 val snapshot = WorkspaceSnapshot(exportedAt = Instant.now().toString(), tables = repository.exportTables(), captures = names)
                 repository.validate(snapshot)
+                val json = mapper.writeValueAsBytes(snapshot)
+                val captureSizes = names.map { Files.size(checkedCapture(it)) }
+                require(names.size <= 100_000 && json.size <= 128L * 1024 * 1024 && captureSizes.all { it <= 128L * 1024 * 1024 } && captureSizes.sum() + json.size <= maxExpanded) { "복원 가능한 백업 크기 제한을 초과했습니다. JSON·개별 캡처 128 MiB, 해제 전체 4 GiB, 캡처 10만 개까지 지원합니다." }
                 ZipOutputStream(Files.newOutputStream(target)).use { zip ->
-                    zip.putNextEntry(ZipEntry("workspace.json")); zip.write(mapper.writeValueAsBytes(snapshot)); zip.closeEntry()
+                    zip.putNextEntry(ZipEntry("workspace.json")); zip.write(json); zip.closeEntry()
                     names.forEach { name ->
                         val source = checkedCapture(name)
                         require(hash(source) + ".png" == name) { "캡처 파일의 무결성을 확인할 수 없습니다: $name" }
