@@ -3347,7 +3347,7 @@ dialog::backdrop {
 .category-tabs { overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; }
 .category-tabs button { flex: 0 0 auto; white-space: nowrap; }
 
-.brand-bucketplace { background: #27c3d7; color: #fff; }
+.brand-bucketplace { background: #fff; color: #00a5ff; }
 
 /* Keep all three workspace pages reachable on short and narrow screens. */
 .sidebar { overflow-y: auto; }

@@ -47,7 +47,7 @@ export const SOURCES: Source[] = [
     mark: '배',
     url: 'https://career.woowahan.com/',
   },
-  { id: 'bucketplace', logo: '/logos/bucketplace.ico', name: '오늘의집', mark: '집', url: 'https://www.bucketplace.com/careers/' },
+  { id: 'bucketplace', logo: '/logos/bucketplace.jpg', name: '오늘의집', mark: '집', url: 'https://www.bucketplace.com/careers/' },
 ]
 export const sourceById = (id: SourceId) =>
   SOURCES.find((source) => source.id === id)!
