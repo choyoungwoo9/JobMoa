@@ -19,10 +19,11 @@ open class CollectionRunEntity(
     @field:Column(name = "retry_of") open var retryOf: String? = null,
     @field:Column(name = "category_id", nullable = false, length = 64) open var categoryId: String = "all",
     @field:Column(name = "company_ids", nullable = false, columnDefinition = "text") open var companyIds: String = "",
+    @field:Column(name = "category_ids", nullable = false, columnDefinition = "text") open var categoryIds: String = "",
 ) {
-    fun domain() = CollectionRun(id, startedAt, RunStatus.valueOf(status), finishedAt, retryOf, categoryId, companyIds.split(',').filter { it.isNotBlank() }.toSet())
+    fun domain() = CollectionRun(id, startedAt, RunStatus.valueOf(status), finishedAt, retryOf, categoryId, companyIds.split(',').filter { it.isNotBlank() }.toSet(), categoryIds.split(',').filter { it.isNotBlank() }.toSet())
 }
-fun CollectionRun.entity() = CollectionRunEntity(id, startedAt, status.name, finishedAt, retryOf, categoryId, companyIds.sorted().joinToString(","))
+fun CollectionRun.entity() = CollectionRunEntity(id, startedAt, status.name, finishedAt, retryOf, categoryId, companyIds.sorted().joinToString(","), categoryIds.sorted().joinToString(","))
 
 @Entity @Table(name = "collection_run_source")
 open class RunSourceEntity(

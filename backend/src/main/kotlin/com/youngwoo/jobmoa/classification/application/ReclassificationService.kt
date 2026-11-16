@@ -7,9 +7,10 @@ import org.springframework.transaction.annotation.Transactional
 
 /** 공고 하나의 잠금 안에서 최신 본문으로 분류한다. 브라우저·외부 요청은 수행하지 않는다. */
 @Service
-class ReclassificationWriter(private val postings: PostingRepository, private val classifier: PostingClassifier) {
+class ReclassificationWriter(private val postings: PostingRepository, private val classifier: PostingClassifier, private val access: com.youngwoo.jobmoa.workspace.application.WorkspaceAccess) {
     @Transactional
     fun reclassify(id: Long): Boolean {
+        access.writing()
         val posting = postings.lock(id) ?: return false
         val body = postings.latestVersion(id)?.bodyText.orEmpty()
         val result = classifier.classify(posting.title, body)

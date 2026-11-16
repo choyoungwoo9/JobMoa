@@ -113,3 +113,43 @@ Flyway V6은 기존 공고의 마지막 상태를 기준점으로 보존합니�
 공고의 비관적 잠금을 잡고 기존 관리 정보를 읽어 수정하므로 최초 행 생성·별표·메모·읽음·수집 저장이 공고 단위로 직렬화됩니다. 별표 해제에 행 삭제를 사용하지 않습니다. 수집기와 저장 본문 재분류는 `posting_interest`를 갱신하지 않습니다. 마이그레이션은 기존 공고/캡처/기록을 삭제하지 않습니다.
 
 2026-11-16 검증: Flyway V8 적용과 실제 DB/API에서 등록·해제·재등록 보존·지원 전 복구·동시 최초 저장·입력 오류(400/404)·기존 공고/버전/분류/기록 보존을 확인했습니다. 임시 관리 정보는 검증 후 원복했습니다. 실제 재수집을 통한 검증은 실행하지 않았습니다. [검증 범위](../docs/interest-postings-spec.md).
+
+## 개인 데이터 관리·프리셋·변화 요약 API
+
+설계와 삭제 범위는 [`docs/workspace-tools-spec.md`](../docs/workspace-tools-spec.md)를 따른다. V9는 프리셋·실행별 변화·작업공간 리비전을, V10은 한 실행의 다중 직군 범위를 추가한다. 일반 CRUD는 Spring Data JPA를 사용하며, 전체 백업/복원과 일괄 초기화만 고정 테이블 목록의 JDBC 배치와 트랜잭션을 사용한다. FK를 끄거나 TRUNCATE하지 않는다.
+
+| API | 용도 |
+| --- | --- |
+| `GET /api/collection-presets` | 저장된 선택 목록 |
+| `POST /api/collection-presets` | `{name, categoryIds, companyIds} (단일 categoryId도 허용)` 저장 |
+| `PUT /api/collection-presets/{id}` | 선택과 이름 변경 |
+| `DELETE /api/collection-presets/{id}` | 프리셋 삭제 |
+| `POST /api/collection-presets/{id}/start` | 저장된 조합으로 수집 실행 |
+| `GET /api/collections/{id}/changes` | 신규·변경·마감 및 당시 관심 공고 변화의 ID 목록, 과거 기록 여부 |
+| `GET /api/workspace` | 데이터 건수·캡처 용량 |
+| `POST /api/workspace/reset` | `{scope: interests\|postings\|read\|presets, confirmation: "초기화"}` |
+| `POST /api/workspace/captures/cleanup` | `{confirmation: "정리"}`로 미사용 캡처 삭제 |
+| `GET /api/workspace/backup` | ZIP 다운로드, 수집 중 409 |
+| `POST /api/workspace/backups/preview` | multipart `file` 업로드, 검증 후 토큰·건수 반환 |
+| `POST /api/workspace/backups/{token}/restore` | `{confirmation: "복원"}`, 현재 전체 데이터 교체 |
+| `DELETE /api/workspace/backups/{token}` | 미리보기 취소 및 임시 파일 삭제 |
+
+백업 형식은 `jobmoa` v1 / DB 스키마 10, ZIP의 `workspace.json`과 `captures/{sha256}.png`로 구성된다. 현재 스키마가 다른 백업은 거부한다. ZIP 2 GiB·해제 4 GiB·개별 파일/JSON 128 MiB 제한이다. 임시 파일은 `${STORAGE_DIRECTORY}/workspace-tmp`에 저장하고 만료·재시작 잔여물을 정리한다. Spring multipart와 Docker 프론트 NGINX의 업로드 크기/타임아웃을 함께 조정했다. 백업 생성은 파일 스트리밍을 사용하지만 스냅샷 JSON·DB 행은 메모리에 보관하므로 한도까지의 대규모 복원 성능은 별도 검증이 필요하다.
+
+`/api/state`의 `workspaceRevision`은 초기화·복원 때 바뀐다. 클라이언트는 리비전이 바뀌면 이전 버전 ID의 본문 캐시를 버린다. 유지보수는 수집 중 409로 차단하며, 사용자 확인 문구도 서버에서 검증한다.
+
+외부 접속 없는 격리 검증 또는 보관 데이터만 읽는 실행은 `--jobmoa.crawler.enabled=false`로 크롤러 런타임을 제외할 수 있다. 기본값은 true다. 이 옵션은 수집 API를 비활성화하지 않으므로 실행을 만들면 런타임을 다시 켤 때까지 대기한다.
+
+`POST /api/collections`는 선택적인 `categoryIds: string[]`도 받는다. 하나의 실행에 직군 합집합을 저장하며 후보 URL과 본문 확인 모두 실행의 범위를 사용한다. `categoryId`는 기존 단일 직군 클라이언트와의 호환용 대표 값이다. 재시도에도 전체 범위를 보존한다.
+
+### 2026-11-16 격리 검증
+
+운영 DB와 분리한 임시 MySQL DB·저장 디렉터리에서 3개 공고/6개 버전/공유 캡처 1개의 픽스처로 확인했다. 현재 사용자 데이터 건수를 뜻하지 않는다.
+
+- 프리셋 생성·수정·삭제·조합 검증, 다중 직군 실행과 공통 큐의 URL 중복 방지. 크롤러 런타임을 끄고 확인하여 외부 사이트 요청은 하지 않았다.
+- 관심·읽음·공고·프리셋 초기화와 확인 문구 검증, 수집 중 초기화·백업·복원 409 차단.
+- 백업 → 초기화 → 복원 후 공고·버전·개인 관리 정보·실행 기록 동일성, 캡처 복구, 리비전 변경.
+- 경로 이탈 ZIP, 손상/누락 캡처, 다른 스키마, 중복 기본 키, 끊어진 참조 거부. 복원 INSERT 제약 위반 시 전체 삭제·삽입·리비전 롤백과 기존 데이터 유지.
+- 실제 `TaskService.finish`를 임시 DB에서 호출해 본문 동일 + 마감 전환 시 버전 미증가, 본문 변경 시 새 버전 및 관심 변화 기록, 이후 관심 해제에도 과거 스냅샷 유지.
+
+정식 테스트 소스는 추가하지 않았으며 빌드와 일회성 API·서비스 프로브로 검증했다. 대용량 상한까지의 부하 검증과 외부 사이트 재수집은 수행하지 않았다.

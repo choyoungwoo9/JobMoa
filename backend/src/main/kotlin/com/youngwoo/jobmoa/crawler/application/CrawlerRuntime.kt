@@ -18,6 +18,7 @@ import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicInteger
 
 @Component
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(prefix = "jobmoa.crawler", name = ["enabled"], havingValue = "true", matchIfMissing = true)
 class CrawlerRuntime(private val properties: CrawlerProperties, private val tasks: CrawlTaskRepository,
     private val runs: CollectionRepository, private val collections: CollectionService,
     private val taskService: TaskService, private val sources: SourceRegistry,
@@ -77,7 +78,8 @@ class CrawlerRuntime(private val properties: CrawlerProperties, private val task
                             var posting = DiscoveredPosting(task.url, task.company, task.title, task.location)
                             if (task.stage == CrawlStage.BODY) {
                                 val extracted = adapter.extract(page, posting)
-                                if (!classifier.accepts(task.categoryId, task.companyId, extracted)) {
+                                val scope = runs.findRun(task.runId)?.categoryIds.orEmpty().ifEmpty { setOf(task.categoryId) }
+                                if (!scope.any { classifier.accepts(it, task.companyId, extracted) }) {
                                     throw PostingExcluded("선택한 분야의 회사별 판별 기준에서 제외: ${task.categoryId} / ${extracted.title}")
                                 }
                                 checkpoint = taskService.body(task.id, token, extracted)

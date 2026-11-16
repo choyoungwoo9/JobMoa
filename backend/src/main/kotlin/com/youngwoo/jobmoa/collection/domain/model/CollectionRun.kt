@@ -13,6 +13,7 @@ data class CollectionRun(
     val retryOf: String? = null,
     val categoryId: String = "all",
     val companyIds: Set<String> = emptySet(),
+    val categoryIds: Set<String> = emptySet(),
 ) {
     val active: Boolean get() = finishedAt == null
 }

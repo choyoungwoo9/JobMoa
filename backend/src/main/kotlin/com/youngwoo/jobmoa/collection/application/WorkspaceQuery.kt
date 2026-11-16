@@ -12,14 +12,14 @@ import org.springframework.transaction.annotation.Transactional
 
 @Service
 @Transactional(readOnly = true)
-class WorkspaceQuery(private val runs: CollectionRepository, private val tasks: CrawlTaskRepository,
+class WorkspaceQuery(private val changes: CollectionChangeRepository, private val maintenance: com.youngwoo.jobmoa.workspace.application.WorkspaceRevision, private val runs: CollectionRepository, private val tasks: CrawlTaskRepository,
     private val postings: PostingRepository, private val sites: SourceRegistry, private val companies: CompanyRegistry, private val interests: com.youngwoo.jobmoa.interest.domain.repository.PostingInterestRepository) {
     fun sources() = sites.definitions.map { definition -> mapOf(
         "id" to definition.id, "name" to definition.name, "url" to definition.listingUrl,
         "available" to sites.supported(definition.id),
         "portals" to if (sites.supported(definition.id)) sites.adapter(definition.id).discoveryTargets else emptyList<Any>(),
     ) }
-    fun state() = mapOf("version" to 1, "jobs" to jobs(), "runs" to collections(), "sources" to sources(), "categories" to companies.categories, "companies" to companies.list())
+    fun state() = mapOf("version" to 1, "workspaceRevision" to maintenance.current(), "jobs" to jobs(), "runs" to collections(), "sources" to sources(), "categories" to companies.categories, "companies" to companies.list())
     fun jobs(): List<Map<String, Any?>> {
         val all = postings.list()
         val management = interests.findAll(all.map { it.id })
@@ -44,6 +44,17 @@ class WorkspaceQuery(private val runs: CollectionRepository, private val tasks: 
     )
     fun collections() = runs.recentRuns().map(::collection)
     fun collection(id: String) = collection(runs.findRun(id) ?: throw ResourceNotFound("수집 실행을 찾을 수 없습니다."))
+    fun changes(id: String): Map<String, Any?> {
+        val run = runs.findRun(id) ?: throw ResourceNotFound("수집 실행을 찾을 수 없습니다.")
+        val events = changes.list(id)
+        fun ids(predicate: (CollectionChange) -> Boolean) = events.filter(predicate).map { it.postingId.toString() }.distinct()
+        val legacy = events.any { it.wasStarred == null || it.becameClosed == null }
+        return mapOf("runId" to id, "finished" to !run.active, "legacy" to legacy,
+            "new" to ids { it.outcome == "NEW" }, "changed" to ids { it.outcome == "CHANGED" },
+            "closed" to ids { it.becameClosed == true },
+            "interestChanged" to ids { it.wasStarred == true && it.outcome == "CHANGED" },
+            "interestClosed" to ids { it.wasStarred == true && it.becameClosed == true })
+    }
     fun taskList(id: String): List<TaskSummary> {
         if (runs.findRun(id) == null) throw ResourceNotFound("수집 실행을 찾을 수 없습니다.")
         return tasks.summaries(id)
@@ -55,7 +66,7 @@ class WorkspaceQuery(private val runs: CollectionRepository, private val tasks: 
         val terminal = all.count { it.status == TaskStatus.COMPLETED || it.status == TaskStatus.FAILED }
         return mapOf(
             "id" to run.id, "startedAt" to run.startedAt, "finishedAt" to run.finishedAt, "retryOf" to run.retryOf,
-            "categoryId" to run.categoryId, "companyIds" to run.companyIds.sorted(),
+            "categoryId" to run.categoryId, "categoryIds" to run.categoryIds.ifEmpty { setOf(run.categoryId) }.sorted(), "companyIds" to run.companyIds.sorted(),
             "status" to run.status, "progress" to mapOf("discoveryFinished" to discoveryFinished, "total" to all.size,
                 "pending" to all.count { it.status == TaskStatus.PENDING }, "processing" to all.count { it.status == TaskStatus.PROCESSING },
                 "completed" to all.count { it.status == TaskStatus.COMPLETED }, "failed" to all.count { it.status == TaskStatus.FAILED },

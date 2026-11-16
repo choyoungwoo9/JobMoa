@@ -23,18 +23,19 @@ class CollectionService(
     private val classifier: CategoryClassifier,
 ) {
     @Transactional
-    fun start(sourceIds: List<String>, targets: List<DirectTarget> = emptyList(), categoryId: String = "all", companyIds: List<String>? = null): String {
-        require(companies.categories.any { it.id == categoryId }) { "지원하지 않는 분야입니다: $categoryId" }
+    fun start(sourceIds: List<String>, targets: List<DirectTarget> = emptyList(), categoryId: String = "all", companyIds: List<String>? = null, categoryIds: List<String>? = null): String {
+        val scope = (categoryIds ?: listOf(categoryId)).toSet()
+        require(scope.isNotEmpty() && scope.all { id -> companies.categories.any { it.id == id } } && ("all" !in scope || scope.size == 1)) { "지원하는 직군을 선택하세요. 전체 공고와 세부 직군은 함께 선택할 수 없습니다." }
         val selected = if (companyIds == null) companies.list().filter {
-            it.sourceId in sourceIds && classifier.supports(it.id, categoryId)
+            it.sourceId in sourceIds && scope.any { category -> classifier.supports(it.id, category) }
         } else companyIds.distinct().map { companies.require(it) }
         require(selected.isNotEmpty()) { "수집할 계열사를 선택하세요." }
-        require(selected.all { classifier.supports(it.id, categoryId) }) { "선택한 분야를 지원하지 않는 계열사가 포함되어 있습니다." }
+        require(selected.all { company -> scope.any { classifier.supports(company.id, it) } } && scope.all { category -> selected.any { classifier.supports(it.id, category) } }) { "선택한 분야를 지원하지 않는 계열사가 포함되어 있습니다." }
         require(sourceIds.isEmpty() || selected.all { it.sourceId in sourceIds }) { "선택한 계열사와 기업군이 일치하지 않습니다." }
         val sources = selected.map { it.sourceId }.distinct()
         sources.forEach { sites.adapter(it) }
         require(targets.all { it.sourceId in sources }) { "직접 지정한 공고의 기업군이 수집 대상에 포함되어야 합니다." }
-        val run = CollectionRun(UUID.randomUUID().toString(), Instant.now(), categoryId = categoryId, companyIds = selected.map { it.id }.toSet())
+        val run = CollectionRun(UUID.randomUUID().toString(), Instant.now(), categoryId = scope.sorted().first(), companyIds = selected.map { it.id }.toSet(), categoryIds = scope)
         runs.activate(run, sources.flatMap { source ->
             val portalIds = selected.filter { it.sourceId == source }.map { it.portalId }.toSet()
             sites.adapter(source).discoveryTargets.filter { it.id in portalIds }.map { portal ->
@@ -59,7 +60,7 @@ class CollectionService(
         val url = PostingUrl.normalize(adapter.canonicalizeUrl(PostingUrl.normalize(posting.url)))
         require(adapter.acceptsUrl(url)) { "수집기가 지원하지 않는 공고 주소입니다." }
         val company = companies.resolve(sourceId, posting.company, url).firstOrNull { it.id in run.companyIds } ?: return false
-        if (!classifier.candidate(run.categoryId, company.id, posting)) return false
+        if (!(run.categoryIds.ifEmpty { setOf(run.categoryId) }).any { classifier.candidate(it, company.id, posting) }) return false
         return tasks.enqueue(CrawlTask(UUID.randomUUID().toString(), runId, sourceId,
             posting.company.take(255), url, PostingUrl.hash(url), PostingUrl.siteKey(url), Instant.now(),
             posting.title.take(1000), posting.location.take(255), categoryId = run.categoryId, companyId = company.id))
@@ -81,7 +82,7 @@ class CollectionService(
         } + sourceIds.filter { source -> sourceFailures.none { it.sourceId == source } }.map { source ->
             RunSource("$id:$source", id, source, DiscoveryStatus.COMPLETED)
         }
-        runs.activate(CollectionRun(id, Instant.now(), retryOf = runId, categoryId = previous.categoryId, companyIds = previous.companyIds), retrySources)
+        runs.activate(CollectionRun(id, Instant.now(), retryOf = runId, categoryId = previous.categoryId, companyIds = previous.companyIds, categoryIds = previous.categoryIds), retrySources)
         failures.forEach { failed ->
             val adapter = sites.adapter(failed.sourceId)
             val retried = failed.retry(id, UUID.randomUUID().toString())

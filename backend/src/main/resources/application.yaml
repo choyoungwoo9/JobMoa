@@ -1,6 +1,13 @@
 server:
   port: ${SERVER_PORT:18080}
 spring:
+  servlet:
+    multipart:
+      max-file-size: 2GB
+      max-request-size: 2GB
+  mvc:
+    async:
+      request-timeout: 1800000
   application:
     name: jobmoa
   datasource:

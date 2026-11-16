@@ -16,6 +16,9 @@ interface CollectionRunJpaRepository : JpaRepository<CollectionRunEntity, String
 }
 
 interface CollectionLockJpaRepository : JpaRepository<CollectionLockEntity, String> {
+    @Lock(LockModeType.PESSIMISTIC_READ)
+    @Query("select l from CollectionLockEntity l where l.id = :id")
+    fun shared(@Param("id") id: String): CollectionLockEntity?
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select l from CollectionLockEntity l where l.id = :id")
     fun lockById(@Param("id") id: String): CollectionLockEntity?

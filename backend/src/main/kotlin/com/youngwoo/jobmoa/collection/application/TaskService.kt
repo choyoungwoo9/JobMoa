@@ -12,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 
 @Service
-class TaskService(private val tasks: CrawlTaskRepository, private val postings: PostingRepository, private val observations: ObservationRepository, private val classifier: com.youngwoo.jobmoa.classification.domain.model.PostingClassifier) {
+class TaskService(private val tasks: CrawlTaskRepository, private val postings: PostingRepository, private val observations: ObservationRepository, private val classifier: com.youngwoo.jobmoa.classification.domain.model.PostingClassifier, private val changes: CollectionChangeRepository, private val interests: com.youngwoo.jobmoa.interest.domain.repository.PostingInterestRepository) {
     @Transactional
     fun body(id: String, token: String, body: ExtractedPosting): CrawlTask {
         val task = tasks.lock(id).also { it.requireOwnership(token, Instant.now()) }
@@ -70,6 +70,8 @@ class TaskService(private val tasks: CrawlTaskRepository, private val postings: 
             closed = task.closed, lastChange = "new", categories = classification.categories, classification = classification.details))
         if (outcome != TaskOutcome.IDENTICAL) postings.saveVersion(PostingVersion(postingId = posting.id,
             taskId = task.id, contentHash = task.contentHash, bodyText = checkNotNull(task.bodyText), capturePath = task.capturePath, savedAt = now))
+        changes.append(CollectionChange(task.id, task.runId, posting.id, outcome.name, interests.find(posting.id)?.starred ?: false,
+            old != null && !old.closed && task.closed, now))
         observations.append(PostingObservation(postingId = posting.id, taskId = task.id, observedAt = now, closed = task.closed))
         tasks.save(task.copy(status = TaskStatus.COMPLETED, outcome = outcome, bodyText = null, leaseToken = null, leaseExpiresAt = null))
         resolveParents(task, now)
