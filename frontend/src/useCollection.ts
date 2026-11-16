@@ -9,10 +9,10 @@ interface BackendState extends DemoState {
   sources: { id: SourceId; available: boolean }[]
 }
 const initial: BackendState = { version: 1, jobs: [], runs: [], sources: [] }
-function merge(next: BackendState, previous: BackendState): BackendState {
+function merge(next: BackendState, previous: BackendState, preserveInterest: (id: string) => boolean): BackendState {
   const loaded = new Map(previous.jobs.flatMap(job => job.versions.filter(v => v.bodyLoaded).map(v => [v.id, v] as const)))
   const previousJobs = new Map(previous.jobs.map(job => [job.id, job]))
-  return { ...next, jobs: next.jobs.map(job => ({ ...job, interest: newestInterest(job.interest, previousJobs.get(job.id)?.interest), versions: job.versions.map(v => loaded.has(v.id) ? { ...v, body: loaded.get(v.id)!.body, bodyLoaded: true } : v) })) }
+  return { ...next, jobs: next.jobs.map(job => ({ ...job, interest: preserveInterest(job.id) ? previousJobs.get(job.id)?.interest : job.interest, versions: job.versions.map(v => loaded.has(v.id) ? { ...v, body: loaded.get(v.id)!.body, bodyLoaded: true } : v) })) }
 }
 function newestInterest(next?: PostingInterest, previous?: PostingInterest) {
   return Date.parse(previous?.updatedAt ?? '') > Date.parse(next?.updatedAt ?? '1970-01-01') ? previous : next
@@ -34,12 +34,16 @@ function useBackendCollection() {
   const [busy, setBusy] = useState(false)
   const locked = useRef(false)
   const loading = useRef(new Set<string>())
+  // 저장 전에 시작한 조회만 보류한다. 이후 조회는 서버의 빈 관리 정보도 그대로 반영한다.
+  const interestRevision = useRef(0)
+  const interestWrites = useRef(new Map<string, number>())
   const loadJob = useCallback(async (id: string) => {
     if (loading.current.has(id)) return
     loading.current.add(id)
     try {
+      const requestRevision = interestRevision.current
       const job = await request<Job>(`/api/postings/${id}`)
-      setData(current => ({ ...current, jobs: current.jobs.map(existing => existing.id === id ? { ...job, interest: newestInterest(job.interest, existing.interest), read: existing.read, latestChange: existing.latestChange } : existing) }))
+      setData(current => ({ ...current, jobs: current.jobs.map(existing => existing.id === id ? { ...job, interest: (interestWrites.current.get(id) ?? 0) > requestRevision ? existing.interest : job.interest, read: existing.read, latestChange: existing.latestChange } : existing) }))
     } catch (e) { setNotice(e instanceof Error ? e.message : '본문을 불러오지 못했어요.') }
     finally { loading.current.delete(id) }
   }, [])
@@ -49,8 +53,9 @@ function useBackendCollection() {
     const controller = new AbortController()
     async function poll() {
       try {
+        const requestRevision = interestRevision.current
         const state = await request<BackendState>('/api/state', { signal: controller.signal })
-        if (!disposed) { setData(current => merge(state, current)); setError(''); setConnected(true) }
+        if (!disposed) { setData(current => merge(state, current, id => (interestWrites.current.get(id) ?? 0) > requestRevision)); setError(''); setConnected(true) }
       } catch (e) {
         if (!disposed) { setConnected(false); setError(`백엔드에 연결하지 못했어요. ${e instanceof Error ? e.message : ''}`) }
       } finally { if (!disposed) timer = setTimeout(poll, 1000) }
@@ -68,8 +73,9 @@ function useBackendCollection() {
     locked.current = true; setBusy(true)
     try {
       const result = await request<{ id: string }>(url, { method: 'POST', body: JSON.stringify(body) })
+      const requestRevision = interestRevision.current
       const state = await request<BackendState>('/api/state')
-      setData(current => merge(state, current))
+      setData(current => merge(state, current, id => (interestWrites.current.get(id) ?? 0) > requestRevision))
       return result.id
     } catch (e) { setNotice(e instanceof Error ? e.message : '실행에 실패했어요.'); return null }
     finally { locked.current = false; setBusy(false) }
@@ -77,13 +83,15 @@ function useBackendCollection() {
   async function read(id: string, value: boolean) {
     try {
       await request(`/api/postings/${id}/read`, { method: 'PATCH', body: JSON.stringify({ read: value }) })
+      const requestRevision = interestRevision.current
       const state = await request<BackendState>('/api/state')
-      setData(current => merge(state, current))
+      setData(current => merge(state, current, id => (interestWrites.current.get(id) ?? 0) > requestRevision))
     } catch (e) { setNotice(e instanceof Error ? e.message : '읽음 저장에 실패했어요.') }
   }
   async function updateInterest(id: string, method: 'PATCH' | 'PUT', body: object) {
     try {
       const interest = await request<PostingInterest>(`/api/postings/${id}/interest${method === 'PUT' ? '/management' : ''}`, { method, body: JSON.stringify(body) })
+      interestWrites.current.set(id, ++interestRevision.current)
       setData(current => ({ ...current, jobs: current.jobs.map(job => job.id === id ? { ...job, interest: newestInterest(interest, job.interest) } : job) }))
       if (method === 'PUT') setNotice('관심 공고 관리 정보를 저장했어요.')
       return true
