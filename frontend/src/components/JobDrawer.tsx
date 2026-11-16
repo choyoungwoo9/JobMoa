@@ -1,3 +1,4 @@
+import { VersionDiff } from './VersionDiff'
 import { useCallback, useState } from 'react'
 import { dateLabel, sourceById } from '../data'
 import type { Category, InterestManagement, Job, JobVersion } from '../types'
@@ -47,7 +48,7 @@ export function JobDrawer({
   onPrevious: () => void
   onNext: () => void
 }) {
-  const [tab, setTab] = useState<'capture' | 'text'>('text')
+  const [tab, setTab] = useState<'capture' | 'text' | 'diff'>('text')
   const [versionId, setVersionId] = useState(job.versions[0].id)
   const [zoomed, setZoomed] = useState(false)
   const closeZoom = useCallback(() => setZoomed(false), [])
@@ -202,6 +203,7 @@ export function JobDrawer({
             <Icon name="image" size={17} />
             캡처 보기
           </button>
+          <button role="tab" id="diff-tab" aria-selected={tab === 'diff'} aria-controls="saved-content" className={tab === 'diff' ? 'active' : ''} onClick={() => setTab('diff')}>변경점 비교</button>
           <span>
             v{revision} · {dateLabel(version.savedAt)}
           </span>
@@ -209,9 +211,9 @@ export function JobDrawer({
         <div
           role="tabpanel"
           id="saved-content"
-          aria-labelledby={tab === 'capture' ? 'capture-tab' : 'text-tab'}
+          aria-labelledby={`${tab}-tab`}
         >
-          {tab === 'text' ? (
+          {tab === 'diff' ? <VersionDiff key={version.id} versions={job.versions} current={version} /> : tab === 'text' ? (
             <div className="saved-text">
               {version.bodyLoaded === false ? '저장된 본문을 불러오는 중이에요…' : version.body ||
                 '본문 추출에 실패했어요. 수집 기록에서 해당 단계를 재시도할 수 있어요.'}

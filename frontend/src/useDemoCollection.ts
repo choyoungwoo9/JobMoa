@@ -40,6 +40,7 @@ export function useDemoCollection() {
     categoryId = 'all',
     companyIds?: string[],
     retry?: { runId: string; failures: Failure[] },
+    _categoryIds?: string[],
   ) {
     if (locked.current || !ids.length) {
       setNotice('현재 수집이 끝난 뒤 다시 시도해주세요.')

@@ -97,6 +97,7 @@ export interface SourceResult {
   excluded?: number
 }
 export interface CollectionRun {
+  categoryIds?: string[]
   categoryId?: string
   companyIds?: string[]
   id: string
@@ -108,6 +109,7 @@ export interface CollectionRun {
   progress?: { discoveryFinished: boolean; total: number; pending: number; processing: number; completed: number; failed: number; percent: number | null }
 }
 export interface DemoState {
+  workspaceRevision?: string
   version: 1
   jobs: Job[]
   runs: CollectionRun[]

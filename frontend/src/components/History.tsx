@@ -1,3 +1,4 @@
+import { CollectionChanges } from './CollectionChanges'
 import {
   categoryName,
   dateLabel,
@@ -20,7 +21,9 @@ export function RunCard({
   onOpenOriginal,
   companies = [],
   categories = [],
+  onBrowseChanges,
 }: {
+  onBrowseChanges?: (ids: string[], label: string) => void
   run: CollectionRun
   companies?: Company[]
   categories?: Category[]
@@ -31,7 +34,7 @@ export function RunCard({
   onOpenOriginal: (id: string) => void
 }) {
   const summary = summarize(run)
-  const fieldName = categories.find(category => category.id === run.categoryId)?.name ?? categoryName(run.categoryId)
+  const fieldName = (run.categoryIds?.length ? run.categoryIds : [run.categoryId ?? 'all']).map(id => categories.find(category => category.id === id)?.name ?? categoryName(id)).join(' · ')
   const unresolved = run.results
     .flatMap((r) => r.failures)
     .filter((f) => !f.resolved)
@@ -87,6 +90,7 @@ export function RunCard({
         </span>
         <Icon name="down" size={16} className={expanded ? 'rotate-180' : ''} />
       </button>
+      {expanded && onBrowseChanges && <CollectionChanges run={run} onBrowse={onBrowseChanges} />}
       {expanded && (
         <div className="run-details">
           {!!run.companyIds?.length && <p className="collection-scope">수집 대상 · {companies.filter(company => run.companyIds?.includes(company.id)).map(company => company.name).join(', ')}</p>}

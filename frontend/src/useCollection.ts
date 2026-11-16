@@ -4,12 +4,14 @@ import { useDemoCollection } from './useDemoCollection'
 import { CATEGORIES } from './data'
 
 interface BackendState extends DemoState {
+  workspaceRevision?: string
   categories?: Category[]
   companies?: Company[]
   sources: { id: SourceId; available: boolean }[]
 }
 const initial: BackendState = { version: 1, jobs: [], runs: [], sources: [] }
 function merge(next: BackendState, previous: BackendState, preserveInterest: (id: string) => boolean): BackendState {
+  if (next.workspaceRevision !== previous.workspaceRevision) return next
   const loaded = new Map(previous.jobs.flatMap(job => job.versions.filter(v => v.bodyLoaded).map(v => [v.id, v] as const)))
   const previousJobs = new Map(previous.jobs.map(job => [job.id, job]))
   return { ...next, jobs: next.jobs.map(job => ({ ...job, interest: preserveInterest(job.id) ? previousJobs.get(job.id)?.interest : job.interest, versions: job.versions.map(v => loaded.has(v.id) ? { ...v, body: loaded.get(v.id)!.body, bodyLoaded: true } : v) })) }
@@ -29,21 +31,25 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 function useBackendCollection() {
   const [data, setData] = useState<BackendState>(initial)
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
+  const [notice, setNotice] = useState(() => sessionStorage.getItem('jobmoa.workspace.notice') ?? '')
   const [connected, setConnected] = useState(false)
   const [busy, setBusy] = useState(false)
+  useEffect(() => { sessionStorage.removeItem('jobmoa.workspace.notice') }, [])
   const locked = useRef(false)
   const loading = useRef(new Set<string>())
+  const workspaceRevision = useRef<string | undefined>(undefined)
+  useEffect(() => { workspaceRevision.current = data.workspaceRevision }, [data.workspaceRevision])
   // 저장 전에 시작한 조회만 보류한다. 이후 조회는 서버의 빈 관리 정보도 그대로 반영한다.
   const interestRevision = useRef(0)
   const interestWrites = useRef(new Map<string, number>())
   const loadJob = useCallback(async (id: string) => {
     if (loading.current.has(id)) return
     loading.current.add(id)
+    const epoch = workspaceRevision.current
     try {
       const requestRevision = interestRevision.current
       const job = await request<Job>(`/api/postings/${id}`)
-      setData(current => ({ ...current, jobs: current.jobs.map(existing => existing.id === id ? { ...job, interest: (interestWrites.current.get(id) ?? 0) > requestRevision ? existing.interest : job.interest, read: existing.read, latestChange: existing.latestChange } : existing) }))
+      setData(current => current.workspaceRevision !== epoch ? current : ({ ...current, jobs: current.jobs.map(existing => existing.id === id ? { ...job, interest: (interestWrites.current.get(id) ?? 0) > requestRevision ? existing.interest : job.interest, read: existing.read, latestChange: existing.latestChange } : existing) }))
     } catch (e) { setNotice(e instanceof Error ? e.message : '본문을 불러오지 못했어요.') }
     finally { loading.current.delete(id) }
   }, [])
@@ -104,7 +110,7 @@ function useBackendCollection() {
     availableSources: data.sources.filter(s => s.available).map(s => s.id),
     categories: data.categories ?? CATEGORIES,
     companies: data.companies ?? [],
-    start: (ids: SourceId[], _failure: FailureStage | null = null, categoryId = 'all', companyIds?: string[]) => launch('/api/collections', { sourceIds: ids, categoryId, companyIds }),
+    start: (ids: SourceId[], _failure: FailureStage | null = null, categoryId = 'all', companyIds?: string[], _retry?: unknown, categoryIds?: string[]) => launch('/api/collections', { sourceIds: ids, categoryId, companyIds, categoryIds }),
     retryFailures: (id: string, ids?: string[]) => launch(`/api/collections/${id}/retry`, { failureIds: ids }),
     toggleRead: (id: string) => { void read(id, !data.jobs.find(j => j.id === id)?.read) },
     markRead: (id: string) => { if (!data.jobs.find(j => j.id === id)?.read) void read(id, true) },

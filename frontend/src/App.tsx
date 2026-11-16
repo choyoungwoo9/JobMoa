@@ -1,3 +1,5 @@
+import { MyPage } from './components/MyPage'
+import { CollectionChanges } from './components/CollectionChanges'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { SOURCES, dateLabel, sourceById, summarize } from './data'
 import type { FailureStage, SourceId } from './types'
@@ -15,9 +17,13 @@ import './App.css'
 
 const PAGE_SIZE = 8
 function App() {
-  const { data, notice, start, retryFailures, toggleRead, markRead, running, demo, connected, error, availableSources, categories, companies, loadJob, setStarred, saveInterest } =
-    useCollection()
-  const [view, setView] = useState<'jobs' | 'history' | 'statistics' | 'interests'>('jobs')
+  const collection = useCollection()
+  return <Workspace key={collection.data.workspaceRevision} collection={collection} />
+}
+function Workspace({ collection }: { collection: ReturnType<typeof useCollection> }) {
+  const { data, notice, start, retryFailures, toggleRead, markRead, running, demo, connected, error, availableSources, categories, companies, loadJob, setStarred, saveInterest } = collection
+  const [view, setView] = useState<'jobs' | 'history' | 'statistics' | 'interests' | 'my'>('jobs')
+  const [changeScope, setChangeScope] = useState<{ ids: string[]; label: string } | null>(null)
   const [categoryId, setCategoryId] = useState('all')
   const [source, setSource] = useState<SourceId | 'all'>('all')
   const [companyFilter, setCompanyFilter] = useState<string | null>(null)
@@ -36,7 +42,7 @@ function App() {
   const latest = latestRun ? summarize(latestRun) : null
   const collectionCategoryId = categoryId === 'unclassified' || (!demo && !companies.some(company => company.supportedCategoryIds.includes(categoryId))) ? 'all' : categoryId
   const categoryName = (id = 'all') => id === 'unclassified' ? '미분류' : categories.find(category => category.id === id)?.name ?? '기타 분야'
-  const categoryJobs = data.jobs.filter(job => (categoryId === 'all' || (categoryId === 'unclassified' ? !job.categories?.length : job.categories?.includes(categoryId))) && (!companyFilter || job.companyId === companyFilter))
+  const categoryJobs = data.jobs.filter(job => (!changeScope || changeScope.ids.includes(job.id)) && (categoryId === 'all' || (categoryId === 'unclassified' ? !job.categories?.length : job.categories?.includes(categoryId))) && (!companyFilter || job.companyId === companyFilter))
   const available = categoryJobs.filter((job) => includeClosed || !job.closed)
   const unread = available.filter((job) => !job.read).length
   const newCount = available.filter((job) => job.latestChange === 'new').length
@@ -47,6 +53,7 @@ function App() {
       data.jobs
         .filter(
           (job) =>
+            (!changeScope || changeScope.ids.includes(job.id)) &&
             (categoryId === 'all' || (categoryId === 'unclassified' ? !job.categories?.length : !!job.categories?.includes(categoryId))) &&
             (!companyFilter || job.companyId === companyFilter) &&
             (includeClosed || !job.closed) &&
@@ -64,7 +71,7 @@ function App() {
               ? a.firstSeen.localeCompare(b.firstSeen)
               : b.firstSeen.localeCompare(a.firstSeen),
         ),
-    [data.jobs, categoryId, companyFilter, includeClosed, source, tab, query, sort],
+    [data.jobs, changeScope, categoryId, companyFilter, includeClosed, source, tab, query, sort],
   )
   const listJobs = selectedJob
     ? browseQueue.flatMap((id) => data.jobs.find((job) => job.id === id) ?? [])
@@ -76,15 +83,20 @@ function App() {
     safePage * PAGE_SIZE,
   )
   const activeJob = data.jobs.find((job) => job.id === selectedJob)
+  const activeVersionId = activeJob?.versions[0]?.id
   useEffect(() => {
     if (selectedJob) void loadJob(selectedJob)
-  }, [selectedJob, activeJob?.versions[0]?.id, loadJob])
+  }, [selectedJob, activeVersionId, loadJob])
   const changeSource = (id: SourceId | 'all') => {
+    setChangeScope(null)
     setSource(id)
     setCompanyFilter(null)
     setView('jobs')
     setPage(1)
     setSelectedJob(null)
+  }
+  const browseChanges = (ids: string[], label: string) => {
+    setView('jobs'); setChangeScope({ ids, label }); setCategoryId('all'); setSource('all'); setCompanyFilter(null); setTab('all'); setQuery(''); setIncludeClosed(true); setSelectedJob(null); setPage(1)
   }
   const openJob = (id: string) => {
     if (!selectedJob) setBrowseQueue(filtered.map((job) => job.id))
@@ -104,8 +116,8 @@ function App() {
     setView('history')
     setExpandedRuns((ids) => (ids.includes(id) ? ids : [id, ...ids]))
   }
-  const begin = async (ids: SourceId[], failure: FailureStage | null, selectedCategory: string, companyIds: string[]) => {
-    const id = await start(ids, failure, selectedCategory, companyIds)
+  const begin = async (ids: SourceId[], failure: FailureStage | null, selectedCategory: string, companyIds: string[], categoryIds?: string[]) => {
+    const id = await start(ids, failure, selectedCategory, companyIds, undefined, categoryIds)
     if (id) {
       setCollectOpen(false)
       setExpandedRuns((items) => [id, ...items])
@@ -116,6 +128,7 @@ function App() {
     if (id) openRun(id)
   }
   const resetFilters = () => {
+    setChangeScope(null)
     setCompanyFilter(null)
     setSource('all')
     setTab('all')
@@ -125,6 +138,7 @@ function App() {
   }
 
   const browseStatistics = (scope: StatisticsScope) => {
+    setChangeScope(null)
     setSource(scope.sourceId)
     setCompanyFilter(scope.companyId)
     setCategoryId(scope.categoryId)
@@ -175,6 +189,7 @@ function App() {
             {running && <span className="live-dot" />}
           </button>
           <button className={view === 'statistics' ? 'active' : ''} onClick={() => { setSelectedJob(null); setCategoryId('all'); setSource('all'); setCompanyFilter(null); setView('statistics') }}><Icon name="chart" size={18} /><span>채용 통계</span></button>
+          <button className={view === 'my' ? 'active' : ''} onClick={() => { setSelectedJob(null); setView('my') }}><Icon name="layers" size={18} /><span>마이페이지</span></button>
         </nav>
         <div className="source-section-heading">
           <span>관심 기업군</span>
@@ -233,7 +248,7 @@ function App() {
             <Icon name="layers" size={16} />
             <span>내 워크스페이스</span>
             <Icon name="chevron" size={12} />
-            <strong>{view === 'jobs' ? '공고 모아보기' : view === 'interests' ? '관심 공고' : view === 'statistics' ? '채용 통계' : '수집 기록'}</strong>
+            <strong>{view === 'jobs' ? '공고 모아보기' : view === 'my' ? '마이페이지' : view === 'interests' ? '관심 공고' : view === 'statistics' ? '채용 통계' : '수집 기록'}</strong>
           </div>
           <div className="topbar-right">
             <span className="preview-badge">
@@ -257,13 +272,13 @@ function App() {
                   ? source === 'all'
                     ? categoryId === 'all' ? '공고 모아보기' : `${categoryName(categoryId)} 공고`
                     : `${sourceById(source).name} 공고`
-                  : view === 'interests' ? '관심 공고' : view === 'statistics' ? '채용 통계' : '수집 기록'}
+                  : view === 'my' ? '마이페이지' : view === 'interests' ? '관심 공고' : view === 'statistics' ? '채용 통계' : '수집 기록'}
                 <span className="heading-dot">.</span>
               </h1>
               <p>
                 {view === 'jobs'
                   ? '관심 있는 회사와 직무의 채용공고를 한곳에 모아요.'
-                  : view === 'interests' ? '지원하고 싶은 공고와 다음 할 일을 차곡차곡 관리해요.' : view === 'statistics' ? '쌓아온 공고에서 채용의 흐름을 살펴봐요.' : '언제, 어디에서, 얼마나 모았는지 확인해요.'}
+                  : view === 'my' ? '내 데이터를 백업하고 필요한 범위만 초기화해요.' : view === 'interests' ? '지원하고 싶은 공고와 다음 할 일을 차곡차곡 관리해요.' : view === 'statistics' ? '쌓아온 공고에서 채용의 흐름을 살펴봐요.' : '언제, 어디에서, 얼마나 모았는지 확인해요.'}
               </p>
             </div>
             <button
@@ -283,6 +298,8 @@ function App() {
           {error && <div className="backend-error" role="alert">{error} 연결을 자동으로 다시 확인하고 있어요.</div>}
           {view === 'jobs' ? (
             <>
+              {changeScope && <div className="stats-job-scope">{changeScope.label} · {changeScope.ids.filter(id => data.jobs.some(job => job.id === id)).length}개 공고<button className="text-button" onClick={() => { setChangeScope(null); setSelectedJob(null); setPage(1) }}>변화 요약 필터 해제</button></div>}
+              {!demo && latestRun?.finishedAt && <CollectionChanges key={latestRun.id} run={latestRun} onBrowse={browseChanges} />}
               {companyFilter && <div className="stats-job-scope">{companies.find(c => c.id === companyFilter)?.name} 공고 <button className="text-button" onClick={() => setCompanyFilter(null)}>회사 필터 해제</button></div>}
               <div className="classification-filters">
                 <div className="category-tabs" role="tablist" aria-label="공고 분류">
@@ -348,7 +365,7 @@ function App() {
                   >
                     <div>
                       <Icon name="refresh" size={17} className="spin" />
-                      <strong>{categoryName(latestRun.categoryId)}를 모으고 있어요</strong>
+                      <strong>{(latestRun.categoryIds?.length ? latestRun.categoryIds.map(id => categoryName(id)).join(' · ') : categoryName(latestRun.categoryId))}를 모으고 있어요</strong>
                       <span>
                         {latestRun.progress ? `${latestRun.progress.completed + latestRun.progress.failed} / ${latestRun.progress.total}개 공고 · ${latestRun.progress.discoveryFinished ? `${latestRun.progress.percent}%` : '목록 탐색 중'}` : `${latest.done} / ${latestRun.results.length}개 기업군`}
                       </span>
@@ -398,7 +415,7 @@ function App() {
                       <span
                         className={`tiny-dot ${latest.failed ? 'warning' : ''}`}
                       />
-                      {categoryName(latestRun.categoryId)} · 마지막 수집 <b>{dateLabel(latestRun.startedAt, true)}</b>
+                      {(latestRun.categoryIds?.length ? latestRun.categoryIds.map(id => categoryName(id)).join(' · ') : categoryName(latestRun.categoryId))} · 마지막 수집 <b>{dateLabel(latestRun.startedAt, true)}</b>
                       <i />
                       신규 <strong>{latest.added}</strong> · 변경{' '}
                       <strong>{latest.changed}</strong>
@@ -791,7 +808,7 @@ function App() {
                 </span>
               </div>
             </>
-          ) : view === 'interests' ? <InterestBoard jobs={data.jobs} categories={categories} onStar={setStarred} onSave={saveInterest} markRead={markRead} toggleRead={toggleRead} loadJob={loadJob} onBrowse={() => changeSource('all')} /> : view === 'statistics' ? <Statistics categories={categories} companies={companies} demo={demo} onBrowse={browseStatistics} /> : (
+          ) : view === 'my' ? <MyPage key={data.workspaceRevision} demo={demo} running={running} /> : view === 'interests' ? <InterestBoard key={data.workspaceRevision} jobs={data.jobs} categories={categories} onStar={setStarred} onSave={saveInterest} markRead={markRead} toggleRead={toggleRead} loadJob={loadJob} onBrowse={() => changeSource('all')} /> : view === 'statistics' ? <Statistics categories={categories} companies={companies} demo={demo} onBrowse={browseStatistics} /> : (
             <section className="history-view">
               <div className="section-heading">
                 <h2>
@@ -825,6 +842,7 @@ function App() {
                         ?.scrollIntoView({ block: 'start' }),
                     )
                   }}
+                  onBrowseChanges={demo ? undefined : browseChanges}
                   busy={running}
                 />
               ))}
