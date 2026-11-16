@@ -98,3 +98,16 @@ Flyway V6은 기존 공고의 마지막 상태를 기준점으로 보존합니�
 - 공고별 비관적 잠금과 짧은 트랜잭션으로 최신 본문을 읽고 연결을 교체합니다. 수집·읽음 변경과 같은 공고 잠금을 사용하며, 개별 실패는 목록으로 반환합니다. 재분류는 브라우저를 만들지 않습니다.
 
 실제 Kotlin 결과 평가 도구: `java -cp 'backend/build/classes/kotlin/main:backend/build/resources/main:backend/build/runtime-libs/*' scripts/analysis/EvaluateKotlinClassifier.java /path/corpus.jsonl /tmp/predictions.json` (루트에서 빌드 후 JDK 21 이상). 고정 정답과 Python 해석기 대조 결과는 [구현 검증](../docs/analysis/classification-implementation-v0.5.md)에 기록합니다.
+
+## 관심 공고 API
+
+`interest` 영역은 도메인 `PostingInterest`와 저장 포트, Spring Data JPA 구현으로 구성합니다. Flyway V8의 `posting_interest`에 공고 ID당 한 행을 두고 수집 결과/본문 버전과 분리합니다. 목록 조회는 관심 정보를 한 번에 읽어 N+1을 피합니다. `/api/state`, `/api/postings`, `/api/postings/{id}`의 `interest`에는 `starred`, `note`, `priority`, `applicationStatus`, `appliedOn`, `updatedAt`을 제공합니다. 저장 이력이 없으면 관심 해제·빈 메모·미지정·지원 전·지원일 없음이 기본값입니다.
+
+| 요청 | 본문 | 동작 |
+| --- | --- | --- |
+| `PATCH /api/postings/{id}/interest` | `{"starred":true}` | 별표만 변경. 메모·지원 기록 유지 |
+| `PUT /api/postings/{id}/interest/management` | `{"note":"확인할 내용","priority":"HIGH","applicationStatus":"APPLIED","appliedOn":"2026-11-15"}` | 개인 관리 필드 저장. 별표 유지 |
+
+두 쓰기 API는 갱신한 `interest` 객체를 반환합니다. 우선순위는 `HIGH/NORMAL/LOW/NONE`, 상태는 `BEFORE_APPLY/APPLIED`입니다. 메모 최대 5,000자. 완료 상태에서 지원일 생략 시 기존 지원일 또는 서울 시간 오늘을 사용합니다. 지원 전으로 저장할 때 지원일은 `null`이어야 하며, 미래 지원일과 길이 초과는 400, 존재하지 않는 공고는 404입니다. 잘못된 enum/날짜 형식은 요청 파싱에서 400 처리됩니다.
+
+공고의 비관적 잠금을 잡고 기존 관리 정보를 읽어 수정하므로 최초 행 생성·별표·메모·읽음·수집 저장이 공고 단위로 직렬화됩니다. 별표 해제에 행 삭제를 사용하지 않습니다. 수집기와 저장 본문 재분류는 `posting_interest`를 갱신하지 않습니다. 마이그레이션은 기존 공고/캡처/기록을 삭제하지 않습니다.

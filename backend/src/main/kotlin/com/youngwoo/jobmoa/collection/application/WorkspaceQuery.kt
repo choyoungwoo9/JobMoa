@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 @Transactional(readOnly = true)
 class WorkspaceQuery(private val runs: CollectionRepository, private val tasks: CrawlTaskRepository,
-    private val postings: PostingRepository, private val sites: SourceRegistry, private val companies: CompanyRegistry) {
+    private val postings: PostingRepository, private val sites: SourceRegistry, private val companies: CompanyRegistry, private val interests: com.youngwoo.jobmoa.interest.domain.repository.PostingInterestRepository) {
     fun sources() = sites.definitions.map { definition -> mapOf(
         "id" to definition.id, "name" to definition.name, "url" to definition.listingUrl,
         "available" to sites.supported(definition.id),
@@ -22,15 +22,16 @@ class WorkspaceQuery(private val runs: CollectionRepository, private val tasks: 
     fun state() = mapOf("version" to 1, "jobs" to jobs(), "runs" to collections(), "sources" to sources(), "categories" to companies.categories, "companies" to companies.list())
     fun jobs(): List<Map<String, Any?>> {
         val all = postings.list()
+        val management = interests.findAll(all.map { it.id })
         val versions = postings.versionSummaries(all.map { it.id }).groupBy { it.postingId }
         val latest = runs.recentRuns(1).firstOrNull()?.let { tasks.summaries(it.id).associateBy { t -> t.urlHash } }.orEmpty()
-        return all.map { posting -> metadata(posting, latest[posting.urlHash]?.outcome?.name?.lowercase()) +
+        return all.map { posting -> metadata(posting, latest[posting.urlHash]?.outcome?.name?.lowercase()) + ("interest" to (management[posting.id] ?: com.youngwoo.jobmoa.interest.domain.model.PostingInterest(posting.id))) +
             ("versions" to versions[posting.id].orEmpty().map { mapOf("id" to it.id.toString(), "savedAt" to it.savedAt,
                 "body" to "", "bodyLoaded" to false, "captureAvailable" to true, "captureUrl" to "/api/captures/${it.capturePath}") }) }
     }
     fun job(id: Long): Map<String, Any?> {
         val posting = postings.find(id) ?: throw ResourceNotFound("공고를 찾을 수 없습니다.")
-        return metadata(posting, posting.lastChange) + ("versions" to postings.versions(id).map {
+        return metadata(posting, posting.lastChange) + ("interest" to (interests.find(id) ?: com.youngwoo.jobmoa.interest.domain.model.PostingInterest(id))) + ("versions" to postings.versions(id).map {
             mapOf("id" to it.id.toString(), "savedAt" to it.savedAt, "body" to it.bodyText, "bodyLoaded" to true,
                 "captureAvailable" to true, "captureUrl" to "/api/captures/${it.capturePath}")
         })
