@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react'
 import { dateLabel, sourceById } from '../data'
-import type { Category, Job, JobVersion } from '../types'
+import type { Category, InterestManagement, Job, JobVersion } from '../types'
 import { BrandMark } from './BrandMark'
 import { Icon } from './Icon'
 import { Modal } from './Modal'
+import { InterestEditor, InterestStar } from './InterestControls'
 
 function sampleCapture(job: Job, version: JobVersion, revision: number) {
   const escape = (value: string) =>
@@ -28,6 +29,8 @@ export function JobDrawer({
   categories,
   onClose,
   onToggleRead,
+  onStar,
+  onSaveInterest,
   position,
   total,
   onPrevious,
@@ -37,6 +40,8 @@ export function JobDrawer({
   categories: Category[]
   onClose: () => void
   onToggleRead: () => void
+  onStar: (id: string, starred: boolean) => Promise<boolean>
+  onSaveInterest: (id: string, management: InterestManagement) => Promise<boolean>
   position: number
   total: number
   onPrevious: () => void
@@ -95,7 +100,8 @@ export function JobDrawer({
           </span>
           {job.closed && <span className="closed-badge">마감 · 보관 중</span>}
         </div>
-        <h2 id="job-title">{job.title}</h2>
+        <div className="drawer-title-line"><h2 id="job-title">{job.title}</h2><InterestStar job={job} onChange={onStar} /></div>
+        <InterestEditor key={job.id} job={job} onSave={onSaveInterest} />
         <dl className="job-metadata">
           <div>
             <dt>근무지</dt>

@@ -9,7 +9,8 @@ import {
   saveDemo,
   sourceById,
 } from './data'
-import type { CollectionRun, Failure, FailureStage, SourceId } from './types'
+import type { CollectionRun, Failure, FailureStage, InterestManagement, SourceId } from './types'
+import { interestOf, koreaToday } from './interest'
 const loadJob = (_id: string) => {}
 
 // Frontend-only simulator. The later API implementation can replace this hook.
@@ -297,7 +298,20 @@ export function useDemoCollection() {
         job.id === id ? { ...job, read: true } : job,
       ),
     }))
+  async function setStarred(id: string, starred: boolean) {
+    setData(current => ({ ...current, jobs: current.jobs.map(job => job.id === id ? { ...job, interest: { ...interestOf(job), starred, updatedAt: new Date().toISOString() } } : job) }))
+    return true
+  }
+  async function saveInterest(id: string, management: InterestManagement) {
+    if (management.note.length > 5000) { setNotice('메모는 5,000자까지 저장할 수 있어요.'); return false }
+    if (management.appliedOn && management.appliedOn > koreaToday()) { setNotice('지원일은 오늘 이후로 지정할 수 없어요.'); return false }
+    setData(current => ({ ...current, jobs: current.jobs.map(job => job.id === id ? { ...job, interest: { ...interestOf(job), ...management, appliedOn: management.applicationStatus === 'APPLIED' ? management.appliedOn ?? interestOf(job).appliedOn ?? koreaToday() : null, updatedAt: new Date().toISOString() } } : job) }))
+    setNotice('관심 공고 관리 정보를 저장했어요.')
+    return true
+  }
   return {
+    setStarred,
+    saveInterest,
     data,
     categories: CATEGORIES,
     companies: SOURCES.map(source => ({ id: source.id, sourceId: source.id, name: source.name, supportedCategoryIds: CATEGORIES.filter(category => ['bucketplace', 'toss', 'daangn'].includes(source.id) || !['planning', 'product-management', 'design', 'marketing', 'sales'].includes(category.id)).map(category => category.id) })),

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { Category, Company, DemoState, FailureStage, Job, SourceId } from './types'
+import type { Category, Company, DemoState, FailureStage, InterestManagement, Job, PostingInterest, SourceId } from './types'
 import { useDemoCollection } from './useDemoCollection'
 import { CATEGORIES } from './data'
 
@@ -11,7 +11,11 @@ interface BackendState extends DemoState {
 const initial: BackendState = { version: 1, jobs: [], runs: [], sources: [] }
 function merge(next: BackendState, previous: BackendState): BackendState {
   const loaded = new Map(previous.jobs.flatMap(job => job.versions.filter(v => v.bodyLoaded).map(v => [v.id, v] as const)))
-  return { ...next, jobs: next.jobs.map(job => ({ ...job, versions: job.versions.map(v => loaded.has(v.id) ? { ...v, body: loaded.get(v.id)!.body, bodyLoaded: true } : v) })) }
+  const previousJobs = new Map(previous.jobs.map(job => [job.id, job]))
+  return { ...next, jobs: next.jobs.map(job => ({ ...job, interest: newestInterest(job.interest, previousJobs.get(job.id)?.interest), versions: job.versions.map(v => loaded.has(v.id) ? { ...v, body: loaded.get(v.id)!.body, bodyLoaded: true } : v) })) }
+}
+function newestInterest(next?: PostingInterest, previous?: PostingInterest) {
+  return Date.parse(previous?.updatedAt ?? '') > Date.parse(next?.updatedAt ?? '1970-01-01') ? previous : next
 }
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, { ...options, headers: { 'Content-Type': 'application/json', ...options?.headers } })
@@ -35,7 +39,7 @@ function useBackendCollection() {
     loading.current.add(id)
     try {
       const job = await request<Job>(`/api/postings/${id}`)
-      setData(current => ({ ...current, jobs: current.jobs.map(existing => existing.id === id ? { ...job, read: existing.read, latestChange: existing.latestChange } : existing) }))
+      setData(current => ({ ...current, jobs: current.jobs.map(existing => existing.id === id ? { ...job, interest: newestInterest(job.interest, existing.interest), read: existing.read, latestChange: existing.latestChange } : existing) }))
     } catch (e) { setNotice(e instanceof Error ? e.message : '본문을 불러오지 못했어요.') }
     finally { loading.current.delete(id) }
   }, [])
@@ -77,7 +81,17 @@ function useBackendCollection() {
       setData(current => merge(state, current))
     } catch (e) { setNotice(e instanceof Error ? e.message : '읽음 저장에 실패했어요.') }
   }
+  async function updateInterest(id: string, method: 'PATCH' | 'PUT', body: object) {
+    try {
+      const interest = await request<PostingInterest>(`/api/postings/${id}/interest${method === 'PUT' ? '/management' : ''}`, { method, body: JSON.stringify(body) })
+      setData(current => ({ ...current, jobs: current.jobs.map(job => job.id === id ? { ...job, interest: newestInterest(interest, job.interest) } : job) }))
+      if (method === 'PUT') setNotice('관심 공고 관리 정보를 저장했어요.')
+      return true
+    } catch (e) { setNotice(e instanceof Error ? e.message : '관심 공고 정보를 저장하지 못했어요.'); return false }
+  }
   return {
+    setStarred: (id: string, starred: boolean) => updateInterest(id, 'PATCH', { starred }),
+    saveInterest: (id: string, management: InterestManagement) => updateInterest(id, 'PUT', management),
     data, notice, connected, error, demo: false, loadJob,
     availableSources: data.sources.filter(s => s.available).map(s => s.id),
     categories: data.categories ?? CATEGORIES,

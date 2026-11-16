@@ -3349,7 +3349,7 @@ dialog::backdrop {
 
 .brand-bucketplace { background: #fff; color: #00a5ff; }
 
-/* Keep all three workspace pages reachable on short and narrow screens. */
+/* Keep all workspace pages reachable on short and narrow screens. */
 .sidebar { overflow-y: auto; }
 @media (max-width: 720px) {
   .main-nav { position: static; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
@@ -3366,3 +3366,58 @@ dialog::backdrop {
 .classification-detail blockquote { margin: 8px 0; padding-left: 10px; border-left: 2px solid #c8d8ba; color: #59664f; overflow-wrap: anywhere; }
 .job-category.unmapped { background: #f2ece0; color: #927848; }
 .saved-indicator { flex-wrap: wrap; }
+
+/* 관심 공고는 수집·읽음과 독립적으로 관리한다. */
+.interest-star { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: #9aa58b; font-size: 25px; line-height: 1; cursor: pointer; }
+.interest-star:hover { background: #fff5d5; color: #a87913; }
+.interest-star.starred { color: #c19020; }
+.interest-star:disabled { opacity: .5; cursor: wait; }
+.interest-star:focus-visible { outline: 2px solid #b39140; outline-offset: 2px; }
+.posting-title-line, .drawer-title-line { display: flex; align-items: flex-start; gap: 8px; }
+.posting-title-line > button:not(.interest-star) { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 4px 0; border: 0; background: none; color: inherit; text-align: left; font: inherit; font-weight: 500; cursor: pointer; }
+.posting-title-line .interest-star { width: 24px; height: 25px; font-size: 22px; }
+.job-read .posting-title-line > button:not(.interest-star) { color: #9dae8b; }
+.drawer-title-line h2 { flex: 1; min-width: 0; }
+.drawer-title-line .interest-star { margin-top: 14px; }
+.compact-job .interest-star { align-self: flex-start; width: 22px; font-size: 20px; }
+.interest-editor { margin: 16px 0; border: 1px solid #e2e9d9; border-radius: 9px; background: #fafbf7; font-size: 12px; }
+.interest-editor > summary { padding: 12px; cursor: pointer; color: #506b3e; font-weight: 600; }
+.interest-editor > summary > span { margin-left: 8px; font-size: 10px; color: #b1852c; font-weight: 400; }
+.interest-editor form { padding: 0 12px 12px; }
+.interest-editor form > p { margin: 0 0 12px; color: #849275; font-size: 11px; }
+.interest-editor fieldset { min-width: 0; padding: 0; border: 0; margin: 0; }
+.interest-editor-fields { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+.interest-editor label { display: flex; flex: 1; min-width: 100px; flex-direction: column; gap: 6px; color: #607451; font-size: 11px; }
+.interest-editor select, .interest-editor input, .interest-editor textarea, .interest-filters > select { width: 100%; max-width: 100%; min-width: 0; padding: 9px; border: 1px solid #dce5d4; border-radius: 6px; background: #fff; font: inherit; color: #34472b; }
+.interest-editor textarea { resize: vertical; min-height: 95px; line-height: 1.6; }
+.interest-editor-footer { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; }
+.interest-editor-footer > span { font-size: 10px; color: #8b997e; }
+.interest-editor .interest-save-error { margin-top: 10px; color: #a35543; }
+.interest-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.interest-toolbar > span { font-size: 11px; color: #8b997f; }
+.interest-tabs { display: flex; gap: 5px; padding: 4px; background: #f0f4e9; border: 1px solid #e2e9d7; border-radius: 9px; }
+.interest-tabs button { display: flex; align-items: center; gap: 8px; border: 0; border-radius: 6px; padding: 10px 14px; font: inherit; font-size: 12px; background: transparent; color: #8a997b; cursor: pointer; }
+.interest-tabs button.active { background: #fff; color: #456235; box-shadow: 0 1px 5px #43543712; }
+.interest-tabs button > span { font-size: 10px; }
+.interest-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 18px; }
+.interest-filters .search-field { flex: 1 1 240px; height: 38px; }
+.interest-filters > select { width: auto; flex: 0 1 165px; font-size: 11px; height: 38px; }
+.interest-closed { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #839374; }
+.interest-workspace { min-width: 0; }
+.interest-workspace.has-detail { display: grid; grid-template-columns: minmax(290px, .8fr) minmax(0, 1.2fr); gap: 16px; align-items: start; }
+.interest-list { min-width: 0; border: 1px solid #e2e9d9; border-radius: 9px; background: #fff; overflow: hidden; }
+.interest-list-heading { display: flex; justify-content: space-between; gap: 8px; padding: 13px 17px; color: #8c9c7d; font-size: 11px; border-bottom: 1px solid #edf1e7; }
+.interest-card { display: flex; align-items: flex-start; gap: 10px; padding: 18px 16px; border-bottom: 1px solid #edf1e7; }
+.interest-card.selected { background: #f4f8ed; }
+.interest-card-main { flex: 1; min-width: 0; border: 0; background: none; font: inherit; text-align: left; padding: 0; cursor: pointer; }
+.interest-card-company { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; font-size: 11px; color: #7f926d; }
+.interest-card-main > strong { display: block; margin: 10px 0; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; color: #34472b; }
+.interest-card-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 10px; color: #8f9c82; }
+.priority-badge { padding: 3px 6px; background: #f1f4ec; border-radius: 4px; color: #8c987f; }
+.priority-high { background: #fbefe1; color: #b37b37; }
+.priority-normal { background: #edf4e6; color: #718c53; }
+.priority-low { background: #edf2f9; color: #7d91ab; }
+.interest-card-note { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; margin-top: 10px; font-size: 11px; line-height: 1.6; color: #8a957f; white-space: pre-wrap; }
+.interest-footnote { font-size: 11px; color: #95a387; line-height: 1.7; margin-top: 16px; }
+@media (max-width: 1050px) { .interest-workspace.has-detail { display: flex; flex-direction: column; } .interest-workspace.has-detail > * { width: 100%; } .interest-workspace.has-detail .job-drawer { order: -1; } }
+@media (max-width: 720px) { .main-nav { flex-wrap: wrap; gap: 8px; } .main-nav > button { flex: 1 1 calc(50% - 8px); justify-content: center; } .interest-tabs { width: 100%; justify-content: space-between; } .interest-filters > select { flex: 1 1 135px; } .interest-toolbar > span { line-height: 1.6; } .interest-card { padding: 14px 10px; gap: 6px; } .interest-card-main > strong { font-size: 12px; } }

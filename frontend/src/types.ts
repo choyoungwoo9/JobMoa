@@ -33,7 +33,19 @@ export interface JobVersion {
   captureUrl?: string
   bodyLoaded?: boolean
 }
+export type InterestPriority = 'HIGH' | 'NORMAL' | 'LOW' | 'NONE'
+export type ApplicationStatus = 'BEFORE_APPLY' | 'APPLIED'
+export interface PostingInterest {
+  starred: boolean
+  note: string
+  priority: InterestPriority
+  applicationStatus: ApplicationStatus
+  appliedOn: string | null
+  updatedAt?: string | null
+}
+export type InterestManagement = Pick<PostingInterest, 'note' | 'priority' | 'applicationStatus' | 'appliedOn'>
 export interface Job {
+  interest?: PostingInterest
   companyId?: string
   classification?: {
     rulesVersion: string

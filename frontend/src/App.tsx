@@ -8,13 +8,16 @@ import { CollectDialog } from './components/CollectDialog'
 import { JobDrawer } from './components/JobDrawer'
 import { RunCard } from './components/History'
 import { Statistics, type StatisticsScope } from './components/Statistics'
+import { InterestBoard } from './components/InterestBoard'
+import { InterestStar } from './components/InterestControls'
+import { interestOf } from './interest'
 import './App.css'
 
 const PAGE_SIZE = 8
 function App() {
-  const { data, notice, start, retryFailures, toggleRead, markRead, running, demo, connected, error, availableSources, categories, companies, loadJob } =
+  const { data, notice, start, retryFailures, toggleRead, markRead, running, demo, connected, error, availableSources, categories, companies, loadJob, setStarred, saveInterest } =
     useCollection()
-  const [view, setView] = useState<'jobs' | 'history' | 'statistics'>('jobs')
+  const [view, setView] = useState<'jobs' | 'history' | 'statistics' | 'interests'>('jobs')
   const [categoryId, setCategoryId] = useState('all')
   const [source, setSource] = useState<SourceId | 'all'>('all')
   const [companyFilter, setCompanyFilter] = useState<string | null>(null)
@@ -162,6 +165,7 @@ function App() {
             <span>공고 모아보기</span>
             <span className="nav-count">{available.length}</span>
           </button>
+          <button className={view === 'interests' ? 'active' : ''} onClick={() => { setSelectedJob(null); setView('interests') }}><Icon name="star" size={18} /><span>관심 공고</span><span className="nav-count">{data.jobs.filter(job => interestOf(job).starred).length}</span></button>
           <button
             className={view === 'history' ? 'active' : ''}
             onClick={() => setView('history')}
@@ -229,7 +233,7 @@ function App() {
             <Icon name="layers" size={16} />
             <span>내 워크스페이스</span>
             <Icon name="chevron" size={12} />
-            <strong>{view === 'jobs' ? '공고 모아보기' : view === 'statistics' ? '채용 통계' : '수집 기록'}</strong>
+            <strong>{view === 'jobs' ? '공고 모아보기' : view === 'interests' ? '관심 공고' : view === 'statistics' ? '채용 통계' : '수집 기록'}</strong>
           </div>
           <div className="topbar-right">
             <span className="preview-badge">
@@ -253,13 +257,13 @@ function App() {
                   ? source === 'all'
                     ? categoryId === 'all' ? '공고 모아보기' : `${categoryName(categoryId)} 공고`
                     : `${sourceById(source).name} 공고`
-                  : view === 'statistics' ? '채용 통계' : '수집 기록'}
+                  : view === 'interests' ? '관심 공고' : view === 'statistics' ? '채용 통계' : '수집 기록'}
                 <span className="heading-dot">.</span>
               </h1>
               <p>
                 {view === 'jobs'
                   ? '관심 있는 회사와 직무의 채용공고를 한곳에 모아요.'
-                  : view === 'statistics' ? '쌓아온 공고에서 채용의 흐름을 살펴봐요.' : '언제, 어디에서, 얼마나 모았는지 확인해요.'}
+                  : view === 'interests' ? '지원하고 싶은 공고와 다음 할 일을 차곡차곡 관리해요.' : view === 'statistics' ? '쌓아온 공고에서 채용의 흐름을 살펴봐요.' : '언제, 어디에서, 얼마나 모았는지 확인해요.'}
               </p>
             </div>
             <button
@@ -575,6 +579,7 @@ function App() {
                               <span>{dateLabel(job.firstSeen)}</span>
                             </span>
                           </button>
+                          <InterestStar job={job} onChange={setStarred} />
                           <a
                             className="original-link"
                             href={job.url}
@@ -641,6 +646,7 @@ function App() {
                                 </div>
                               </td>
                               <td className="title-cell">
+                                <div className="posting-title-line"><InterestStar job={job} onChange={setStarred} />
                                 <button
                                   onClick={() => {
                                     openJob(job.id)
@@ -656,7 +662,7 @@ function App() {
                                   {job.closed && (
                                     <span className="closed-badge">마감</span>
                                   )}
-                                </button>
+                                </button></div>
                                 <span className="saved-indicator">
                                   <Icon name="image" size={12} />
                                   <span>
@@ -769,6 +775,8 @@ function App() {
                     categories={categories}
                     onClose={closeJob}
                     onToggleRead={() => toggleRead(activeJob.id)}
+                    onStar={setStarred}
+                    onSaveInterest={saveInterest}
                     position={browseQueue.indexOf(activeJob.id)}
                     total={browseQueue.length}
                     onPrevious={() => navigateJob(-1)}
@@ -783,7 +791,7 @@ function App() {
                 </span>
               </div>
             </>
-          ) : view === 'statistics' ? <Statistics categories={categories} companies={companies} demo={demo} onBrowse={browseStatistics} /> : (
+          ) : view === 'interests' ? <InterestBoard jobs={data.jobs} categories={categories} onStar={setStarred} onSave={saveInterest} markRead={markRead} toggleRead={toggleRead} loadJob={loadJob} onBrowse={() => changeSource('all')} /> : view === 'statistics' ? <Statistics categories={categories} companies={companies} demo={demo} onBrowse={browseStatistics} /> : (
             <section className="history-view">
               <div className="section-heading">
                 <h2>
