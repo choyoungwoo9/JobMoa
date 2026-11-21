@@ -22,7 +22,7 @@ class SourceRegistry(adapters: List<RecruitmentSite>) {
         SourceDefinition("yanolja", "야놀자", "https://yanolja.wd102.myworkdayjobs.com/External_Yanolja"),
         SourceDefinition("ridi", "리디", "https://ridi.recruit.roundhr.com/"),
         SourceDefinition("channel", "채널코퍼레이션", "https://channel.io/kr/careers"),
-        SourceDefinition("yeogi", "여기어때", "https://internship.yeogi.com/"),
+        SourceDefinition("yeogi", "여기어때", "https://gccompany.career.greetinghr.com/ko/apply"),
         SourceDefinition("banksalad", "뱅크샐러드", "https://corp.banksalad.com/jobs/"),
         SourceDefinition("zigbang", "직방", "https://zigbang.career.greetinghr.com/ko/home"),
     )

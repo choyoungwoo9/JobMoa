@@ -54,7 +54,7 @@ export const SOURCES: Source[] = [
   { id: 'yanolja', logo: '/logos/yanolja.ico', name: '야놀자', mark: '야', url: 'https://www.yanoljagroup.com/ko/apply' },
   { id: 'ridi', logo: '/logos/ridi.png', name: '리디', mark: 'R', url: 'https://ridi.recruit.roundhr.com/' },
   { id: 'channel', logo: '/logos/channel.ico', name: '채널코퍼레이션', mark: 'C', url: 'https://channel.io/kr/careers' },
-  { id: 'yeogi', logo: '/logos/yeogi.png', name: '여기어때', mark: '여', url: 'https://internship.yeogi.com/' },
+  { id: 'yeogi', logo: '/logos/yeogi.png', name: '여기어때', mark: '여', url: 'https://gccompany.career.greetinghr.com/ko/apply' },
   { id: 'banksalad', logo: '/logos/banksalad.ico', name: '뱅크샐러드', mark: 'B', url: 'https://corp.banksalad.com/jobs/' },
   { id: 'zigbang', logo: '/logos/zigbang.png', name: '직방', mark: '직', url: 'https://zigbang.career.greetinghr.com/ko/home' },
 ]

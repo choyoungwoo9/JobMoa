@@ -52,7 +52,7 @@
 | [source-yanolja.md](source-yanolja.md) | 야놀자 Workday 공개 목록 규칙 |
 | [source-ridi.md](source-ridi.md) | 리디 RoundHR API 규칙 |
 | [source-channel.md](source-channel.md) | 채널톡 공개 채용 데이터 규칙 |
-| [source-yeogi.md](source-yeogi.md) | 여기어때 채용 페이지 접근 상태·후보 규칙 |
+| [source-yeogi.md](source-yeogi.md) | 여기어때 Greeting 포털 후보 규칙과 검증 범위 |
 | [source-banksalad.md](source-banksalad.md) | 뱅크샐러드 공식 목록 및 Greeting 상세 규칙 |
 | [source-zigbang.md](source-zigbang.md) | 직방 Greeting 목록 규칙 |
 | [closure-detection.md](closure-detection.md) | 사이트별 종료 증거, 오탐 방지와 실제 확인 범위 |

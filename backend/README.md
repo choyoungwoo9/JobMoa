@@ -54,7 +54,7 @@ MySQL 격리 수준은 `READ_COMMITTED`입니다. 여러 작업자가 서로 다
 - LINE: LINE Careers 전 지역, LY 일본, LY Communications.
 - 우형: 우아한형제들·우아한청년들.
 - 오늘의집: 버킷플레이스 공식 채용 목록과 Greeting 상세. 개발뿐 아니라 기획·PM·디자인·마케팅·영업을 지원합니다. [수집 규칙](../docs/source-bucketplace.md).
-- 새 사이트 9곳: 쏘카(공식 목록+Greeting 상세), 컬리·무신사·직방(Greeting), 야놀자(Workday), 리디(RoundHR), 채널톡(자체 공개 페이지), 여기어때(인턴 공고 페이지), 뱅크샐러드(공식 목록+Greeting 상세). 구현 범위와 사이트별 실제 확인은 [직무 지원표](../docs/job-categories.md) 및 각 `source-*.md` 문서를 따릅니다.
+- 새 사이트 9곳: 쏘카(공식 목록+Greeting 상세), 컬리·무신사·직방·여기어때(Greeting), 야놀자(Workday), 리디(RoundHR), 채널톡(자체 공개 페이지), 뱅크샐러드(공식 목록+Greeting 상세). 구현 범위와 사이트별 실제 확인은 [직무 지원표](../docs/job-categories.md) 및 각 `source-*.md` 문서를 따릅니다.
 
 이 목록은 구현된 공개 포털 범위이며 모든 법인의 존재/채용 여부를 보증하는 법인 목록은 아닙니다. 최신 등록 범위는 `/api/sources`의 `portals`에서 확인합니다. 공고가 0건인 포털도 정상 수집 결과이며, 구조 변경은 실패로 기록합니다.
 

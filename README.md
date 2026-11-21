@@ -147,7 +147,7 @@ docker compose logs --tail=80 backend
 | 야놀자 | Workday 공개 구인 API |
 | 리디 | RoundHR 공개 채용 API · 제품/개발 분야 |
 | 채널코퍼레이션 | 채널톡 공개 채용 페이지 · 소프트웨어 Engineering 역할 |
-| 여기어때 | 2026 인턴 채용 공식 페이지 · 현재 Cloudflare 접근 차단 확인 |
+| 여기어때 | 공식 Greeting 채용 페이지 · 기술 직군의 개발 공고 후보 |
 | 뱅크샐러드 | 공식 채용 목록에서 Greeting 상세 링크 사용 |
 | 직방 | Greeting 공개 채용 홈 · Engineering 후보 |
 
