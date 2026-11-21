@@ -6,6 +6,9 @@
 .career-alert, .career-notice { padding: 12px 15px; border-radius: 8px; font-size: 12px; }
 .career-alert { color: #9d3d34; background: #fff0ed; }
 .career-notice { color: #46633e; background: #eef5e7; }
+.career-tabs { display: flex; gap: 6px; padding: 4px; border: 1px solid #e8ece4; border-radius: 9px; background: #f8f9f6; }
+.career-tabs button { min-height: 34px; padding: 0 13px; border: 0; border-radius: 6px; background: transparent; color: #7d8876; font-size: 10px; }
+.career-tabs button.active { background: #fff; color: #4c663e; box-shadow: 0 1px 4px #34451d14; font-weight: 650; }
 .career-toolbar { display: flex; align-items: center; gap: 16px; min-height: 47px; }
 .career-toolbar > div { flex: 1; color: #89927f; font-size: 12px; }
 .career-toolbar > div strong { color: #33422f; font-size: 14px; }
@@ -47,6 +50,12 @@
 .career-fact { padding: 15px; border: 1px solid #ecefe7; border-radius: 9px; background: #fff; }
 .career-fact-kind { display: flex; align-items: center; gap: 8px; color: #728566; font-size: 10px; font-weight: 650; }
 .career-fact-kind span { padding: 3px 6px; border-radius: 10px; background: #f4f1e5; color: #99833e; font-size: 9px; }
+.career-fact-kind .fact-state-verified { background: #eaf3e4; color: #598047; }
+.career-fact-kind .fact-state-rejected { background: #f0efed; color: #898880; }
+.career-fact-edit { display: grid; gap: 5px; margin-top: 10px; color: #8c9584; font-size: 9px; }
+.career-fact-edit input, .career-fact-edit textarea { width: 100%; padding: 8px 9px; border: 1px solid #e8ece4; border-radius: 6px; color: #52614c; font: inherit; font-size: 11px; line-height: 1.65; resize: vertical; }
+.career-fact-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 11px; }
+.career-fact-actions .button { min-height: 30px; padding: 0 10px; font-size: 10px; }
 .career-fact h4 { margin: 9px 0 6px; color: #354231; font-size: 13px; }
 .career-fact > p { margin: 0; color: #727d6f; font-size: 11px; line-height: 1.7; white-space: pre-wrap; }
 .career-evidence-list { display: grid; gap: 7px; margin-top: 12px; }

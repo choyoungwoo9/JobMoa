@@ -36,6 +36,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
   const [restoredNavigation] = useState(() => readNavigationSnapshot())
   const initialNavigation = restoredNavigation ?? emptyNavigationSnapshot()
   const [view, setView] = useState<WorkspaceView>(initialNavigation.view)
+  const [careerTab, setCareerTab] = useState(initialNavigation.careerTab ?? 'materials')
   const [changeScope, setChangeScope] = useState<{ ids: string[]; label: string } | null>(initialNavigation.changeScope)
   const [categoryId, setCategoryId] = useState(initialNavigation.categoryId)
   const [source, setSource] = useState<SourceId | 'all'>(initialNavigation.source)
@@ -60,6 +61,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
     return {
       version: 1,
       view,
+      careerTab,
       changeScope,
       categoryId,
       source,
@@ -80,9 +82,10 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
       tableScrollLeft: table?.scrollLeft ?? 0,
       ...(savedInterest ? { interest: savedInterest } : {}),
     }
-  }, [view, changeScope, categoryId, source, companyFilter, tab, query, sort, page, pageSize, includeClosed, collectOpen, selectedJob, browseQueue, expandedRuns])
+  }, [view, careerTab, changeScope, categoryId, source, companyFilter, tab, query, sort, page, pageSize, includeClosed, collectOpen, selectedJob, browseQueue, expandedRuns])
   const applyNavigation = useCallback((navigation: AppNavigationSnapshot) => {
     setView(navigation.view)
+    setCareerTab(navigation.careerTab ?? 'materials')
     setChangeScope(navigation.changeScope)
     setCategoryId(navigation.categoryId)
     setSource(navigation.source)
@@ -138,7 +141,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
         table.scrollLeft = pending.tableLeft
       }
     })
-  }, [view, changeScope, categoryId, source, companyFilter, tab, query, sort, page, pageSize, includeClosed, collectOpen, selectedJob, browseQueue, expandedRuns])
+  }, [view, careerTab, changeScope, categoryId, source, companyFilter, tab, query, sort, page, pageSize, includeClosed, collectOpen, selectedJob, browseQueue, expandedRuns])
   useEffect(() => {
     const previousRestoration = window.history.scrollRestoration
     window.history.scrollRestoration = 'manual'
@@ -783,7 +786,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
                 </span>
               </div>
             </>
-          ) : view === 'career' ? <CareerMaterials demo={demo} /> : view === 'my' ? <MyPage key={data.workspaceRevision} demo={demo} running={running} /> : view === 'interests' ? <InterestBoard key={data.workspaceRevision} jobs={data.jobs} categories={categories} onStar={setStarred} onSave={saveInterest} markRead={markRead} toggleRead={toggleRead} loadJob={loadJob} onBrowse={() => changeSource('all')} demo={demo} /> : view === 'statistics' ? <Statistics categories={categories} companies={companies} demo={demo} onBrowse={browseStatistics} /> : view === 'ai' ? <AiChat demo={demo} onOpenPosting={openAiPosting} /> : (
+          ) : view === 'career' ? <CareerMaterials demo={demo} categories={categories} tab={careerTab} onTabChange={(next) => navigateApp({ careerTab: next })} onOpenPosting={openAiPosting} /> : view === 'my' ? <MyPage key={data.workspaceRevision} demo={demo} running={running} /> : view === 'interests' ? <InterestBoard key={data.workspaceRevision} jobs={data.jobs} categories={categories} onStar={setStarred} onSave={saveInterest} markRead={markRead} toggleRead={toggleRead} loadJob={loadJob} onBrowse={() => changeSource('all')} /> : view === 'statistics' ? <Statistics categories={categories} companies={companies} demo={demo} onBrowse={browseStatistics} /> : view === 'ai' ? <AiChat demo={demo} onOpenPosting={openAiPosting} /> : (
             <section className="history-view">
               <div className="section-heading">
                 <h2>

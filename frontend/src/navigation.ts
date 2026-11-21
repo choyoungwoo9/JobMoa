@@ -1,6 +1,7 @@
 import type { SourceId } from './types'
 
 export type WorkspaceView = 'jobs' | 'history' | 'statistics' | 'interests' | 'ai' | 'career' | 'my'
+export type CareerTab = 'materials' | 'assistant'
 export type JobListTab = 'all' | 'unread' | 'new'
 export type InterestStatusTab = 'all' | 'BEFORE_APPLY' | 'APPLIED'
 
@@ -20,6 +21,7 @@ export interface InterestNavigationSnapshot {
 export interface AppNavigationSnapshot {
   version: 1
   view: WorkspaceView
+  careerTab: CareerTab
   changeScope: { ids: string[]; label: string } | null
   categoryId: string
   source: SourceId | 'all'
@@ -47,6 +49,7 @@ export function emptyNavigationSnapshot(): AppNavigationSnapshot {
   return {
     version: 1,
     view: 'jobs',
+    careerTab: 'materials',
     changeScope: null,
     categoryId: 'all',
     source: 'all',

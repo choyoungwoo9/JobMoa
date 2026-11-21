@@ -3,14 +3,14 @@ import { api } from '../api'
 import { dateLabel } from '../data'
 
 type Counts = Record<string, number>
-interface Preview { token: string; exportedAt: string; expiresAt: string; counts: Counts; captureBytes: number; careerBytes: number; careerMaterialsIncluded: boolean; applicationRequirementsIncluded: boolean }
-const labels: Record<string, string> = { postings: '수집 공고', versions: '본문 버전', runs: '수집 기록', interests: '관심 표시', management: '개인 관리 정보', presets: '수집 프리셋', read: '읽은 공고', captureFiles: '캡처 파일', careerMaterials: '경력 자료', careerFacts: '경력 후보', careerFiles: '경력 원본', applicationRequirements: '지원서 정보' }
+interface Preview { token: string; exportedAt: string; expiresAt: string; counts: Counts; captureBytes: number; careerBytes: number; careerMaterialsIncluded: boolean; applicationRequirementsIncluded: boolean; careerAssistantIncluded: boolean }
+const labels: Record<string, string> = { postings: '수집 공고', versions: '본문 버전', runs: '수집 기록', interests: '관심 표시', management: '개인 관리 정보', presets: '수집 프리셋', read: '읽은 공고', captureFiles: '캡처 파일', careerMaterials: '경력 자료', careerFacts: '경력 후보', careerTasks: '추천·초안 작업', careerFiles: '경력 원본', applicationRequirements: '지원서 정보' }
 const scopes = [
   { id: 'interests', title: '관심 공고 초기화', description: '관심 표시와 모든 공고의 메모·우선순위·지원 기록을 지워요. 관심을 해제한 공고의 관리 정보도 포함해요. 공고와 캡처는 유지돼요.' },
-  { id: 'postings', title: '수집 공고 초기화', description: '전체 공고·관심 정보·지원서 문항·메모·지원 기록·본문 버전·캡처·수집 기록·통계 관측을 지워요. 수집 프리셋은 유지돼요.' },
+  { id: 'postings', title: '수집 공고 초기화', description: '전체 공고·관심 정보·지원서 문항·메모·지원 기록·본문 버전·캡처·수집 기록·통계 관측과 공고에 연결된 추천·맞춤 초안을 지워요. 경력 자료와 확정 정보, 수집 프리셋은 유지돼요.' },
   { id: 'read', title: '읽음 상태 초기화', description: '모든 공고를 안 읽음으로 바꿔요. 공고와 관심 정보는 유지돼요.' },
   { id: 'presets', title: '수집 프리셋 초기화', description: '저장한 직군·회사 선택 조합만 지워요.' },
-  { id: 'career', title: '경력 자료 초기화', description: '등록한 원본 파일·추출 본문·AI가 찾은 확인 전 후보를 지워요. 채용 공고와 관심 정보는 유지돼요.' },
+  { id: 'career', title: '경력 자료 초기화', description: '원본 파일·추출 본문·확인 전/확정/제외 후보와 추천·맞춤 초안 기록을 지워요. 채용 공고와 관심 정보는 유지돼요.' },
 ]
 const sizeLabel = (size: number) => `${(size / 1024 / 1024).toFixed(1)} MB`
 export function MyPage({ demo, running }: { demo: boolean; running: boolean }) {
@@ -43,7 +43,7 @@ export function MyPage({ demo, running }: { demo: boolean; running: boolean }) {
       if (!response.ok) throw new Error((await response.json().catch(() => null))?.message ?? '백업을 만들지 못했어요.')
       const url = URL.createObjectURL(await response.blob()), link = document.createElement('a')
       link.href = url; link.download = `jobmoa-${new Date().toISOString().slice(0, 10)}.zip`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 60000)
-      setNotice('백업 파일 다운로드를 시작했어요. 공고와 캡처, 지원서 정보, 경력 자료 원본, 개인 관리 정보, 프리셋과 수집 기록이 포함돼요.')
+      setNotice('백업 파일 다운로드를 시작했어요. 공고와 캡처, 지원서 정보, 경력 원본·추출 결과·확정 정보, 추천·맞춤 초안, 개인 관리 정보, 프리셋과 수집 기록이 포함돼요.')
     })
   }
   async function inspect(file?: File) {
@@ -66,9 +66,9 @@ export function MyPage({ demo, running }: { demo: boolean; running: boolean }) {
       {!!counts.careerBytes && <small>경력 원본 저장 공간 {sizeLabel(counts.careerBytes)}</small>}
       {running && <p className="workspace-warning">수집 중이에요. 수집이 끝나면 초기화·백업·복원을 사용할 수 있어요.</p>}
     </section>
-    <section className="workspace-card"><h2>백업 · 복원</h2><p>공고·본문 버전·캡처·지원서 정보·경력 자료 원본과 추출 결과·메모·지원 기록·프리셋·수집 기록을 ZIP 하나로 옮겨요. 복원하면 현재 데이터 전체가 백업 내용으로 교체돼요. 먼저 현재 데이터를 백업해두세요.</p>
+    <section className="workspace-card"><h2>백업 · 복원</h2><p>공고·본문 버전·캡처·경력 자료 원본과 추출 결과·확정 정보·추천 및 맞춤 초안·메모·지원 기록·프리셋·수집 기록을 ZIP 하나로 옮겨요. 복원하면 현재 데이터 전체가 백업 내용으로 교체돼요. 먼저 현재 데이터를 백업해두세요.</p>
       <div className="workspace-actions"><button className="button primary" disabled={disabled} onClick={() => void download()}>백업 다운로드</button><label className={`button secondary ${disabled ? 'disabled' : ''}`}>복원할 ZIP 선택<input type="file" accept=".zip,application/zip" aria-label="복원할 백업 파일" disabled={disabled} onChange={e => { void inspect(e.target.files?.[0]); e.target.value = '' }} hidden /></label><small>ZIP 2 GiB 이하 · 같은 백업 스키마 버전 지원</small></div>
-      {preview && <div className="backup-preview"><h3>복원 미리보기</h3><p>백업 시각 {dateLabel(preview.exportedAt, true)} · 파일 무결성 확인 완료</p><div className="workspace-counts">{Object.entries(preview.counts).map(([key, value]) => <div key={key}><span>{labels[key] ?? key}</span><strong>{value}</strong></div>)}</div>{!preview.careerMaterialsIncluded && <p className="workspace-warning">이전 백업 형식이라 경력 자료를 포함하지 않아요. 복원하면 현재 경력 자료도 제거됩니다.</p>}{!preview.applicationRequirementsIncluded && <p className="workspace-warning">이 백업에는 공고별 지원서 정보가 없어요. 복원하면 현재 지원서 정보도 제거됩니다.</p>}<p>미리보기 유효 시간: {dateLabel(preview.expiresAt, true)}</p><button className="button secondary small" disabled={disabled} onClick={() => chooseAction('restore')}>이 백업으로 복원</button> <button className="text-button" disabled={busy} onClick={() => { void perform(async () => { await api(`/api/workspace/backups/${preview.token}`, { method: 'DELETE' }); setPreview(null); currentPreview.current = null; chooseAction(null) }) }}>복원 취소</button></div>}
+      {preview && <div className="backup-preview"><h3>복원 미리보기</h3><p>백업 시각 {dateLabel(preview.exportedAt, true)} · 파일 무결성 확인 완료</p><div className="workspace-counts">{Object.entries(preview.counts).map(([key, value]) => <div key={key}><span>{labels[key] ?? key}</span><strong>{value}</strong></div>)}</div>{!preview.careerMaterialsIncluded && <p className="workspace-warning">이전 백업 형식이라 경력 자료를 포함하지 않아요. 복원하면 현재 경력 자료도 제거됩니다.</p>}{!preview.applicationRequirementsIncluded && <p className="workspace-warning">이 백업에는 공고별 지원서 정보가 없어요. 복원하면 현재 지원서 정보도 제거됩니다.</p>}{!preview.careerAssistantIncluded && <p className="workspace-warning">이 백업에는 추천·맞춤 초안이 없어요. 복원하면 현재 추천·초안 기록도 제거됩니다.</p>}<p>미리보기 유효 시간: {dateLabel(preview.expiresAt, true)}</p><button className="button secondary small" disabled={disabled} onClick={() => chooseAction('restore')}>이 백업으로 복원</button> <button className="text-button" disabled={busy} onClick={() => { void perform(async () => { await api(`/api/workspace/backups/${preview.token}`, { method: 'DELETE' }); setPreview(null); currentPreview.current = null; chooseAction(null) }) }}>복원 취소</button></div>}
     </section>
     <section className="workspace-card"><h2>데이터별 초기화</h2><p>한 번 지운 데이터는 백업 파일이 있어야 복원할 수 있어요.</p><div className="reset-list">{scopes.map(scope => <div key={scope.id}><div><h3>{scope.title}</h3><p>{scope.description}</p></div><button className="button secondary small danger" disabled={disabled} onClick={() => chooseAction(scope.id)}>초기화 선택</button></div>)}</div>
       <div className="orphan-cleanup"><span>이전 복원·저장 중단 등으로 남은 미사용 캡처와 경력 원본 파일만 정리할 수 있어요.</span><button className="text-button" disabled={disabled} onClick={() => chooseAction('cleanup')}>미사용 파일 정리</button></div>
