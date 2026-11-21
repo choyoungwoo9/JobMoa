@@ -48,15 +48,15 @@ export const SOURCES: Source[] = [
     url: 'https://career.woowahan.com/',
   },
   { id: 'bucketplace', logo: '/logos/bucketplace.jpg', name: '오늘의집', mark: '집', url: 'https://www.bucketplace.com/careers/' },
-  { id: 'socar', logo: '', name: '쏘카', mark: '쏘', url: 'https://www.socarcorp.kr/careers/jobs' },
-  { id: 'kurly', logo: '', name: '컬리', mark: '컬', url: 'https://kurly.career.greetinghr.com/ko/recruiting' },
-  { id: 'musinsa', logo: '', name: '무신사', mark: 'M', url: 'https://www.musinsacareers.com/ko/home' },
-  { id: 'yanolja', logo: '', name: '야놀자', mark: '야', url: 'https://www.yanoljagroup.com/ko/apply' },
-  { id: 'ridi', logo: '', name: '리디', mark: 'R', url: 'https://ridi.recruit.roundhr.com/' },
+  { id: 'socar', logo: '/logos/socar.png', name: '쏘카', mark: '쏘', url: 'https://www.socarcorp.kr/careers/jobs' },
+  { id: 'kurly', logo: '/logos/kurly.png', name: '컬리', mark: '컬', url: 'https://kurly.career.greetinghr.com/ko/recruiting' },
+  { id: 'musinsa', logo: '/logos/musinsa.jpg', name: '무신사', mark: 'M', url: 'https://www.musinsacareers.com/ko/home' },
+  { id: 'yanolja', logo: '/logos/yanolja.ico', name: '야놀자', mark: '야', url: 'https://www.yanoljagroup.com/ko/apply' },
+  { id: 'ridi', logo: '/logos/ridi.png', name: '리디', mark: 'R', url: 'https://ridi.recruit.roundhr.com/' },
   { id: 'channel', logo: '/logos/channel.ico', name: '채널코퍼레이션', mark: 'C', url: 'https://channel.io/kr/careers' },
-  { id: 'yeogi', logo: '', name: '여기어때', mark: '여', url: 'https://internship.yeogi.com/' },
+  { id: 'yeogi', logo: '/logos/yeogi.png', name: '여기어때', mark: '여', url: 'https://internship.yeogi.com/' },
   { id: 'banksalad', logo: '/logos/banksalad.ico', name: '뱅크샐러드', mark: 'B', url: 'https://corp.banksalad.com/jobs/' },
-  { id: 'zigbang', logo: '', name: '직방', mark: '직', url: 'https://zigbang.career.greetinghr.com/ko/home' },
+  { id: 'zigbang', logo: '/logos/zigbang.png', name: '직방', mark: '직', url: 'https://zigbang.career.greetinghr.com/ko/home' },
 ]
 export const sourceById = (id: SourceId) =>
   SOURCES.find((source) => source.id === id)!

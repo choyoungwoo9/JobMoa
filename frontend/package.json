@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "npm run validate:source-assets && tsc -b && vite build",
+    "validate:source-assets": "node scripts/check-source-assets.mjs",
     "lint": "oxlint src vite.config.ts",
     "preview": "vite preview"
   },
