@@ -1,6 +1,7 @@
 package com.youngwoo.jobmoa.applicationrequirements.application
 
 import com.youngwoo.jobmoa.applicationrequirements.domain.*
+import com.youngwoo.jobmoa.crawler.domain.model.PostingUrl
 import com.youngwoo.jobmoa.shared.LeaseLost
 import com.youngwoo.jobmoa.shared.ResourceNotFound
 import com.youngwoo.jobmoa.posting.application.PostingService
@@ -29,12 +30,28 @@ class ApplicationRequirementService(
     fun create(postingId: Long, source: RequirementSource, sourceUrl: String?, rawText: String): ApplicationRequirementView {
         access.writing()
         postings.requirePosting(postingId)
+        require(source != RequirementSource.PUBLIC_PAGE) { "공개 지원 페이지 수집은 별도 API를 사용하세요." }
         val text = rawText.trim()
         require(text.length in 20..MAX_TEXT_CHARS) { "분석할 텍스트는 20자 이상 ${MAX_TEXT_CHARS}자 이하여야 합니다." }
         val now = Instant.now()
         val requirement = ApplicationRequirement(UUID.randomUUID().toString(), postingId, source,
             sourceUrl?.trim()?.takeIf(String::isNotBlank)?.also { require(it.length <= 2048) { "출처 URL이 너무 깁니다." } },
             text, null, RequirementStatus.WAITING_AI, 0, null, null, null, now, now, null)
+        requirements.save(requirement)
+        return view(requirement)
+    }
+
+    @Transactional
+    fun collectPublicPage(postingId: Long): ApplicationRequirementView {
+        access.writing()
+        val posting = postings.requirePosting(postingId)
+        PostingUrl.normalize(posting.url)
+        requirements.findByPosting(postingId).firstOrNull { it.source == RequirementSource.PUBLIC_PAGE &&
+            it.status in setOf(RequirementStatus.WAITING_PUBLIC, RequirementStatus.FETCHING_PUBLIC, RequirementStatus.WAITING_AI, RequirementStatus.ANALYZING) }
+            ?.let { return view(it) }
+        val now = Instant.now()
+        val requirement = ApplicationRequirement(UUID.randomUUID().toString(), postingId, RequirementSource.PUBLIC_PAGE,
+            posting.url, "", null, RequirementStatus.WAITING_PUBLIC, 0, null, null, null, now, now, null)
         requirements.save(requirement)
         return view(requirement)
     }
@@ -54,7 +71,8 @@ class ApplicationRequirementService(
         access.writing()
         val current = requirements.lock(id) ?: throw ResourceNotFound("지원서 정보를 찾을 수 없습니다.")
         require(current.status == RequirementStatus.FAILED) { "분석 실패한 항목만 다시 분석할 수 있습니다." }
-        val updated = current.copy(status = RequirementStatus.WAITING_AI, errorMessage = null, leaseToken = null, leaseExpiresAt = null, updatedAt = Instant.now())
+        val updated = current.copy(status = if (current.source == RequirementSource.PUBLIC_PAGE && current.rawText.isBlank()) RequirementStatus.WAITING_PUBLIC else RequirementStatus.WAITING_AI,
+            errorMessage = null, leaseToken = null, leaseExpiresAt = null, updatedAt = Instant.now())
         requirements.save(updated)
         return view(updated)
     }
@@ -69,6 +87,37 @@ class ApplicationRequirementService(
 
     @Transactional
     fun renew(id: String, token: String) = requirements.renew(id, token, Instant.now(), LEASE)
+
+    @Transactional
+    fun claimPublicPage(): PublicPageFetchLease? {
+        access.writing()
+        val row = requirements.claimPublicPage(Instant.now(), PUBLIC_FETCH_LEASE) ?: return null
+        return PublicPageFetchLease(row.id, row.postingId, requireNotNull(row.leaseToken), requireNotNull(row.sourceUrl))
+    }
+
+    @Transactional
+    fun renewPublicPage(id: String, token: String) = requirements.renewPublicPage(id, token, Instant.now(), PUBLIC_FETCH_LEASE)
+
+    @Transactional
+    fun completePublicPage(id: String, token: String, resolvedUrl: String, text: String) {
+        access.writing()
+        val current = requirements.lock(id) ?: throw ResourceNotFound("지원서 정보를 찾을 수 없습니다.")
+        requirePublicLease(current, token)
+        val body = text.trim().take(MAX_TEXT_CHARS)
+        require(body.length >= MIN_PUBLIC_TEXT_CHARS) { "공개 지원 페이지에서 읽을 수 있는 문항 텍스트가 충분하지 않습니다." }
+        val safeResolvedUrl = PostingUrl.normalize(resolvedUrl)
+        requirements.save(current.copy(sourceUrl = safeResolvedUrl, rawText = body, status = RequirementStatus.WAITING_AI,
+            errorMessage = null, leaseToken = null, leaseExpiresAt = null, updatedAt = Instant.now()))
+    }
+
+    @Transactional
+    fun failPublicPage(id: String, token: String, message: String) {
+        access.writing()
+        val current = requirements.lock(id) ?: throw ResourceNotFound("지원서 정보를 찾을 수 없습니다.")
+        requirePublicLease(current, token)
+        requirements.save(current.copy(status = RequirementStatus.FAILED, errorMessage = safeError(message),
+            leaseToken = null, leaseExpiresAt = null, updatedAt = Instant.now()))
+    }
 
     @Transactional
     fun complete(id: String, token: String, result: Map<String, Any?>) {
@@ -91,6 +140,10 @@ class ApplicationRequirementService(
 
     private fun requireLease(row: ApplicationRequirement, token: String) {
         if (row.status != RequirementStatus.ANALYZING || row.leaseToken != token || row.leaseExpiresAt?.isAfter(Instant.now()) != true) throw LeaseLost()
+    }
+
+    private fun requirePublicLease(row: ApplicationRequirement, token: String) {
+        if (row.status != RequirementStatus.FETCHING_PUBLIC || row.leaseToken != token || row.leaseExpiresAt?.isAfter(Instant.now()) != true) throw LeaseLost()
     }
 
     private fun view(row: ApplicationRequirement) = ApplicationRequirementView(row.id, row.postingId, row.source,
@@ -131,8 +184,10 @@ class ApplicationRequirementService(
 
     companion object {
         const val MAX_TEXT_CHARS = 100_000
+        const val MIN_PUBLIC_TEXT_CHARS = 40
         private const val MAX_ITEMS = 100
         private val LEASE = Duration.ofMinutes(10)
+        private val PUBLIC_FETCH_LEASE = Duration.ofMinutes(2)
     }
 }
 

@@ -16,6 +16,10 @@ class ApplicationRequirementController(private val service: ApplicationRequireme
     fun create(@PathVariable postingId: Long, @RequestBody request: CreateRequirementRequest) =
         service.create(postingId, request.source, request.sourceUrl, request.rawText)
 
+    @PostMapping("/api/postings/{postingId}/application-requirements/public-page")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    fun collectPublicPage(@PathVariable postingId: Long) = service.collectPublicPage(postingId)
+
     @PostMapping("/api/application-requirements/{id}/confirm")
     fun confirm(@PathVariable id: String) = service.confirm(id)
 

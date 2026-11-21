@@ -143,13 +143,16 @@ V13 `posting_application_requirement`는 공고에 종속된 원문·분석 이�
 | --- | --- |
 | `GET /api/postings/{postingId}/application-requirements` | 해당 공고의 원문·분석 결과·상태 이력 최신순 조회 |
 | `POST /api/postings/{postingId}/application-requirements` | `{source, sourceUrl, rawText}` 저장 후 AI 작업 대기열 등록 |
+| `POST /api/postings/{postingId}/application-requirements/public-page` | 공개 공고 페이지에서 지원 링크·문항 텍스트를 비동기 확인한 뒤 AI 분석 등록 |
 | `POST /api/application-requirements/{id}/confirm` | 검토 상태의 결과를 사용자 확정 상태로 변경 |
 | `POST /api/application-requirements/{id}/retry` | 실패한 분석 이력을 재대기열에 등록 |
 | `/api/application-requirements/worker/tasks/**` | claim·lease 갱신·구조화 결과 완료·실패 보고 |
 
 원문은 최대 100,000자다. 출력은 제출 서류와 문항 최대 100개, confidence·안내로 정규화한다. 서버는 인용이 원문에 실제 포함되는지 확인하고, 문항 원문도 입력에 존재하는 경우만 저장한다. 필수 여부는 `REQUIRED/OPTIONAL/UNKNOWN`; 불확실한 길이 제한은 `null`로 둔다. 저장 결과는 사용자가 확인하기 전 `REVIEW`다. 재입력은 과거를 덮어쓰지 않는 새 이력이다.
 
-Codex 작업자는 `/api/application-requirements/worker/tasks/**`, `/api/career-materials/worker/tasks/**`, `/api/ai/worker/tasks/**`를 순환 조회한다. 지원서 텍스트 분석은 웹 검색을 비활성화한다. 작업 임대 만료 시 해당 건을 다시 claim할 수 있다. 이 입력 원문도 AI 분석 시 Codex 서비스로 전달된다.
+공개 지원 페이지 확인은 `CrawlerRuntime`의 기존 Playwright 작업자에서 공고 단위 큐로 처리하며 `/api/application-requirements/public-page` 등록 즉시 `WAITING_PUBLIC` 이력을 만든다. 빈 작업자가 해당 항목을 `FETCHING_PUBLIC`으로 임대하고, URL 호스트별 활성 페이지 제한 및 요청 간격을 적용한다. 렌더링 후 지원 문구가 있는 공개 앵커 링크만 최대 5개 확인한다. 로그인/계정/동의 페이지 조작, 버튼 클릭, 입력, 업로드, 제출은 없다. 사용자 로그인 쿠키가 없는 새 컨텍스트이며 HTTPS와 공개 IP만 허용하고 redirect·하위 요청의 사설/로컬 주소를 막는다. 원문이 발견되면 `WAITING_AI`로 바뀌고, 크롤러 작업자가 꺼져 있으면 `WAITING_PUBLIC`에 남는다. 네트워크·접근 제한·지원 링크 탐지 실패는 해당 이력에 오류를 저장하고 재시도할 수 있다.
+
+Codex 작업자는 `/api/application-requirements/worker/tasks/**`, `/api/career-materials/worker/tasks/**`, `/api/ai/worker/tasks/**`를 순환 조회한다. 지원서 텍스트 분석은 웹 검색을 비활성화한다. 각 단계의 임대 만료 시 해당 건을 다시 claim할 수 있다. 공개 페이지 원문과 붙여넣은 텍스트 모두 AI 분석 시 Codex 서비스로 전달된다.
 
 ## 경력 자료와 Codex 분석
 

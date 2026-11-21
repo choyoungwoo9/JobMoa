@@ -109,8 +109,8 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
         }
         if (snapshot.schema == 12) {
             references("posting_application_requirement", "posting_id", "posting")
-            require(values("posting_application_requirement", "source").all { it in setOf("POSTING_BODY", "USER_PASTED") }) { "지원서 정보 출처가 올바르지 않습니다." }
-            require(values("posting_application_requirement", "status").all { it in setOf("WAITING_AI", "ANALYZING", "REVIEW", "CONFIRMED", "FAILED") }) { "지원서 정보 상태가 올바르지 않습니다." }
+            require(values("posting_application_requirement", "source").all { it in setOf("POSTING_BODY", "USER_PASTED", "PUBLIC_PAGE") }) { "지원서 정보 출처가 올바르지 않습니다." }
+            require(values("posting_application_requirement", "status").all { it in setOf("WAITING_PUBLIC", "FETCHING_PUBLIC", "WAITING_AI", "ANALYZING", "REVIEW", "CONFIRMED", "FAILED") }) { "지원서 정보 상태가 올바르지 않습니다." }
         }
     }
     override fun replace(snapshot: WorkspaceSnapshot) {

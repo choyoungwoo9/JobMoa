@@ -57,8 +57,8 @@ class WorkspaceService(private val repository: WorkspaceSnapshotRepository, priv
         val tokenIndex = table.columns.indexOf("lease_token")
         val expiresIndex = table.columns.indexOf("lease_expires_at")
         val rows = table.rows.map { row ->
-            if (row[statusIndex] != "ANALYZING") row else row.toMutableList().also { values ->
-                values[statusIndex] = "WAITING_AI"
+            if (row[statusIndex] !in setOf("ANALYZING", "FETCHING_PUBLIC")) row else row.toMutableList().also { values ->
+                values[statusIndex] = if (row[statusIndex] == "FETCHING_PUBLIC") "WAITING_PUBLIC" else "WAITING_AI"
                 values[tokenIndex] = null
                 values[expiresIndex] = null
             }
@@ -68,8 +68,8 @@ class WorkspaceService(private val repository: WorkspaceSnapshotRepository, priv
         val requirementToken = requirementTable.columns.indexOf("lease_token")
         val requirementExpires = requirementTable.columns.indexOf("lease_expires_at")
         val requirementRows = requirementTable.rows.map { row ->
-            if (row[requirementStatus] != "ANALYZING") row else row.toMutableList().also { values ->
-                values[requirementStatus] = "WAITING_AI"
+            if (row[requirementStatus] !in setOf("ANALYZING", "FETCHING_PUBLIC")) row else row.toMutableList().also { values ->
+                values[requirementStatus] = if (row[requirementStatus] == "FETCHING_PUBLIC") "WAITING_PUBLIC" else "WAITING_AI"
                 values[requirementToken] = null
                 values[requirementExpires] = null
             }

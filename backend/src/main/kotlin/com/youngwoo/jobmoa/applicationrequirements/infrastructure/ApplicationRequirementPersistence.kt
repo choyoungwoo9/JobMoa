@@ -49,9 +49,16 @@ interface ApplicationRequirementJpaRepository : JpaRepository<ApplicationRequire
     @Query(value = "SELECT * FROM posting_application_requirement WHERE status='WAITING_AI' OR (status='ANALYZING' AND lease_expires_at <= :now) ORDER BY created_at, id LIMIT 1 FOR UPDATE SKIP LOCKED", nativeQuery = true)
     fun nextForUpdate(@Param("now") now: Instant): ApplicationRequirementEntity?
 
+    @Query(value = "SELECT * FROM posting_application_requirement WHERE status='WAITING_PUBLIC' OR (status='FETCHING_PUBLIC' AND lease_expires_at <= :now) ORDER BY created_at, id LIMIT 1 FOR UPDATE SKIP LOCKED", nativeQuery = true)
+    fun nextPublicPageForUpdate(@Param("now") now: Instant): ApplicationRequirementEntity?
+
     @Modifying
     @Query("update ApplicationRequirementEntity r set r.leaseExpiresAt = :expiresAt, r.updatedAt = :now where r.id = :id and r.status = 'ANALYZING' and r.leaseToken = :token")
     fun renew(@Param("id") id: String, @Param("token") token: String, @Param("now") now: Instant, @Param("expiresAt") expiresAt: Instant): Int
+
+    @Modifying
+    @Query("update ApplicationRequirementEntity r set r.leaseExpiresAt = :expiresAt, r.updatedAt = :now where r.id = :id and r.status = 'FETCHING_PUBLIC' and r.leaseToken = :token")
+    fun renewPublicPage(@Param("id") id: String, @Param("token") token: String, @Param("now") now: Instant, @Param("expiresAt") expiresAt: Instant): Int
 }
 
 @Repository
@@ -70,5 +77,15 @@ class ApplicationRequirementPersistence(private val jpa: ApplicationRequirementJ
         row.updatedAt = now
         return jpa.saveAndFlush(row).domain()
     }
+    override fun claimPublicPage(now: Instant, lease: Duration): ApplicationRequirement? {
+        val row = jpa.nextPublicPageForUpdate(now) ?: return null
+        row.status = RequirementStatus.FETCHING_PUBLIC.name
+        row.attempts++
+        row.leaseToken = UUID.randomUUID().toString()
+        row.leaseExpiresAt = now.plus(lease)
+        row.updatedAt = now
+        return jpa.saveAndFlush(row).domain()
+    }
     override fun renew(id: String, token: String, now: Instant, lease: Duration) = jpa.renew(id, token, now, now.plus(lease)) == 1
+    override fun renewPublicPage(id: String, token: String, now: Instant, lease: Duration) = jpa.renewPublicPage(id, token, now, now.plus(lease)) == 1
 }

@@ -2,8 +2,8 @@ package com.youngwoo.jobmoa.applicationrequirements.domain
 
 import java.time.Instant
 
-enum class RequirementSource { POSTING_BODY, USER_PASTED }
-enum class RequirementStatus { WAITING_AI, ANALYZING, REVIEW, CONFIRMED, FAILED }
+enum class RequirementSource { POSTING_BODY, USER_PASTED, PUBLIC_PAGE }
+enum class RequirementStatus { WAITING_PUBLIC, FETCHING_PUBLIC, WAITING_AI, ANALYZING, REVIEW, CONFIRMED, FAILED }
 
 data class ApplicationRequirement(
     val id: String,
@@ -23,3 +23,10 @@ data class ApplicationRequirement(
 )
 
 data class ApplicationRequirementAnalysis(val resultJson: String)
+
+data class PublicPageFetchLease(
+    val id: String,
+    val postingId: Long,
+    val leaseToken: String,
+    val postingUrl: String,
+)
