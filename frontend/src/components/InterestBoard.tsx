@@ -10,7 +10,7 @@ import { InterestStar } from './InterestControls'
 
 type StatusFilter = 'all' | 'BEFORE_APPLY' | 'APPLIED'
 const PAGE_SIZE = 12
-export function InterestBoard({ jobs, categories, onStar, onSave, markRead, toggleRead, loadJob, onBrowse }: {
+export function InterestBoard({ jobs, categories, onStar, onSave, markRead, toggleRead, loadJob, onBrowse, demo = false }: {
   jobs: Job[]
   categories: Category[]
   onStar: (id: string, starred: boolean) => Promise<boolean>
@@ -19,6 +19,7 @@ export function InterestBoard({ jobs, categories, onStar, onSave, markRead, togg
   toggleRead: (id: string) => void
   loadJob: (id: string) => void
   onBrowse: () => void
+  demo?: boolean
 }) {
   const [compareIds, setCompareIds] = useState<string[]>([])
   const [comparing, setComparing] = useState(false)
@@ -94,7 +95,7 @@ export function InterestBoard({ jobs, categories, onStar, onSave, markRead, togg
         {!displayed.length && <div className="empty-state"><span aria-hidden="true">☆</span><h3>{interests.length ? '조건에 맞는 관심 공고가 없어요' : '관심 있는 공고를 모아보세요'}</h3><p>{interests.length ? '지원 상태나 검색 조건을 바꿔보세요.' : '공고의 별표를 누르면 지원 후보를 이곳에서 관리할 수 있어요.'}</p><button className="button secondary small" onClick={interests.length ? () => { setTab('all'); setQuery(''); setSource('all'); setCategory('all'); setIncludeClosed(true); filterChange() } : onBrowse}>{interests.length ? '조회 조건 초기화' : '공고 둘러보기'}</button></div>}
         <div className="table-footer"><span>{safePage} / {pages}페이지</span><nav className="pagination" aria-label="관심 공고 페이지"><button aria-label="관심 공고 이전 페이지" disabled={safePage === 1} onClick={() => setPage(safePage - 1)}><Icon name="chevron" className="rotate-180" size={14} /></button><button aria-label="관심 공고 다음 페이지" disabled={safePage === pages} onClick={() => setPage(safePage + 1)}><Icon name="chevron" size={14} /></button></nav></div>
       </div>
-      {activeJob && <JobDrawer key={activeJob.id} job={activeJob} categories={categories} onClose={() => setSelected(null)} onToggleRead={() => toggleRead(activeJob.id)} onStar={onStar} onSaveInterest={onSave} position={queue.indexOf(activeJob.id)} total={queue.length} onPrevious={() => navigate(-1)} onNext={() => navigate(1)} />}
+      {activeJob && <JobDrawer key={activeJob.id} job={activeJob} categories={categories} onClose={() => setSelected(null)} onToggleRead={() => toggleRead(activeJob.id)} onStar={onStar} onSaveInterest={onSave} position={queue.indexOf(activeJob.id)} total={queue.length} onPrevious={() => navigate(-1)} onNext={() => navigate(1)} demo={demo} />}
     </div>
     <p className="interest-footnote">마감 공고도 관리할 수 있어요. 관심을 해제해도 저장한 메모·우선순위·지원 기록은 유지돼요.</p>
   </section>

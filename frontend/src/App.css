@@ -3615,6 +3615,37 @@ dialog::backdrop {
 .collection-run-link { grid-column: 3; display: inline-flex; align-items: center; gap: 5px; padding: 5px; background: transparent; color: #7f9467; font-size: 9px; white-space: nowrap; }
 .collection-run-link:hover { color: #526d38; }
 .collection-legacy-note { grid-column: 1 / -1; margin: -2px 0 0; color: #9aa18f; font-size: 9px; }
+.application-requirements { margin: 16px 0; padding: 14px; border: 1px solid #e5eadd; border-radius: 9px; background: #fbfcf8; font-size: 11px; }
+.application-requirements-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 13px; }
+.application-requirements-heading h3 { color: #47583e; font-size: 13px; }
+.application-requirements-heading p,.application-requirements-note,.application-requirements-empty { margin-top: 4px; color: #89947d; font-size: 10px; line-height: 1.7; }
+.application-requirements-heading > span { color: #82926e; white-space: nowrap; }
+.application-requirements-input-label { display: block; margin-bottom: 6px; color: #63744f; font-weight: 600; }
+.application-requirements textarea { width: 100%; min-height: 110px; resize: vertical; border: 1px solid #dfe7d7; border-radius: 7px; padding: 10px; color: #485242; background: #fff; font: inherit; line-height: 1.7; }
+.application-requirements textarea:focus { outline: 2px solid #c6d8b7; outline-offset: 1px; }
+.application-requirements-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; }
+.application-requirements-actions > span,.application-requirement-card time { color: #97a08e; font-size: 9px; }
+.application-requirements-actions .button,.application-requirement-card .button { height: 34px; padding: 0 12px; font-size: 10px; }
+.application-body-analysis { margin-top: 9px; padding: 0; color: #63804b; font-size: 10px; }
+.application-requirements-note { margin: 8px 0; }
+.application-requirements-error { margin: 8px 0; color: #aa5148; font-size: 10px; line-height: 1.6; }
+.application-requirements-list { display: grid; gap: 9px; margin-top: 12px; }
+.application-requirement-card { padding: 11px; border: 1px solid #e7ebdf; border-radius: 7px; background: #fff; }
+.application-requirement-card > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 9px; }
+.application-requirement-status { padding: 4px 7px; border-radius: 99px; background: #f1f3ec; color: #78846c; font-size: 9px; }
+.application-requirement-status.review,.application-requirement-status.confirmed { background: #edf5e7; color: #54713e; }
+.application-requirement-status.failed { background: #fff0ed; color: #a6544c; }
+.application-requirement-card details { margin: 6px 0 10px; color: #7b876e; }
+.application-requirement-card summary { cursor: pointer; }
+.application-requirement-card pre { max-height: 180px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: 8px; margin-top: 6px; background: #f8f9f5; color: #68715f; font: inherit; line-height: 1.7; }
+.application-requirement-card h4 { margin: 12px 0 7px; color: #5d704a; font-size: 10px; }
+.application-requirement-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 5px 9px; padding: 8px 0; border-top: 1px solid #f0f1ec; line-height: 1.6; }
+.application-requirement-row strong { color: #4d5945; font-size: 10px; overflow-wrap: anywhere; }
+.application-requirement-row > span { color: #8a957c; font-size: 9px; white-space: nowrap; }
+.application-requirement-row p,.application-requirement-card > p { grid-column: 1 / -1; color: #7f8876; font-size: 10px; line-height: 1.6; }
+.application-requirement-row blockquote { grid-column: 1 / -1; margin: 0; padding-left: 8px; border-left: 2px solid #d3dfc5; color: #829071; font-size: 9px; line-height: 1.6; }
+.application-requirement-card > small { color: #9aa28f; font-size: 9px; }
+.application-requirement-card > footer { display: flex; justify-content: flex-end; margin-top: 8px; }
 .collection-changes-message { margin: 0 0 10px; color: #89947d; font-size: 10px; }
 @media (max-width: 1050px) {
   .collection-changes-compact { grid-template-columns: minmax(0, 1fr) auto; }

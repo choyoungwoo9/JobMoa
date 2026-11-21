@@ -6,6 +6,7 @@ import { BrandMark } from './BrandMark'
 import { Icon } from './Icon'
 import { Modal } from './Modal'
 import { InterestEditor, InterestStar } from './InterestControls'
+import { ApplicationRequirementsPanel } from './ApplicationRequirementsPanel'
 
 function sampleCapture(job: Job, version: JobVersion, revision: number) {
   const escape = (value: string) =>
@@ -36,6 +37,7 @@ export function JobDrawer({
   total,
   onPrevious,
   onNext,
+  demo = false,
 }: {
   job: Job
   categories: Category[]
@@ -47,6 +49,7 @@ export function JobDrawer({
   total: number
   onPrevious: () => void
   onNext: () => void
+  demo?: boolean
 }) {
   const [tab, setTab] = useState<'capture' | 'text' | 'diff'>('capture')
   const [versionId, setVersionId] = useState(job.versions[0].id)
@@ -189,6 +192,7 @@ export function JobDrawer({
             </div>)}
           </details> : <p>아직 자동 분류를 실행하지 않은 공고예요.</p>}
         </section>
+        {!demo && <ApplicationRequirementsPanel key={job.id} job={job} />}
         <div className="drawer-actions">
           <button
             className={`button ${job.read ? 'read-button' : 'secondary'}`}
