@@ -122,6 +122,7 @@ export function RunCard({
                   <th>신규</th>
                   <th>변경</th>
                   <th>동일</th>
+                  {run.progress && <th>마감 확인</th>}
                   <th>실패</th>
                 </tr>
               </thead>
@@ -151,6 +152,7 @@ export function RunCard({
                     <td>{result.added ?? '—'}</td>
                     <td>{result.changed ?? '—'}</td>
                     <td>{result.identical ?? '—'}</td>
+                    {run.progress && <td>{result.closed ?? '—'}</td>}
                     <td>
                       {result.failed === null ? (
                         result.failures.length ? (
@@ -185,7 +187,7 @@ export function RunCard({
           <div className="result-explainer">
             <Icon name="info" size={13} />
             <span>
-              동일: 내용이 같아 새 버전을 저장하지 않은 공고 · —: 목록을
+              동일: 내용이 같아 새 버전을 저장하지 않은 공고 · 마감 확인: 성공 중 마감된 공고(동일·변경과 중복 가능) · —: 목록을
               확인하지 못했거나 아직 집계 전
             </span>
           </div>

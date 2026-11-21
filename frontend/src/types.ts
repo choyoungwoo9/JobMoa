@@ -84,6 +84,7 @@ export interface Failure {
   resolved: boolean
 }
 export interface SourceResult {
+  closed?: number | null
   sourceId: SourceId
   status: 'waiting' | 'running' | 'success' | 'partial' | 'failed'
   added: number | null
