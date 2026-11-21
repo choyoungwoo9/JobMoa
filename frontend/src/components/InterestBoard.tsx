@@ -7,6 +7,7 @@ import { BrandMark } from './BrandMark'
 import { Icon } from './Icon'
 import { JobDrawer } from './JobDrawer'
 import { InterestStar } from './InterestControls'
+import { readNavigationSnapshot, writeNavigationSnapshot, type InterestNavigationSnapshot } from '../navigation'
 
 type StatusFilter = 'all' | 'BEFORE_APPLY' | 'APPLIED'
 const PAGE_SIZE = 12
@@ -20,19 +21,20 @@ export function InterestBoard({ jobs, categories, onStar, onSave, markRead, togg
   loadJob: (id: string) => void
   onBrowse: () => void
 }) {
+  const [restoredInterest] = useState(() => readNavigationSnapshot()?.interest)
   const [compareIds, setCompareIds] = useState<string[]>([])
-  const [comparing, setComparing] = useState(false)
+  const [comparing, setComparing] = useState(restoredInterest?.comparing ?? false)
   const compareJobs = compareIds.flatMap(id => jobs.find(job => job.id === id && interestOf(job).starred) ?? [])
   useEffect(() => { if (comparing) jobs.filter(job => compareIds.includes(job.id) && job.versions.some(version => version.bodyLoaded === false)).forEach(job => { void loadJob(job.id) }) }, [comparing, jobs, compareIds, loadJob])
-  const [tab, setTab] = useState<StatusFilter>('BEFORE_APPLY')
-  const [query, setQuery] = useState('')
-  const [source, setSource] = useState('all')
-  const [category, setCategory] = useState('all')
-  const [includeClosed, setIncludeClosed] = useState(true)
-  const [sort, setSort] = useState('priority')
-  const [page, setPage] = useState(1)
-  const [selected, setSelected] = useState<string | null>(null)
-  const [queue, setQueue] = useState<string[]>([])
+  const [tab, setTab] = useState<StatusFilter>(restoredInterest?.tab ?? 'BEFORE_APPLY')
+  const [query, setQuery] = useState(restoredInterest?.query ?? '')
+  const [source, setSource] = useState(restoredInterest?.source ?? 'all')
+  const [category, setCategory] = useState(restoredInterest?.category ?? 'all')
+  const [includeClosed, setIncludeClosed] = useState(restoredInterest?.includeClosed ?? true)
+  const [sort, setSort] = useState(restoredInterest?.sort ?? 'priority')
+  const [page, setPage] = useState(restoredInterest?.page ?? 1)
+  const [selected, setSelected] = useState<string | null>(restoredInterest?.selected ?? null)
+  const [queue, setQueue] = useState<string[]>(restoredInterest?.queue ?? [])
   const interests = jobs.filter(job => interestOf(job).starred)
   const filtered = interests.filter(job => (tab === 'all' || interestOf(job).applicationStatus === tab) &&
     (source === 'all' || job.sourceId === source) && (category === 'all' || (category === 'unclassified' ? !job.categories?.length : job.categories?.includes(category))) &&
@@ -49,14 +51,57 @@ export function InterestBoard({ jobs, categories, onStar, onSave, markRead, togg
   const pages = Math.max(1, Math.ceil(displayed.length / PAGE_SIZE))
   const safePage = Math.min(page, pages)
   const visible = displayed.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  const captureInterest = (): InterestNavigationSnapshot => ({ tab, query, source, category, includeClosed, sort, page, selected, queue, comparing })
+  useEffect(() => {
+    const current = readNavigationSnapshot()
+    if (current) writeNavigationSnapshot({ ...current, interest: { tab, query, source, category, includeClosed, sort, page, selected, queue, comparing } })
+  }, [tab, query, source, category, includeClosed, sort, page, selected, queue, comparing])
+  useEffect(() => {
+    const onPopState = (event: PopStateEvent) => {
+      const interest = readNavigationSnapshot(event.state)?.interest
+      if (!interest) return
+      setTab(interest.tab)
+      setQuery(interest.query)
+      setSource(interest.source)
+      setCategory(interest.category)
+      setIncludeClosed(interest.includeClosed)
+      setSort(interest.sort)
+      setPage(interest.page)
+      setSelected(interest.selected)
+      setQueue(interest.queue)
+      setComparing(interest.comparing)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
   function filterChange() { setSelected(null); setPage(1) }
   function open(id: string) {
-    if (!selected) setQueue(filtered.map(job => job.id))
-    markRead(id); setSelected(id)
+    const nextQueue = selected ? queue : filtered.map(job => job.id)
+    const current = readNavigationSnapshot()
+    if (current) writeNavigationSnapshot({ ...current, interest: { ...captureInterest(), selected: id, queue: nextQueue } }, 'push')
+    markRead(id); setQueue(nextQueue); setSelected(id)
   }
   function navigate(offset: number) {
     const index = queue.indexOf(selected ?? '') + offset
-    if (queue[index]) { markRead(queue[index]); setSelected(queue[index]); setPage(Math.floor(index / PAGE_SIZE) + 1) }
+    if (queue[index]) {
+      const nextPage = Math.floor(index / PAGE_SIZE) + 1
+      const current = readNavigationSnapshot()
+      if (current) writeNavigationSnapshot({ ...current, interest: { ...captureInterest(), selected: queue[index], page: nextPage } }, 'push')
+      markRead(queue[index]); setSelected(queue[index]); setPage(nextPage)
+    }
+  }
+  function closeDetail() {
+    if (readNavigationSnapshot()?.interest?.selected) window.history.back()
+    else setSelected(null)
+  }
+  function openComparison() {
+    const current = readNavigationSnapshot()
+    if (current) writeNavigationSnapshot({ ...current, modal: 'compare-title', interest: { ...captureInterest(), comparing: true } }, 'push')
+    setComparing(true)
+  }
+  function closeComparison() {
+    if (readNavigationSnapshot()?.modal === 'compare-title') window.history.back()
+    else setComparing(false)
   }
   return <section className="interest-board" aria-label="관심 공고 목록">
     <div className="interest-toolbar">
@@ -72,8 +117,8 @@ export function InterestBoard({ jobs, categories, onStar, onSave, markRead, togg
       <select aria-label="관심 공고 정렬" value={sort} onChange={e => { setSort(e.target.value); filterChange() }}><option value="priority">우선순위 높은 순</option><option value="newest">최초 발견일 최신순</option><option value="applied">지원일 최신순</option></select>
       <label className="interest-closed"><input type="checkbox" checked={includeClosed} onChange={e => { setIncludeClosed(e.target.checked); filterChange() }} />마감 포함</label>
     </div>
-    <div className="compare-toolbar"><span>비교할 관심 공고 2~3개를 선택하세요. <b>{compareJobs.length}/3</b></span><button className="button secondary small" disabled={compareJobs.length < 2} onClick={() => { compareJobs.forEach(job => markRead(job.id)); setComparing(true) }}>선택한 공고 비교</button>{compareIds.length > 0 && <button className="text-button" onClick={() => setCompareIds([])}>선택 해제</button>}</div>
-    {comparing && <InterestComparison jobs={compareJobs} categories={categories} onClose={() => setComparing(false)} />}
+    <div className="compare-toolbar"><span>비교할 관심 공고 2~3개를 선택하세요. <b>{compareJobs.length}/3</b></span><button className="button secondary small" disabled={compareJobs.length < 2} onClick={() => { compareJobs.forEach(job => markRead(job.id)); openComparison() }}>선택한 공고 비교</button>{compareIds.length > 0 && <button className="text-button" onClick={() => setCompareIds([])}>선택 해제</button>}</div>
+    {comparing && <InterestComparison jobs={compareJobs} categories={categories} onClose={closeComparison} />}
     <div className={`interest-workspace ${activeJob ? 'has-detail' : ''}`}>
       <div className="interest-list">
         <div className="interest-list-heading"><span>{displayed.length}개 공고</span>{selected && <span>열어둔 목록 · 닫으면 필터 갱신</span>}</div>
@@ -94,7 +139,7 @@ export function InterestBoard({ jobs, categories, onStar, onSave, markRead, togg
         {!displayed.length && <div className="empty-state"><span aria-hidden="true">☆</span><h3>{interests.length ? '조건에 맞는 관심 공고가 없어요' : '관심 있는 공고를 모아보세요'}</h3><p>{interests.length ? '지원 상태나 검색 조건을 바꿔보세요.' : '공고의 별표를 누르면 지원 후보를 이곳에서 관리할 수 있어요.'}</p><button className="button secondary small" onClick={interests.length ? () => { setTab('all'); setQuery(''); setSource('all'); setCategory('all'); setIncludeClosed(true); filterChange() } : onBrowse}>{interests.length ? '조회 조건 초기화' : '공고 둘러보기'}</button></div>}
         <div className="table-footer"><span>{safePage} / {pages}페이지</span><nav className="pagination" aria-label="관심 공고 페이지"><button aria-label="관심 공고 이전 페이지" disabled={safePage === 1} onClick={() => setPage(safePage - 1)}><Icon name="chevron" className="rotate-180" size={14} /></button><button aria-label="관심 공고 다음 페이지" disabled={safePage === pages} onClick={() => setPage(safePage + 1)}><Icon name="chevron" size={14} /></button></nav></div>
       </div>
-      {activeJob && <JobDrawer key={activeJob.id} job={activeJob} categories={categories} onClose={() => setSelected(null)} onToggleRead={() => toggleRead(activeJob.id)} onStar={onStar} onSaveInterest={onSave} position={queue.indexOf(activeJob.id)} total={queue.length} onPrevious={() => navigate(-1)} onNext={() => navigate(1)} />}
+      {activeJob && <JobDrawer key={activeJob.id} job={activeJob} categories={categories} onClose={closeDetail} onToggleRead={() => toggleRead(activeJob.id)} onStar={onStar} onSaveInterest={onSave} position={queue.indexOf(activeJob.id)} total={queue.length} onPrevious={() => navigate(-1)} onNext={() => navigate(1)} />}
     </div>
     <p className="interest-footnote">마감 공고도 관리할 수 있어요. 관심을 해제해도 저장한 메모·우선순위·지원 기록은 유지돼요.</p>
   </section>

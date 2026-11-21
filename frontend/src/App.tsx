@@ -1,6 +1,6 @@
 import { MyPage } from './components/MyPage'
 import { CollectionChanges } from './components/CollectionChanges'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { SOURCES, dateLabel, sourceById, summarize } from './data'
 import type { FailureStage, SourceId } from './types'
 import { useCollection } from './useCollection'
@@ -17,6 +17,7 @@ import { AiChat } from './components/AiChat'
 import { PostingMockGallery } from './components/PostingMockGallery'
 import { CategoryPicker } from './components/CategoryPicker'
 import { CareerMaterials } from './components/CareerMaterials'
+import { emptyNavigationSnapshot, readNavigationSnapshot, writeNavigationSnapshot, type AppNavigationSnapshot, type WorkspaceView } from './navigation'
 import './App.css'
 
 const PAGE_SIZES = [8, 20, 50]
@@ -32,25 +33,134 @@ function LiveApp() {
 }
 function Workspace({ collection }: { collection: ReturnType<typeof useCollection> }) {
   const { data, notice, start, retryFailures, toggleRead, markRead, running, demo, connected, error, availableSources, categories, companies, loadJob, setStarred, saveInterest } = collection
-  const [view, setView] = useState<'jobs' | 'history' | 'statistics' | 'interests' | 'ai' | 'career' | 'my'>('jobs')
-  const [changeScope, setChangeScope] = useState<{ ids: string[]; label: string } | null>(null)
-  const [categoryId, setCategoryId] = useState('all')
-  const [source, setSource] = useState<SourceId | 'all'>('all')
-  const [companyFilter, setCompanyFilter] = useState<string | null>(null)
-  const [tab, setTab] = useState<'all' | 'unread' | 'new'>('all')
-  const [query, setQuery] = useState('')
-  const [sort, setSort] = useState('newest')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(20)
-  const [includeClosed, setIncludeClosed] = useState(false)
-  const [collectOpen, setCollectOpen] = useState(false)
-  const [selectedJob, setSelectedJob] = useState<string | null>(null)
-  const [browseQueue, setBrowseQueue] = useState<string[]>([])
-  const [expandedRuns, setExpandedRuns] = useState<string[]>([data.runs[0]?.id])
-  const closeCollect = useCallback(() => setCollectOpen(false), [])
-  const closeJob = useCallback(() => setSelectedJob(null), [])
+  const [restoredNavigation] = useState(() => readNavigationSnapshot())
+  const initialNavigation = restoredNavigation ?? emptyNavigationSnapshot()
+  const [view, setView] = useState<WorkspaceView>(initialNavigation.view)
+  const [changeScope, setChangeScope] = useState<{ ids: string[]; label: string } | null>(initialNavigation.changeScope)
+  const [categoryId, setCategoryId] = useState(initialNavigation.categoryId)
+  const [source, setSource] = useState<SourceId | 'all'>(initialNavigation.source)
+  const [companyFilter, setCompanyFilter] = useState<string | null>(initialNavigation.companyFilter)
+  const [tab, setTab] = useState<'all' | 'unread' | 'new'>(initialNavigation.tab)
+  const [query, setQuery] = useState(initialNavigation.query)
+  const [sort, setSort] = useState(initialNavigation.sort)
+  const [page, setPage] = useState(initialNavigation.page)
+  const [pageSize, setPageSize] = useState(initialNavigation.pageSize)
+  const [includeClosed, setIncludeClosed] = useState(initialNavigation.includeClosed)
+  const [collectOpen, setCollectOpen] = useState(initialNavigation.collectOpen)
+  const [selectedJob, setSelectedJob] = useState<string | null>(initialNavigation.selectedJob)
+  const [browseQueue, setBrowseQueue] = useState<string[]>(initialNavigation.browseQueue)
+  const [expandedRuns, setExpandedRuns] = useState<string[]>(restoredNavigation?.expandedRuns ?? [data.runs[0]?.id].filter((id): id is string => !!id))
+  const pendingScrollRestore = useRef<{ y: number; tableTop: number; tableLeft: number } | null>(restoredNavigation ? { y: restoredNavigation.scrollY, tableTop: restoredNavigation.tableScrollTop, tableLeft: restoredNavigation.tableScrollLeft } : null)
   const latestRun = data.runs[0]
   const latest = latestRun ? summarize(latestRun) : null
+  const captureNavigation = useCallback((): AppNavigationSnapshot => {
+    const savedNavigation = readNavigationSnapshot()
+    const savedInterest = savedNavigation?.interest
+    const table = document.querySelector('.table-scroll')
+    return {
+      version: 1,
+      view,
+      changeScope,
+      categoryId,
+      source,
+      companyFilter,
+      tab,
+      query,
+      sort,
+      page,
+      pageSize,
+      includeClosed,
+      collectOpen,
+      modal: savedNavigation?.modal ?? null,
+      selectedJob,
+      browseQueue,
+      expandedRuns,
+      scrollY: window.scrollY,
+      tableScrollTop: table?.scrollTop ?? 0,
+      tableScrollLeft: table?.scrollLeft ?? 0,
+      ...(savedInterest ? { interest: savedInterest } : {}),
+    }
+  }, [view, changeScope, categoryId, source, companyFilter, tab, query, sort, page, pageSize, includeClosed, collectOpen, selectedJob, browseQueue, expandedRuns])
+  const applyNavigation = useCallback((navigation: AppNavigationSnapshot) => {
+    setView(navigation.view)
+    setChangeScope(navigation.changeScope)
+    setCategoryId(navigation.categoryId)
+    setSource(navigation.source)
+    setCompanyFilter(navigation.companyFilter)
+    setTab(navigation.tab)
+    setQuery(navigation.query)
+    setSort(navigation.sort)
+    setPage(navigation.page)
+    setPageSize(navigation.pageSize)
+    setIncludeClosed(navigation.includeClosed)
+    setCollectOpen(navigation.collectOpen)
+    setSelectedJob(navigation.selectedJob)
+    setBrowseQueue(navigation.browseQueue)
+    setExpandedRuns(navigation.expandedRuns)
+    pendingScrollRestore.current = { y: navigation.scrollY, tableTop: navigation.tableScrollTop, tableLeft: navigation.tableScrollLeft }
+  }, [])
+  const navigateApp = useCallback((patch: Partial<AppNavigationSnapshot>, mode: 'push' | 'replace' = 'push') => {
+    const next = { ...captureNavigation(), ...patch }
+    writeNavigationSnapshot(next, mode)
+    applyNavigation(next)
+  }, [captureNavigation, applyNavigation])
+  const closeCollect = useCallback(() => {
+    if (readNavigationSnapshot()?.collectOpen) window.history.back()
+    else setCollectOpen(false)
+  }, [])
+  const closeJob = useCallback(() => {
+    if (readNavigationSnapshot()?.selectedJob) window.history.back()
+    else setSelectedJob(null)
+  }, [])
+  useEffect(() => {
+    const onPopState = (event: PopStateEvent) => {
+      const navigation = readNavigationSnapshot(event.state)
+      if (navigation) applyNavigation(navigation)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [applyNavigation])
+  useEffect(() => {
+    const saved = readNavigationSnapshot()
+    const navigation = captureNavigation()
+    if (saved?.interest) navigation.interest = saved.interest
+    writeNavigationSnapshot(navigation)
+  }, [captureNavigation])
+  useEffect(() => {
+    const pending = pendingScrollRestore.current
+    if (!pending) return
+    pendingScrollRestore.current = null
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: pending.y })
+      const table = document.querySelector('.table-scroll')
+      if (table) {
+        table.scrollTop = pending.tableTop
+        table.scrollLeft = pending.tableLeft
+      }
+    })
+  }, [view, changeScope, categoryId, source, companyFilter, tab, query, sort, page, pageSize, includeClosed, collectOpen, selectedJob, browseQueue, expandedRuns])
+  useEffect(() => {
+    const previousRestoration = window.history.scrollRestoration
+    window.history.scrollRestoration = 'manual'
+    let frame = 0
+    const saveScroll = () => {
+      if (frame) return
+      frame = requestAnimationFrame(() => {
+        frame = 0
+        const current = readNavigationSnapshot()
+        if (current) writeNavigationSnapshot({ ...captureNavigation(), interest: current.interest })
+      })
+    }
+    window.addEventListener('scroll', saveScroll, { passive: true })
+    const table = document.querySelector('.table-scroll')
+    table?.addEventListener('scroll', saveScroll, { passive: true })
+    return () => {
+      if (frame) cancelAnimationFrame(frame)
+      window.removeEventListener('scroll', saveScroll)
+      table?.removeEventListener('scroll', saveScroll)
+      window.history.scrollRestoration = previousRestoration
+    }
+  }, [captureNavigation])
   const collectionCategoryId = categoryId === 'unclassified' || (!demo && !companies.some(company => company.supportedCategoryIds.includes(categoryId))) ? 'all' : categoryId
   const categoryName = (id = 'all') => id === 'unclassified' ? '미분류' : categories.find(category => category.id === id)?.name ?? '기타 분야'
   const categoryJobs = data.jobs.filter(job => (!changeScope || changeScope.ids.includes(job.id)) && (categoryId === 'all' || (categoryId === 'unclassified' ? !job.categories?.length : job.categories?.includes(categoryId))) && (!companyFilter || job.companyId === companyFilter))
@@ -110,38 +220,37 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
     if (selectedJob) void loadJob(selectedJob)
   }, [selectedJob, activeVersionId, loadJob])
   const changeSource = (id: SourceId | 'all') => {
-    setChangeScope(null)
-    setSource(id)
-    setCompanyFilter(null)
-    setView('jobs')
-    setPage(1)
-    setSelectedJob(null)
+    navigateApp({ changeScope: null, source: id, companyFilter: null, view: 'jobs', page: 1, selectedJob: null, scrollY: 0, tableScrollTop: 0, tableScrollLeft: 0 })
   }
   const browseChanges = (ids: string[], label: string) => {
-    setView('jobs'); setChangeScope({ ids, label }); setCategoryId('all'); setSource('all'); setCompanyFilter(null); setTab('all'); setQuery(''); setIncludeClosed(true); setSelectedJob(null); setPage(1)
+    navigateApp({ view: 'jobs', changeScope: { ids, label }, categoryId: 'all', source: 'all', companyFilter: null, tab: 'all', query: '', includeClosed: true, selectedJob: null, page: 1, scrollY: 0, tableScrollTop: 0, tableScrollLeft: 0 })
   }
   const openJob = (id: string) => {
-    if (!selectedJob) setBrowseQueue(filtered.map((job) => job.id))
+    const queue = selectedJob ? browseQueue : filtered.map((job) => job.id)
     markRead(id)
-    setSelectedJob(id)
+    navigateApp({ selectedJob: id, browseQueue: queue })
   }
   const navigateJob = (offset: number) => {
     const position = browseQueue.indexOf(selectedJob ?? '') + offset
     const id = browseQueue[position]
     if (id) {
       markRead(id)
-      setSelectedJob(id)
-      setPage(Math.floor(position / pageSize) + 1)
+      navigateApp({ selectedJob: id, page: Math.floor(position / pageSize) + 1 })
     }
   }
   const openRun = (id: string) => {
-    setView('history')
-    setExpandedRuns((ids) => (ids.includes(id) ? ids : [id, ...ids]))
+    const expanded = expandedRuns.includes(id) ? expandedRuns : [id, ...expandedRuns]
+    if (view === 'history' && expandedRuns.includes(id)) return
+    navigateApp({ view: 'history', expandedRuns: expanded, selectedJob: null, scrollY: 0, tableScrollTop: 0, tableScrollLeft: 0 })
+  }
+  const toggleRun = (id: string) => {
+    const expanded = expandedRuns.includes(id) ? expandedRuns.filter(runId => runId !== id) : [id, ...expandedRuns]
+    navigateApp({ expandedRuns: expanded })
   }
   const begin = async (ids: SourceId[], failure: FailureStage | null, selectedCategory: string, companyIds: string[], categoryIds?: string[]) => {
     const id = await start(ids, failure, selectedCategory, companyIds, undefined, categoryIds)
     if (id) {
-      setCollectOpen(false)
+      closeCollect()
       setExpandedRuns((items) => [id, ...items])
     }
   }
@@ -160,32 +269,13 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
   }
 
   const browseStatistics = (scope: StatisticsScope) => {
-    setChangeScope(null)
-    setSource(scope.sourceId)
-    setCompanyFilter(scope.companyId)
-    setCategoryId(scope.categoryId)
-    setView('jobs')
-    setIncludeClosed(true)
-    setTab('all')
-    setQuery('')
-    setPage(1)
-    setSelectedJob(null)
+    navigateApp({ changeScope: null, source: scope.sourceId, companyFilter: scope.companyId, categoryId: scope.categoryId, view: 'jobs', includeClosed: true, tab: 'all', query: '', page: 1, selectedJob: null, scrollY: 0, tableScrollTop: 0, tableScrollLeft: 0 })
   }
 
   const openAiPosting = (postingId: number) => {
     const id = String(postingId)
-    setView('jobs')
-    setChangeScope(null)
-    setCategoryId('all')
-    setSource('all')
-    setCompanyFilter(null)
-    setTab('all')
-    setQuery('')
-    setIncludeClosed(true)
-    setPage(1)
-    setBrowseQueue([id])
     markRead(id)
-    setSelectedJob(id)
+    navigateApp({ view: 'jobs', changeScope: null, categoryId: 'all', source: 'all', companyFilter: null, tab: 'all', query: '', includeClosed: true, page: 1, browseQueue: [id], selectedJob: id, scrollY: 0, tableScrollTop: 0, tableScrollLeft: 0 })
   }
 
   return (
@@ -196,9 +286,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
         <button
           className="wordmark"
           onClick={() => {
-            changeSource('all')
-            setTab('all')
-            setQuery('')
+            navigateApp({ view: 'jobs', changeScope: null, source: 'all', companyFilter: null, tab: 'all', query: '', page: 1, selectedJob: null, scrollY: 0, tableScrollTop: 0, tableScrollLeft: 0 })
           }}
           aria-label="JobMoa 홈"
         >
@@ -217,19 +305,19 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
             <span>공고 모아보기</span>
             <span className="nav-count">{available.length}</span>
           </button>
-          <button className={view === 'interests' ? 'active' : ''} onClick={() => { setSelectedJob(null); setView('interests') }}><Icon name="star" size={18} /><span>관심 공고</span><span className="nav-count">{data.jobs.filter(job => interestOf(job).starred).length}</span></button>
+          <button className={view === 'interests' ? 'active' : ''} onClick={() => navigateApp({ view: 'interests', selectedJob: null, scrollY: 0, tableScrollTop: 0, tableScrollLeft: 0 })}><Icon name="star" size={18} /><span>관심 공고</span><span className="nav-count">{data.jobs.filter(job => interestOf(job).starred).length}</span></button>
           <button
             className={view === 'history' ? 'active' : ''}
-            onClick={() => setView('history')}
+            onClick={() => navigateApp({ view: 'history', selectedJob: null, scrollY: 0, tableScrollTop: 0, tableScrollLeft: 0 })}
           >
             <Icon name="history" size={18} />
             <span>수집 기록</span>
             {running && <span className="live-dot" />}
           </button>
-          <button className={view === 'statistics' ? 'active' : ''} onClick={() => { setSelectedJob(null); setCategoryId('all'); setSource('all'); setCompanyFilter(null); setView('statistics') }}><Icon name="chart" size={18} /><span>채용 통계</span></button>
-          <button className={view === 'ai' ? 'active' : ''} onClick={() => { setSelectedJob(null); setView('ai') }}><Icon name="spark" size={18} /><span>AI에게 질문</span></button>
-          <button className={view === 'career' ? 'active' : ''} onClick={() => { setSelectedJob(null); setView('career') }}><Icon name="file" size={18} /><span>경력 자료</span></button>
-          <button className={view === 'my' ? 'active' : ''} onClick={() => { setSelectedJob(null); setView('my') }}><Icon name="layers" size={18} /><span>마이페이지</span></button>
+          <button className={view === 'statistics' ? 'active' : ''} onClick={() => navigateApp({ view: 'statistics', selectedJob: null, categoryId: 'all', source: 'all', companyFilter: null, scrollY: 0, tableScrollTop: 0, tableScrollLeft: 0 })}><Icon name="chart" size={18} /><span>채용 통계</span></button>
+          <button className={view === 'ai' ? 'active' : ''} onClick={() => navigateApp({ view: 'ai', selectedJob: null, scrollY: 0, tableScrollTop: 0, tableScrollLeft: 0 })}><Icon name="spark" size={18} /><span>AI에게 질문</span></button>
+          <button className={view === 'career' ? 'active' : ''} onClick={() => navigateApp({ view: 'career', selectedJob: null, scrollY: 0, tableScrollTop: 0, tableScrollLeft: 0 })}><Icon name="file" size={18} /><span>경력 자료</span></button>
+          <button className={view === 'my' ? 'active' : ''} onClick={() => navigateApp({ view: 'my', selectedJob: null, scrollY: 0, tableScrollTop: 0, tableScrollLeft: 0 })}><Icon name="layers" size={18} /><span>마이페이지</span></button>
         </nav>
         <div className="source-section-heading">
           <span>관심 기업군</span>
@@ -320,7 +408,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
             {view === 'jobs' && <button
               className="button primary collect-button"
               disabled={running || !connected}
-              onClick={() => setCollectOpen(true)}
+              onClick={() => navigateApp({ collectOpen: true, modal: 'collect-title' })}
             >
               <Icon
                 name="refresh"
@@ -712,13 +800,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
                   key={run.id}
                   run={run}
                   expanded={expandedRuns.includes(run.id)}
-                  onToggle={() =>
-                    setExpandedRuns((ids) =>
-                      ids.includes(run.id)
-                        ? ids.filter((id) => id !== run.id)
-                        : [...ids, run.id],
-                    )
-                  }
+                  onToggle={() => toggleRun(run.id)}
                   onRetry={(ids) => retry(run.id, ids)}
                   onOpenOriginal={(id) => {
                     openRun(id)

@@ -6,6 +6,12 @@ import { BrandMark } from './BrandMark'
 import { Icon } from './Icon'
 import { Modal } from './Modal'
 import { InterestEditor, InterestStar } from './InterestControls'
+import { readNavigationSnapshot, writeNavigationSnapshot } from '../navigation'
+
+function isCaptureZoomOpen(jobId: string, state: unknown = window.history.state) {
+  const navigation = readNavigationSnapshot(state)
+  return navigation?.modal === 'capture-zoom' && (navigation.selectedJob === jobId || navigation.interest?.selected === jobId)
+}
 
 function sampleCapture(job: Job, version: JobVersion, revision: number) {
   const escape = (value: string) =>
@@ -50,13 +56,28 @@ export function JobDrawer({
 }) {
   const [tab, setTab] = useState<'capture' | 'text' | 'diff'>('capture')
   const [versionId, setVersionId] = useState(job.versions[0].id)
-  const [zoomed, setZoomed] = useState(false)
+  const [zoomed, setZoomed] = useState(() => isCaptureZoomOpen(job.id))
   const closeButton = useRef<HTMLButtonElement>(null)
   const zoomedRef = useRef(zoomed)
   const jobIdRef = useRef(job.id)
-  const closeZoom = useCallback(() => setZoomed(false), [])
+  const openZoom = useCallback(() => {
+    const navigation = readNavigationSnapshot()
+    if (navigation && navigation.modal !== 'capture-zoom') writeNavigationSnapshot({ ...navigation, modal: 'capture-zoom' }, 'push')
+    setZoomed(true)
+  }, [])
+  const closeZoom = useCallback(() => {
+    if (readNavigationSnapshot()?.modal === 'capture-zoom') window.history.back()
+    else setZoomed(false)
+  }, [])
   useEffect(() => { zoomedRef.current = zoomed }, [zoomed])
   useEffect(() => { jobIdRef.current = job.id }, [job.id])
+  useEffect(() => {
+    const onPopState = (event: PopStateEvent) => {
+      setZoomed(isCaptureZoomOpen(job.id, event.state))
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [job.id])
   useEffect(() => {
     const body = document.body
     const previousOverflow = body.style.overflow
@@ -104,7 +125,7 @@ export function JobDrawer({
   useEffect(() => {
     setTab('capture')
     setVersionId(job.versions[0].id)
-    setZoomed(false)
+    setZoomed(isCaptureZoomOpen(job.id))
   }, [job.id])
   const version =
     job.versions.find((v) => v.id === versionId) ?? job.versions[0]
@@ -283,14 +304,14 @@ export function JobDrawer({
               <div>
                 <Icon name="image" size={15} />
                 <span>{version.captureUrl ? '수집 시점의 원문 캡처' : '예시 이미지 · 실제 공고가 아니에요'}</span>
-                <button className="text-button" onClick={() => setZoomed(true)}>
+                <button className="text-button" onClick={openZoom}>
                   캡처 확대
                   <Icon name="external" size={11} />
                 </button>
               </div>
               <button
                 className="capture-image-button"
-                onClick={() => setZoomed(true)}
+                onClick={openZoom}
                 aria-label="캡처 이미지 확대"
               >
                 <img
