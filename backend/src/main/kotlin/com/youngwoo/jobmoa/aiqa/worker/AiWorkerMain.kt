@@ -1,5 +1,6 @@
 package com.youngwoo.jobmoa.aiqa.worker
 
+import com.youngwoo.jobmoa.career.assistant.domain.model.CareerAssistantTaskType
 import org.slf4j.LoggerFactory
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
@@ -48,25 +49,26 @@ private class AiWorker {
         }, HEARTBEAT_SECONDS, HEARTBEAT_SECONDS, TimeUnit.SECONDS)
         log.info("JobMoa AI 워커 시작: model={}, endpoint={}", CodexCli.MODEL, baseUrl)
 
-        var nextQueue = 0
-        val queues = listOf("application-requirements", "career-materials", "ai")
+        var nextQueueIndex = 0
         while (!Thread.currentThread().isInterrupted) {
             try {
-                var claimed: Pair<JsonNode, String>? = null
+                val queues = WorkerQueue.entries
+                var selected: Pair<WorkerQueue, JsonNode>? = null
                 for (offset in queues.indices) {
-                    val queue = queues[(nextQueue + offset) % queues.size]
-                    val task = request("POST", "/api/$queue/worker/tasks/claim", "{}")
+                    val queue = queues[(nextQueueIndex + offset) % queues.size]
+                    val task = claim(queue)
                     if (!task.isNull && !task.isMissingNode) {
-                        claimed = task to queue
-                        nextQueue = (queues.indexOf(queue) + 1) % queues.size
+                        selected = queue to task
                         break
                     }
                 }
-                if (claimed == null) {
+                if (selected == null) {
+                    nextQueueIndex = (nextQueueIndex + 1) % queues.size
                     Thread.sleep(POLL_MILLIS)
                     continue
                 }
-                process(claimed.first, claimed.second)
+                nextQueueIndex = (selected.first.ordinal + 1) % queues.size
+                process(selected.second, selected.first)
             } catch (interrupted: InterruptedException) {
                 Thread.currentThread().interrupt()
             } catch (error: Exception) {
@@ -78,11 +80,18 @@ private class AiWorker {
         deltaScheduler.shutdownNow()
     }
 
-    private fun process(task: JsonNode, queue: String) {
+    private fun claim(queue: WorkerQueue) = request("POST", when (queue) {
+        WorkerQueue.CAREER_MATERIAL -> "/api/career-materials/worker/tasks/claim"
+        WorkerQueue.CAREER_ASSISTANT -> "/api/career-assistant/worker/tasks/claim"
+        WorkerQueue.APPLICATION_REQUIREMENTS -> "/api/application-requirements/worker/tasks/claim"
+        WorkerQueue.AI_CHAT -> "/api/ai/worker/tasks/claim"
+    }, "{}")
+
+    private fun process(task: JsonNode, queue: WorkerQueue) {
         val taskId = task["taskId"].asString()
         val leaseToken = task["leaseToken"].asString()
         val lease = Lease(taskId, leaseToken, queue)
-        val progress = if (queue != "ai") null else ProgressReporter(taskId, leaseToken)
+        val progress = if (queue == WorkerQueue.AI_CHAT) ProgressReporter(taskId, leaseToken) else null
         active.set(lease)
         reporter.set(progress)
         val flushJob: ScheduledFuture<*>? = progress?.let { reporter ->
@@ -92,26 +101,42 @@ private class AiWorker {
             )
         }
         try {
-            if (queue == "career-materials") {
-                val result = codex.analyzeCareer(task)
-                request("POST", "/api/career-materials/worker/tasks/$taskId/complete", mapper.writeValueAsString(mapOf(
-                    "leaseToken" to leaseToken,
-                    "facts" to result.facts.map { fact -> mapOf(
-                        "kind" to fact.kind.name,
-                        "title" to fact.title,
-                        "summary" to fact.summary,
-                        "evidence" to fact.evidence.map { evidence -> mapOf("fragmentId" to evidence.fragmentId, "excerpt" to evidence.excerpt) },
-                    ) },
-                )))
-                log.info("경력 자료 분석 완료: {} (facts={})", taskId, result.facts.size)
-            } else if (queue == "application-requirements") {
-                val result = codex.analyzeApplicationRequirements(task)
-                request("POST", "/api/application-requirements/worker/tasks/$taskId/complete", mapper.writeValueAsString(mapOf(
-                    "leaseToken" to leaseToken,
-                    "result" to result,
-                )))
-                log.info("지원서 요구 정보 분석 완료: {}", taskId)
-            } else {
+            when (queue) {
+                WorkerQueue.CAREER_MATERIAL -> {
+                    val result = codex.analyzeCareer(task)
+                    request("POST", "/api/career-materials/worker/tasks/$taskId/complete", mapper.writeValueAsString(mapOf(
+                        "leaseToken" to leaseToken,
+                        "facts" to result.facts.map { fact -> mapOf(
+                            "kind" to fact.kind.name,
+                            "title" to fact.title,
+                            "summary" to fact.summary,
+                            "evidence" to fact.evidence.map { evidence -> mapOf("fragmentId" to evidence.fragmentId, "excerpt" to evidence.excerpt) },
+                        ) },
+                    )))
+                    log.info("경력 자료 분석 완료: {} (facts={})", taskId, result.facts.size)
+                }
+                WorkerQueue.CAREER_ASSISTANT -> {
+                    val taskType = CareerAssistantTaskType.valueOf(task["taskType"].asString())
+                    val input = task["request"]
+                    val result = when (taskType) {
+                        CareerAssistantTaskType.RECOMMENDATIONS -> codex.recommendCareer(input)
+                        CareerAssistantTaskType.POSTING_DRAFT -> codex.buildPostingDraft(input)
+                    }
+                    request("POST", "/api/career-assistant/worker/tasks/$taskId/complete", mapper.writeValueAsString(mapOf(
+                        "leaseToken" to leaseToken,
+                        "result" to mapper.readTree(mapper.writeValueAsString(result)),
+                    )))
+                    log.info("경력 맞춤 작업 완료: {} ({})", taskId, taskType)
+                }
+                WorkerQueue.APPLICATION_REQUIREMENTS -> {
+                    val result = codex.analyzeApplicationRequirements(task)
+                    request("POST", "/api/application-requirements/worker/tasks/$taskId/complete", mapper.writeValueAsString(mapOf(
+                        "leaseToken" to leaseToken,
+                        "result" to result,
+                    )))
+                    log.info("지원서 요구 정보 분석 완료: {}", taskId)
+                }
+                WorkerQueue.AI_CHAT -> {
                 val aiProgress = requireNotNull(progress)
                 aiProgress.status("공고 자료를 확인하고 있어요")
                 aiProgress.status("Codex가 답변을 작성하고 있어요")
@@ -127,12 +152,18 @@ private class AiWorker {
                 )
                 request("POST", "/api/ai/worker/tasks/$taskId/complete", mapper.writeValueAsString(body))
                 log.info("AI 작업 완료: {} (webSearch={})", taskId, result.searchPerformed)
+                }
             }
         } catch (error: Exception) {
             progress?.flushQuietly()
             val message = safeError(error.message ?: "Codex CLI가 작업을 완료하지 못했습니다.")
             runCatching {
-                val endpoint = "/api/$queue/worker/tasks/$taskId/fail"
+                val endpoint = when (queue) {
+                    WorkerQueue.CAREER_MATERIAL -> "/api/career-materials/worker/tasks/$taskId/fail"
+                    WorkerQueue.CAREER_ASSISTANT -> "/api/career-assistant/worker/tasks/$taskId/fail"
+                    WorkerQueue.APPLICATION_REQUIREMENTS -> "/api/application-requirements/worker/tasks/$taskId/fail"
+                    WorkerQueue.AI_CHAT -> "/api/ai/worker/tasks/$taskId/fail"
+                }
                 request("POST", endpoint, mapper.writeValueAsString(mapOf(
                     "leaseToken" to leaseToken,
                     "message" to message,
@@ -154,7 +185,12 @@ private class AiWorker {
     }
 
     private fun renew(lease: Lease) {
-        val endpoint = "/api/${lease.queue}/worker/tasks/${lease.taskId}/renew"
+        val endpoint = when (lease.queue) {
+            WorkerQueue.CAREER_MATERIAL -> "/api/career-materials/worker/tasks/${lease.taskId}/renew"
+            WorkerQueue.CAREER_ASSISTANT -> "/api/career-assistant/worker/tasks/${lease.taskId}/renew"
+            WorkerQueue.APPLICATION_REQUIREMENTS -> "/api/application-requirements/worker/tasks/${lease.taskId}/renew"
+            WorkerQueue.AI_CHAT -> "/api/ai/worker/tasks/${lease.taskId}/renew"
+        }
         request("POST", endpoint, mapper.writeValueAsString(mapOf("leaseToken" to lease.token)))
     }
 
@@ -226,7 +262,8 @@ private class AiWorker {
         }
     }
 
-    private data class Lease(val taskId: String, val token: String, val queue: String)
+    private enum class WorkerQueue { CAREER_MATERIAL, CAREER_ASSISTANT, APPLICATION_REQUIREMENTS, AI_CHAT }
+    private data class Lease(val taskId: String, val token: String, val queue: WorkerQueue)
 
     companion object {
         private const val HEARTBEAT_SECONDS = 10L

@@ -12,7 +12,7 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
     // 부모 → 자식 순서. 삭제는 역순으로 하며 FK를 끄거나 TRUNCATE하지 않는다.
     private val tables = listOf("collection_run", "collection_run_source", "crawl_task", "posting", "posting_version",
         "posting_category", "posting_observation", "posting_interest", "collection_preset", "collection_change",
-        "career_material", "career_material_fragment", "career_fact", "career_fact_evidence", "posting_application_requirement")
+        "career_material", "career_material_fragment", "career_fact", "career_fact_evidence", "posting_application_requirement", "career_assistant_task")
     private data class Column(val name: String, val type: Int)
     private fun metadata(table: String): List<Column> = jdbc.execute(org.springframework.jdbc.core.ConnectionCallback { connection ->
         connection.prepareStatement("SELECT * FROM `$table` LIMIT 0").use { statement -> statement.executeQuery().use { rs ->
@@ -26,6 +26,7 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
         "interests" to (jdbc.queryForObject("SELECT COUNT(*) FROM posting_interest WHERE starred=1", Long::class.java) ?: 0),
         "management" to count("posting_interest"), "presets" to count("collection_preset"),
         "careerMaterials" to count("career_material"), "careerFacts" to count("career_fact"),
+        "careerTasks" to count("career_assistant_task"),
         "applicationRequirements" to count("posting_application_requirement"),
         "read" to (jdbc.queryForObject("SELECT COUNT(*) FROM posting WHERE is_read=1", Long::class.java) ?: 0))
     private fun count(table: String) = jdbc.queryForObject("SELECT COUNT(*) FROM `$table`", Long::class.java) ?: 0
@@ -44,10 +45,11 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
         SnapshotTable(columns.map { it.name }, rows)
     }
     override fun validate(snapshot: WorkspaceSnapshot) {
-        require(snapshot.format == "jobmoa" && snapshot.version in setOf(1, 2) && snapshot.schema in setOf(10, 11, 12)) { "이 버전에서 지원하는 JobMoa 백업 파일이 아닙니다." }
+        require(snapshot.format == "jobmoa" && snapshot.version in setOf(1, 2) && snapshot.schema in setOf(10, 11, 12, 13)) { "이 버전에서 지원하는 JobMoa 백업 파일이 아닙니다." }
         val expectedTables = when (snapshot.schema) {
             10 -> tables.filterNot { it.startsWith("career_") || it == "posting_application_requirement" }.toSet()
-            11 -> tables.filterNot { it == "posting_application_requirement" }.toSet()
+            11 -> tables.filterNot { it == "posting_application_requirement" || it == "career_assistant_task" }.toSet()
+            12 -> tables.filterNot { it == "career_assistant_task" }.toSet()
             else -> tables.toSet()
         }
         require(snapshot.tables.keys == expectedTables) { "백업에 필요한 데이터가 없거나 알 수 없는 테이블이 포함되어 있습니다." }
@@ -100,17 +102,24 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
             references("career_fact_evidence", "fact_id", "career_fact")
             references("career_fact_evidence", "fragment_id", "career_material_fragment")
             require(values("career_material", "status").all { it in setOf("WAITING_AI", "ANALYZING", "ANALYZED", "FAILED", "UNREADABLE") }) { "경력 자료 상태가 올바르지 않습니다." }
-            require(values("career_fact", "verification_status").all { it == "UNVERIFIED" }) { "지원하지 않는 경력 정보 확인 상태입니다." }
+            val factStatuses = if (snapshot.schema >= 12) setOf("UNVERIFIED", "VERIFIED", "REJECTED") else setOf("UNVERIFIED")
+            require(values("career_fact", "verification_status").all { it in factStatuses }) { "지원하지 않는 경력 정보 확인 상태입니다." }
             val materialFiles = values("career_material", "storage_key").map { "${it}.bin" }.toSet()
             require(materialFiles == snapshot.careerFiles.toSet() && snapshot.careerFiles.distinct().size == snapshot.careerFiles.size) { "백업의 경력 원본 파일 목록이 데이터와 일치하지 않습니다." }
             require(values("career_material", "storage_key").none { it == null } && values("career_material", "content_hash").all { it.toString().matches(Regex("[a-f0-9]{64}")) }) { "경력 자료 원본 참조가 올바르지 않습니다." }
         } else {
             require(snapshot.careerFiles.isEmpty()) { "이전 백업 형식에는 경력 원본 파일을 포함할 수 없습니다." }
         }
-        if (snapshot.schema == 12) {
+        if (snapshot.schema >= 12) {
             references("posting_application_requirement", "posting_id", "posting")
             require(values("posting_application_requirement", "source").all { it in setOf("POSTING_BODY", "USER_PASTED", "PUBLIC_PAGE") }) { "지원서 정보 출처가 올바르지 않습니다." }
             require(values("posting_application_requirement", "status").all { it in setOf("WAITING_PUBLIC", "FETCHING_PUBLIC", "WAITING_AI", "ANALYZING", "REVIEW", "CONFIRMED", "FAILED") }) { "지원서 정보 상태가 올바르지 않습니다." }
+        }
+        if (snapshot.schema >= 13) {
+            references("career_assistant_task", "parent_task_id", "career_assistant_task")
+            references("career_assistant_task", "posting_id", "posting")
+            require(values("career_assistant_task", "task_type").all { it in setOf("RECOMMENDATIONS", "POSTING_DRAFT") }) { "지원하지 않는 AI 경력 작업입니다." }
+            require(values("career_assistant_task", "status").all { it in setOf("WAITING_AI", "COMPLETED", "FAILED") }) { "진행 중인 AI 경력 작업은 백업할 수 없습니다." }
         }
     }
     override fun replace(snapshot: WorkspaceSnapshot) {
@@ -139,8 +148,8 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
             "interests" -> jdbc.update("DELETE FROM posting_interest")
             "read" -> jdbc.update("UPDATE posting SET is_read=0")
             "presets" -> jdbc.update("DELETE FROM collection_preset")
-            "career" -> jdbc.update("DELETE FROM career_material")
-            "postings" -> tables.asReversed().filter { it != "collection_preset" && !it.startsWith("career_") }.forEach { jdbc.update("DELETE FROM `$it`") }
+            "career" -> { jdbc.update("DELETE FROM career_assistant_task"); jdbc.update("DELETE FROM career_material") }
+            "postings" -> { jdbc.update("DELETE FROM career_assistant_task"); tables.asReversed().filter { it != "collection_preset" && !it.startsWith("career_") }.forEach { jdbc.update("DELETE FROM `$it`") } }
             else -> throw IllegalArgumentException("지원하지 않는 초기화 범위입니다.")
         }
         bumpRevision()

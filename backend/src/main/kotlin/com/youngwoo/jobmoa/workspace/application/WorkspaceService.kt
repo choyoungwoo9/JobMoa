@@ -35,7 +35,7 @@ class WorkspaceService(private val repository: WorkspaceSnapshotRepository, priv
         val files = Files.list(captures).use { stream -> stream.filter { safeFile(it) }.toList() }
         val materials = Files.list(careerMaterials).use { stream -> stream.filter { safeCareerFile(it) }.toList() }
         counts + mapOf("captureFiles" to files.size, "captureBytes" to files.sumOf { Files.size(it) },
-            "careerFiles" to materials.size, "careerBytes" to materials.sumOf { Files.size(it) }, "backupVersion" to 3)
+            "careerFiles" to materials.size, "careerBytes" to materials.sumOf { Files.size(it) }, "backupVersion" to 4)
     }
     private fun safeFile(path: Path) = fileName.matches(path.fileName.toString()) && Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)
     private fun safeCareerFile(path: Path) = careerFileName.matches(path.fileName.toString()) && Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)
@@ -74,8 +74,20 @@ class WorkspaceService(private val repository: WorkspaceSnapshotRepository, priv
                 values[requirementExpires] = null
             }
         }
+        val assistant = tables.getValue("career_assistant_task")
+        val taskStatusIndex = assistant.columns.indexOf("status")
+        val taskTokenIndex = assistant.columns.indexOf("lease_token")
+        val taskExpiresIndex = assistant.columns.indexOf("lease_expires_at")
+        val normalizedTasks = assistant.rows.map { row ->
+            if (row[taskStatusIndex] != "ANALYZING") row else row.toMutableList().also { values ->
+                values[taskStatusIndex] = "WAITING_AI"
+                values[taskTokenIndex] = null
+                values[taskExpiresIndex] = null
+            }
+        }
         return tables + ("career_material" to table.copy(rows = rows)) +
-            ("posting_application_requirement" to requirementTable.copy(rows = requirementRows))
+            ("posting_application_requirement" to requirementTable.copy(rows = requirementRows)) +
+            ("career_assistant_task" to assistant.copy(rows = normalizedTasks))
     }
     private fun hash(path: Path): String {
         val digest = MessageDigest.getInstance("SHA-256")
@@ -177,7 +189,8 @@ class WorkspaceService(private val repository: WorkspaceSnapshotRepository, priv
                 "captureBytes" to snapshot.captures.sumOf { Files.size(directory.resolve("captures/$it")) },
                 "careerBytes" to snapshot.careerFiles.sumOf { Files.size(directory.resolve("career-materials/$it")) },
                 "careerMaterialsIncluded" to (snapshot.schema >= 11),
-                "applicationRequirementsIncluded" to (snapshot.schema >= 12))
+                "applicationRequirementsIncluded" to (snapshot.schema >= 12),
+                "careerAssistantIncluded" to (snapshot.schema >= 13))
         } catch (e: Exception) {
             removeDirectory(directory)
             if (e is IllegalArgumentException) throw e
@@ -214,7 +227,10 @@ class WorkspaceService(private val repository: WorkspaceSnapshotRepository, priv
     private fun snapshotCounts(s: WorkspaceSnapshot) = mapOf("postings" to s.tables.getValue("posting").rows.size,
         "versions" to s.tables.getValue("posting_version").rows.size, "runs" to s.tables.getValue("collection_run").rows.size,
         "management" to s.tables.getValue("posting_interest").rows.size, "presets" to s.tables.getValue("collection_preset").rows.size, "captureFiles" to s.captures.size,
-        "careerMaterials" to (s.tables["career_material"]?.rows?.size ?: 0), "careerFiles" to s.careerFiles.size,
+        "careerMaterials" to (s.tables["career_material"]?.rows?.size ?: 0),
+        "careerFacts" to (s.tables["career_fact"]?.rows?.size ?: 0),
+        "careerTasks" to (s.tables["career_assistant_task"]?.rows?.size ?: 0),
+        "careerFiles" to s.careerFiles.size,
         "applicationRequirements" to (s.tables["posting_application_requirement"]?.rows?.size ?: 0))
     @Synchronized fun discard(token: String) { previews.remove(token)?.let { removeDirectory(it.directory) } }
     @Synchronized fun restore(token: String, confirmation: String): Map<String, Any> {

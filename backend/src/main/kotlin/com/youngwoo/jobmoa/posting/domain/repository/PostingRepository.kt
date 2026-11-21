@@ -13,6 +13,7 @@ interface PostingRepository {
     fun save(posting: Posting): Posting
     fun versions(id: Long): List<PostingVersion>
     fun latestVersion(postingId: Long): PostingVersion?
+    fun latestVersions(postingIds: List<Long>): List<PostingVersion>
     fun findVersion(id: Long): PostingVersion?
     fun versionSummaries(postingIds: List<Long>): List<VersionSummary>
     fun saveVersion(version: PostingVersion): PostingVersion

@@ -24,6 +24,10 @@ class CareerMaterialController(private val service: CareerMaterialService) {
 
     @GetMapping("/{id}") fun detail(@PathVariable id: String) = service.detail(id)
 
+    @PatchMapping("/{id}/facts/{factId}")
+    fun updateFact(@PathVariable id: String, @PathVariable factId: String, @RequestBody request: CareerFactUpdateRequest) =
+        service.updateFact(id, factId, request.title, request.summary, request.status)
+
     @GetMapping("/{id}/original")
     fun original(@PathVariable id: String): ResponseEntity<InputStreamResource> {
         val (path, filename) = service.originalPath(id)
@@ -77,3 +81,4 @@ data class CareerWorkerFailureRequest(val leaseToken: String, val message: Strin
 data class CareerWorkerCompletionRequest(val leaseToken: String, val facts: List<CareerFactRequest> = emptyList())
 data class CareerFactRequest(val kind: String, val title: String, val summary: String, val evidence: List<CareerFactEvidenceRequest> = emptyList())
 data class CareerFactEvidenceRequest(val fragmentId: String, val excerpt: String)
+data class CareerFactUpdateRequest(val title: String, val summary: String, val status: CareerFactStatus)

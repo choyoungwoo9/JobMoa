@@ -37,6 +37,7 @@ interface CareerMaterialFragmentJpaRepository : JpaRepository<CareerMaterialFrag
 interface CareerFactJpaRepository : JpaRepository<CareerFactEntity, String> {
     fun findAllByMaterialIdOrderByCreatedAtAscIdAsc(materialId: String): List<CareerFactEntity>
     fun findAllByMaterialIdIn(materialIds: List<String>): List<CareerFactEntity>
+    fun findAllByVerificationStatusOrderByCreatedAtAscIdAsc(verificationStatus: String): List<CareerFactEntity>
 
     @Modifying
     @Query("delete from CareerFactEntity f where f.materialId = :materialId")
@@ -45,4 +46,5 @@ interface CareerFactJpaRepository : JpaRepository<CareerFactEntity, String> {
 
 interface CareerFactEvidenceJpaRepository : JpaRepository<CareerFactEvidenceEntity, String> {
     fun findAllByFactIdOrderByIdAsc(factId: String): List<CareerFactEvidenceEntity>
+    fun findAllByFactIdInOrderByFactIdAscIdAsc(factIds: List<String>): List<CareerFactEvidenceEntity>
 }

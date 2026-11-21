@@ -28,6 +28,13 @@ interface PostingVersionJpaRepository : JpaRepository<PostingVersionEntity, Long
     fun summaries(@Param("ids") postingIds: List<Long>): List<VersionSummaryProjection>
     fun findAllByPostingIdOrderBySavedAtDescIdDesc(postingId: Long): List<PostingVersionEntity>
     fun findFirstByPostingIdOrderBySavedAtDescIdDesc(postingId: Long): PostingVersionEntity?
+    @Query("""select v from PostingVersionEntity v
+        where v.postingId in :ids and not exists (
+            select newer.id from PostingVersionEntity newer
+            where newer.postingId = v.postingId
+              and (newer.savedAt > v.savedAt or (newer.savedAt = v.savedAt and newer.id > v.id))
+        )""")
+    fun latestForPostings(@Param("ids") postingIds: List<Long>): List<PostingVersionEntity>
 }
 
 interface PostingCategoryJpaRepository : JpaRepository<PostingCategoryEntity, PostingCategoryId> {

@@ -34,6 +34,8 @@ class PostingRepositoryImpl(
     }
     override fun versions(id: Long): List<PostingVersion> = versions.findAllByPostingIdOrderBySavedAtDescIdDesc(id).map { it.domain() }
     override fun latestVersion(postingId: Long): PostingVersion? = versions.findFirstByPostingIdOrderBySavedAtDescIdDesc(postingId)?.domain()
+    override fun latestVersions(postingIds: List<Long>): List<PostingVersion> =
+        if (postingIds.isEmpty()) emptyList() else versions.latestForPostings(postingIds).map { it.domain() }
     override fun findVersion(id: Long): PostingVersion? = versions.findById(id).orElse(null)?.domain()
     override fun versionSummaries(postingIds: List<Long>): List<VersionSummary> =
         if (postingIds.isEmpty()) emptyList() else versions.summaries(postingIds).map { VersionSummary(it.id, it.postingId, it.savedAt, it.capturePath) }

@@ -107,6 +107,23 @@ class CareerMaterialService(
         return CareerMaterialDetail(summary(material, false), repository.fragments(id), repository.facts(id))
     }
 
+    @Transactional
+    fun updateFact(materialId: String, factId: String, title: String, summary: String, status: CareerFactStatus): CareerFact {
+        access.writing()
+        val material = repository.lock(materialId) ?: throw ResourceNotFound("경력 자료를 찾을 수 없습니다.")
+        require(material.status == CareerMaterialStatus.ANALYZED) { "분석이 끝난 경력 자료만 검토할 수 있습니다." }
+        val current = repository.facts(materialId).firstOrNull { it.id == factId }
+            ?: throw ResourceNotFound("경력 사실 후보를 찾을 수 없습니다.")
+        val cleanTitle = title.trim()
+        val cleanSummary = summary.trim()
+        require(cleanTitle.isNotBlank() && cleanTitle.length <= 500) { "제목은 1~500자로 입력하세요." }
+        require(cleanSummary.isNotBlank() && cleanSummary.length <= 8000) { "설명은 1~8,000자로 입력하세요." }
+        require(current.evidence.isNotEmpty()) { "원문 근거가 있는 후보만 확정할 수 있습니다." }
+        val updated = current.copy(title = cleanTitle, summary = cleanSummary, status = status, updatedAt = Instant.now())
+        repository.saveFact(updated)
+        return repository.facts(materialId).first { it.id == factId }
+    }
+
     @Transactional(readOnly = true)
     fun originalPath(id: String): Pair<Path, String> {
         val material = repository.find(id) ?: throw ResourceNotFound("경력 자료를 찾을 수 없습니다.")

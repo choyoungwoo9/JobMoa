@@ -35,6 +35,23 @@ class CareerMaterialRepositoryImpl(
         }
     }
 
+    override fun verifiedFacts(): List<CareerFact> {
+        val rows = facts.findAllByVerificationStatusOrderByCreatedAtAscIdAsc(CareerFactStatus.VERIFIED.name)
+        if (rows.isEmpty()) return emptyList()
+        val materialIds = rows.map { it.materialId }.distinct()
+        val sourceById = fragments.findAllByMaterialIdIn(materialIds).associateBy { it.id }
+        val evidenceByFact = evidence.findAllByFactIdInOrderByFactIdAscIdAsc(rows.map { it.id })
+            .groupBy { it.factId }
+        return rows.map { fact ->
+            val sources = evidenceByFact[fact.id].orEmpty().mapNotNull { row ->
+                sourceById[row.fragmentId]?.let { row.domain(it.locationLabel) }
+            }
+            fact.domain(sources)
+        }
+    }
+
+    override fun saveFact(fact: CareerFact) { facts.save(fact.entity()) }
+
     override fun replaceFacts(materialId: String, rows: List<CareerFact>, now: Instant) {
         facts.deleteAllForMaterial(materialId)
         if (rows.isEmpty()) return
