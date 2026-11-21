@@ -76,7 +76,7 @@ interface AiPostingContextProjection {
     val url: String
     val firstSeen: Instant
     val closed: Boolean
-    val isRead: Boolean
+    val readFlag: Boolean
     val categoryIds: String
     val versionId: Long?
     val versionSavedAt: Instant?
@@ -87,7 +87,7 @@ interface AiPostingContextJpaRepository : JpaRepository<com.youngwoo.jobmoa.post
     @Query(value = """
         SELECT p.id AS id, p.source_id AS sourceId, p.company AS company, p.title AS title,
             p.location AS location, p.url AS url, p.first_seen AS firstSeen, p.closed AS closed,
-            p.is_read AS isRead,
+            p.is_read AS readFlag,
             COALESCE((SELECT GROUP_CONCAT(pc.category_id ORDER BY pc.category_id SEPARATOR ',')
                 FROM posting_category pc WHERE pc.posting_id = p.id), '') AS categoryIds,
             v.id AS versionId, v.saved_at AS versionSavedAt, v.body_text AS body
@@ -103,7 +103,7 @@ interface AiPostingContextJpaRepository : JpaRepository<com.youngwoo.jobmoa.post
     @Query(value = """
         SELECT p.id AS id, p.source_id AS sourceId, p.company AS company, p.title AS title,
             p.location AS location, p.url AS url, p.first_seen AS firstSeen, p.closed AS closed,
-            p.is_read AS isRead,
+            p.is_read AS readFlag,
             COALESCE((SELECT GROUP_CONCAT(pc.category_id ORDER BY pc.category_id SEPARATOR ',')
                 FROM posting_category pc WHERE pc.posting_id = p.id), '') AS categoryIds,
             v.id AS versionId, v.saved_at AS versionSavedAt, v.body_text AS body

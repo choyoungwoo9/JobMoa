@@ -183,7 +183,7 @@ Docker 반영 전후 공고 메타데이터·버전 목록·읽음 상태·개�
 
 작업자는 선택 로컬 Kotlin 프로세스로 실행한다. Java 21 이상, Codex CLI 설치 및 `codex login`이 필요하다. `./start.sh --ai-worker`는 전체 앱과 선택 워커를 시작하고, `./ai-worker.sh status|start|stop`은 워커만 관리한다. `./stop.sh`는 워커와 Docker 앱을 함께 종료한다. 기본 `./start.sh`에는 워커가 포함되지 않으며 수집·일반 화면은 그대로 쓸 수 있다. Gradle의 `aiWorker` 실행 작업도 제공한다. 워커와 Spring 애플리케이션의 Kotlin `main()`이 별도이므로 Spring Boot `mainClass`는 `JobMoaApplicationKt`로 지정한다.
 
-Codex CLI `app-server`를 stdio JSON-RPC로 실행해 `gpt-6-luna` 임시 대화에서 답변 조각 알림(`item/agentMessage/delta`)을 받는다. 셸 도구·MCP 서버·플러그인을 끄고 읽기 전용 샌드박스·승인 생략 설정으로 실행한다. `web_search="live"` 설정으로 질문에 필요한 경우에만 외부 검색을 허용하며, 출처 URL은 HTTP(S) 주소로 검증해 저장한다. 공고 검색은 모든 수집 공고(마감 포함)의 메타데이터·직군·최신 본문을 조회하고, 키워드 점수 상위 12건의 본문 발췌(각 6,000자까지)를 작업 컨텍스트에 보관한다. 대화 요약·답변·공고/웹 출처는 MySQL에 저장하고 외부 검색 페이지 본문은 저장하지 않는다.
+Codex CLI `app-server`를 stdio JSON-RPC로 실행해 `gpt-6-luna` 임시 대화에서 답변 조각 알림(`item/agentMessage/delta`)을 받는다. 셸 도구·MCP 서버·플러그인을 끄고 읽기 전용 샌드박스·승인 생략 설정으로 실행한다. `web_search="live"` 설정으로 질문에 필요한 경우에만 외부 검색을 허용하며, 출처 URL은 HTTP(S) 주소로 검증해 저장한다. 공고 검색은 모든 수집 공고(마감 포함)의 메타데이터·직군·최신 본문을 조회하고, 키워드 점수 상위 12건의 본문 발췌(각 6,000자까지)를 작업 컨텍스트에 보관한다. 대화 요약·답변·공고/웹 출처는 MySQL에 저장하고 외부 검색 페이지 본문은 저장하지 않는다. 네이티브 공고 projection의 읽음 여부는 `readFlag` 별칭으로 매핑해 Kotlin Boolean `isRead` getter의 프로퍼티 이름 변환 문제를 피한다.
 
 AI 작업이 수행할 수 있는 상태 변경 도구는 없다. 완료된 답변에만 출처를 저장하며, 모델이 선택한 공고 ID는 작업 시점의 검색 컨텍스트와 대조한다. 2026-11-21 기능 브랜치의 격리 환경에서 실제 질문·웹 검색·답변 조각·출처 표시를 브라우저로 확인했다. 검색 도중 화면을 나가 SSE를 끊어도 작업이 완료되고, 재접속 시 저장 답변과 출처가 표시됐다. 단일 작업의 저장 이벤트는 `search` 1개, `delta` 9개, `complete` 1개였고 백엔드 오류 로그는 없었다. 실제 공고 수집은 실행하지 않았다. 백엔드는 `./gradlew compileKotlin`과 격리 Docker 이미지 빌드를 통과했다.
 

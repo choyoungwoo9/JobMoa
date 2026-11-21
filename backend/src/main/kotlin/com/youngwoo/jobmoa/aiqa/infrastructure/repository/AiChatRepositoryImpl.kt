@@ -112,7 +112,7 @@ class AiChatRepositoryImpl(
 
     private fun context(row: AiPostingContextProjection) = AiPostingContext(
         row.id, row.sourceId, row.company, row.title, row.location, row.url,
-        row.firstSeen, row.closed, row.isRead,
+        row.firstSeen, row.closed, row.readFlag,
         row.categoryIds.split(',').filter(String::isNotBlank),
         row.versionId, row.versionSavedAt, row.body.orEmpty(),
     )
