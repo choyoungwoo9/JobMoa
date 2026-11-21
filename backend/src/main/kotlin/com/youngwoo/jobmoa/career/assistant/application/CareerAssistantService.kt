@@ -32,32 +32,39 @@ class CareerAssistantService(
     fun recommend(request: CareerRecommendationRequest): CareerAssistantTaskView {
         access.writing()
         require(request.count in 1..MAX_RECOMMENDATIONS) { "추천 개수는 1~${MAX_RECOMMENDATIONS}개로 설정하세요." }
-        require(request.companyKeywords.length <= 200 && request.locationKeywords.length <= 200) { "회사·근무지 검색어는 각각 200자까지 입력할 수 있습니다." }
+        require(request.preferenceText.length <= MAX_PREFERENCE_CHARS) { "희망 조건은 ${MAX_PREFERENCE_CHARS}자까지 입력할 수 있습니다." }
+        require(request.locationKeywords.length <= 200) { "근무 지역은 200자까지 입력할 수 있습니다." }
         val knownCategories = companies.categories.map { it.id }.toSet() - "all"
         require(request.categoryIds.all { it in knownCategories }) { "지원하지 않는 직군 필터가 포함되어 있습니다." }
+        val knownCompanies = companies.list().associateBy { it.id }
+        require(request.companyIds.all { it in knownCompanies }) { "지원하지 않는 회사 필터가 포함되어 있습니다." }
 
         val allFacts = materials.verifiedFacts().filter { it.status == CareerFactStatus.VERIFIED }
         require(allFacts.isNotEmpty()) { "경력 자료에서 사실 후보를 먼저 확인·확정하세요." }
         val factContexts = allFacts.take(MAX_FACTS).map(::factPrompt)
         val categoryLabels = companies.categories.associate { it.id to it.name }
-        val companyTerms = splitTerms(request.companyKeywords)
+        val selectedCompanyNames = request.companyIds.mapNotNull { knownCompanies[it]?.name }.sorted()
+        val selectedCategoryNames = request.categoryIds.mapNotNull(categoryLabels::get).sorted()
         val locationTerms = splitTerms(request.locationKeywords)
         val eligible = postings.list().asSequence()
             .filterNot { it.closed }
             .filter { request.categoryIds.isEmpty() || it.categories.any(request.categoryIds::contains) }
-            .filter { companyTerms.isEmpty() || companyTerms.any { term -> it.company.contains(term, ignoreCase = true) } }
+            .filter { request.companyIds.isEmpty() || request.companyIds.any { companyId -> companies.matches(companyId, it.company, it.url) } }
             .filter { locationTerms.isEmpty() || locationTerms.any { term -> it.location.contains(term, ignoreCase = true) } }
             .toList()
-        require(eligible.isNotEmpty()) { "선택한 조건에 맞는 진행 중 공고가 없습니다." }
+        require(eligible.isNotEmpty()) { "선택한 직군·회사·지역에 맞는 열린 공고가 없습니다." }
 
         val versions = postings.latestVersions(eligible.map { it.id }.distinct()).associateBy { it.postingId }
         val profileTokens = allFacts.flatMap { tokens("${it.title} ${it.summary}") }.toSet()
+        val preferenceTokens = rankingPreferenceTokens(request.preferenceText)
         val ranked = eligible.mapNotNull { posting ->
             val version = versions[posting.id] ?: return@mapNotNull null
             val categoryText = posting.categories.mapNotNull(categoryLabels::get).joinToString(" ")
-            val titleTokens = tokens("${posting.title} $categoryText").toSet()
+            val metadataTokens = tokens("${posting.company} ${posting.title} ${posting.location} $categoryText").toSet()
             val bodyTokens = tokens(version.bodyText).toSet()
-            val score = titleTokens.intersect(profileTokens).size * 4 + bodyTokens.intersect(profileTokens).size
+            val careerScore = metadataTokens.intersect(profileTokens).size * 4 + bodyTokens.intersect(profileTokens).size
+            val preferenceScore = metadataTokens.intersect(preferenceTokens).size * 6 + bodyTokens.intersect(preferenceTokens).size
+            val score = careerScore + preferenceScore
             RankedPosting(posting, version.bodyText, score)
         }.sortedWith(compareByDescending<RankedPosting> { it.score }.thenByDescending { it.posting.firstSeen })
         require(ranked.isNotEmpty()) { "본문 버전이 저장된 진행 중 공고가 없습니다." }
@@ -77,9 +84,11 @@ class CareerAssistantService(
         val input = mapOf(
             "taskType" to CareerAssistantTaskType.RECOMMENDATIONS.name,
             "count" to request.count,
-            "filters" to mapOf(
-                "categoryIds" to request.categoryIds.toList().sorted(),
-                "companyKeywords" to request.companyKeywords.trim(),
+            "preferenceText" to request.preferenceText.trim(),
+            "criteria" to mapOf(
+                "preferenceText" to request.preferenceText.trim(),
+                "categoryNames" to selectedCategoryNames,
+                "companyNames" to selectedCompanyNames,
                 "locationKeywords" to request.locationKeywords.trim(),
             ),
             "verifiedFactCount" to allFacts.size,
@@ -223,6 +232,13 @@ class CareerAssistantService(
 
     private fun normalizeRecommendations(task: CareerAssistantTask, raw: JsonNode): CareerRecommendationResult {
         val request = mapper.readTree(task.requestJson)
+        val criteriaNode = request["criteria"]
+        val criteria = CareerRecommendationCriteria(
+            preferenceText = criteriaNode?.get("preferenceText")?.takeIf { it.isString }?.asString().orEmpty(),
+            categoryNames = criteriaNode?.get("categoryNames")?.values()?.map { it.asString() }.orEmpty(),
+            companyNames = criteriaNode?.get("companyNames")?.values()?.map { it.asString() }.orEmpty(),
+            locationKeywords = criteriaNode?.get("locationKeywords")?.takeIf { it.isString }?.asString().orEmpty(),
+        )
         val facts = factViews(request["facts"])
         val candidates = request["postings"]?.values()?.mapNotNull(::postingFromNode)
             ?.associateBy { it.id }.orEmpty()
@@ -248,7 +264,11 @@ class CareerAssistantService(
                 evidence = evidence,
             )
         }.take(limit)
-        return CareerRecommendationResult(items)
+        val preferenceSummary = draft.preferenceSummary.trim().take(400).ifBlank {
+            if (criteria.preferenceText.isBlank()) "추가 희망 조건 없이 확정 경력과 선택한 상세 조건을 기준으로 비교했어요."
+            else "입력한 희망 조건과 확정 경력 정보를 함께 고려했어요."
+        }
+        return CareerRecommendationResult(criteria, preferenceSummary, items)
     }
 
     private fun normalizeDraft(task: CareerAssistantTask, raw: JsonNode): CareerPostingDraftResult {
@@ -361,6 +381,12 @@ class CareerAssistantService(
 
     private fun splitTerms(value: String) = value.split(',', '，', ';', '；').map(String::trim).filter(String::isNotBlank).distinct()
 
+    private fun rankingPreferenceTokens(value: String): Set<String> {
+        val positiveClauses = value.split(Regex("[\\n.!?;]+"))
+            .filterNot { NEGATIVE_PREFERENCE_MARKERS.containsMatchIn(it) }
+        return tokens(positiveClauses.joinToString(" ")).toSet()
+    }
+
     private fun tokens(value: String): List<String> {
         val stop = setOf("경험", "업무", "담당", "개발", "기반", "서비스", "기술", "프로젝트", "관련", "통해", "위한", "그리고", "the", "and", "with", "for", "from", "your", "you")
         return Regex("[A-Za-z][A-Za-z0-9+#.]{1,}|[가-힣]{2,}")
@@ -382,19 +408,22 @@ class CareerAssistantService(
 
     companion object {
         private const val MAX_RECOMMENDATIONS = 20
+        private const val MAX_PREFERENCE_CHARS = 1200
         private const val MAX_FACTS = 80
         private const val MAX_CANDIDATES = 36
         private const val MAX_RECOMMENDATION_BODY_CHARS = 3600
         private const val MAX_DRAFT_BODY_CHARS = 18_000
         private const val MAX_RECENT_TASKS = 20
+        private val NEGATIVE_PREFERENCE_MARKERS = Regex("제외|빼고|말고|피하|원하지\\s*않|선호하지\\s*않|싫")
         private val TASK_LEASE = Duration.ofMinutes(10)
     }
 }
 
 data class CareerRecommendationRequest(
     val count: Int = 10,
+    val preferenceText: String = "",
     val categoryIds: Set<String> = emptySet(),
-    val companyKeywords: String = "",
+    val companyIds: Set<String> = emptySet(),
     val locationKeywords: String = "",
 )
 

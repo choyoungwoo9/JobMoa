@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { api } from '../api'
-import type { Category } from '../types'
+import type { Category, Company } from '../types'
 import './CareerAssistant.css'
 
 type TaskStatus = 'WAITING_AI' | 'ANALYZING' | 'COMPLETED' | 'FAILED'
@@ -18,7 +18,17 @@ interface Recommendation {
   gaps: string[]
   evidence: FactView[]
 }
-interface RecommendationResult { recommendations: Recommendation[] }
+interface RecommendationCriteria {
+  preferenceText?: string
+  categoryNames?: string[]
+  companyNames?: string[]
+  locationKeywords?: string
+}
+interface RecommendationResult {
+  criteria?: RecommendationCriteria
+  preferenceSummary?: string
+  recommendations: Recommendation[]
+}
 interface DraftSection { heading: string; content: string; evidence: FactView[] }
 interface PortfolioProject { title: string; selectionReason: string; summary: string; evidence: FactView[] }
 interface PostingDraft {
@@ -48,11 +58,11 @@ interface TaskView {
   candidatesTruncated: boolean
 }
 interface Readiness { verifiedFactCount: number; openPostingCount: number }
-interface Preferences { count: number; categoryIds: string[]; companyKeywords: string; locationKeywords: string }
+interface Preferences { count: number; preferenceText: string; categoryIds: string[]; companyIds: string[]; locationKeywords: string }
 
 const STORAGE_KEY = 'jobmoa.career-assistant.preferences.v1'
 const SELECTED_RECOMMENDATION_KEY = 'jobmoa.career-assistant.selected-recommendation.v1'
-const DEFAULT_PREFERENCES: Preferences = { count: 10, categoryIds: [], companyKeywords: '', locationKeywords: '' }
+const DEFAULT_PREFERENCES: Preferences = { count: 10, preferenceText: '', categoryIds: [], companyIds: [], locationKeywords: '' }
 const FIT_LABEL: Record<Recommendation['fit'], string> = {
   STRONG_MATCH: '잘 맞음', POTENTIAL: '검토해볼 만함', INSUFFICIENT_INFO: '자료가 부족함',
 }
@@ -60,27 +70,43 @@ const TASK_LABEL: Record<TaskStatus, string> = {
   WAITING_AI: '분석 대기', ANALYZING: '분석 중', COMPLETED: '완료', FAILED: '실패',
 }
 
-function loadPreferences(): Preferences {
+function loadPreferences(categories: Category[], companies: Company[]): Preferences {
   try {
-    const value = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as Partial<Preferences>
+    const value = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as Partial<Preferences> & { companyKeywords?: unknown }
+    const legacyCompanyTerms = typeof value.companyKeywords === 'string'
+      ? value.companyKeywords.split(/[,，;；]/).map(term => term.trim()).filter(Boolean)
+      : []
+    const legacyCompanyIds = legacyCompanyTerms.flatMap(term =>
+      companies.filter(company => company.name.toLocaleLowerCase().includes(term.toLocaleLowerCase())).map(company => company.id),
+    )
+    const unrecognizedLegacyCompanies = legacyCompanyTerms.filter(term =>
+      !companies.some(company => company.name.toLocaleLowerCase().includes(term.toLocaleLowerCase())),
+    )
+    const legacyPreferenceText = unrecognizedLegacyCompanies.length
+      ? `관심 기업: ${unrecognizedLegacyCompanies.join(', ')}`
+      : ''
     return {
       count: [5, 10, 15, 20].includes(value.count ?? 0) ? value.count! : DEFAULT_PREFERENCES.count,
-      categoryIds: Array.isArray(value.categoryIds) ? value.categoryIds.filter(id => typeof id === 'string') : [],
-      companyKeywords: typeof value.companyKeywords === 'string' ? value.companyKeywords : '',
+      preferenceText: [typeof value.preferenceText === 'string' ? value.preferenceText : '', legacyPreferenceText].filter(Boolean).join('\n'),
+      categoryIds: Array.isArray(value.categoryIds) ? value.categoryIds.filter(id => typeof id === 'string' && categories.some(category => category.id === id && id !== 'all')) : [],
+      companyIds: Array.isArray(value.companyIds)
+        ? value.companyIds.filter(id => typeof id === 'string' && companies.some(company => company.id === id))
+        : legacyCompanyIds,
       locationKeywords: typeof value.locationKeywords === 'string' ? value.locationKeywords : '',
     }
   } catch { return DEFAULT_PREFERENCES }
 }
 
 export function CareerAssistant({
-  categories, workerConnected, onBackToMaterials, onOpenPosting,
+  categories, companies, workerConnected, onBackToMaterials, onOpenPosting,
 }: {
   categories: Category[]
+  companies: Company[]
   workerConnected: boolean
   onBackToMaterials: () => void
   onOpenPosting: (postingId: number) => void
 }) {
-  const [preferences, setPreferences] = useState<Preferences>(loadPreferences)
+  const [preferences, setPreferences] = useState<Preferences>(() => loadPreferences(categories, companies))
   const [readiness, setReadiness] = useState<Readiness | null>(null)
   const [recommendations, setRecommendations] = useState<TaskView[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(() => localStorage.getItem(SELECTED_RECOMMENDATION_KEY))
@@ -146,8 +172,9 @@ export function CareerAssistant({
         method: 'POST',
         body: JSON.stringify({
           count: preferences.count,
+          preferenceText: preferences.preferenceText,
           categoryIds: preferences.categoryIds,
-          companyKeywords: preferences.companyKeywords,
+          companyIds: preferences.companyIds,
           locationKeywords: preferences.locationKeywords,
         }),
       })
@@ -196,6 +223,8 @@ export function CareerAssistant({
   const selected = recommendations.find(task => task.id === selectedId) ?? null
   const result = selected?.status === 'COMPLETED' ? selected.result as RecommendationResult | null : null
   const roleCategories = categories.filter(category => category.id !== 'all')
+  const selectedCategoryNames = roleCategories.filter(category => preferences.categoryIds.includes(category.id)).map(category => category.name)
+  const selectedCompanyNames = companies.filter(company => preferences.companyIds.includes(company.id)).map(company => company.name)
 
   return <section className="career-assistant" aria-label="추천 공고와 맞춤 이력서·포트폴리오">
     {error && <div className="career-alert" role="alert">{error}</div>}
@@ -209,14 +238,25 @@ export function CareerAssistant({
         <div className="career-plan-heading"><div><span className="career-plan-eyebrow">추천 기준</span><h2>다음에 지원할 곳을 찾아볼까요?</h2><p>{readiness?.verifiedFactCount ?? '—'}개의 확정 경력 정보와 현재 {readiness?.openPostingCount ?? '—'}개의 열린 공고를 바탕으로 추천해요.</p></div>
           <label className="career-count">추천 개수<select value={preferences.count} onChange={event => changePreferences({ count: Number(event.target.value) })}>{[5, 10, 15, 20].map(count => <option key={count} value={count}>{count}개</option>)}</select></label>
         </div>
-        <fieldset className="career-category-filters"><legend>희망 직군 <span>비우면 전체 직군에서 찾아요</span></legend>
-          <button type="button" className={`career-all-categories ${preferences.categoryIds.length === 0 ? 'active' : ''}`} onClick={() => changePreferences({ categoryIds: [] })}>전체 직군</button>
-          <div>{roleCategories.map(category => <label key={category.id}><input type="checkbox" checked={preferences.categoryIds.includes(category.id)} onChange={event => changePreferences({ categoryIds: event.target.checked ? [...new Set([...preferences.categoryIds, category.id])] : preferences.categoryIds.filter(id => id !== category.id) })} />{category.name}</label>)}</div>
-        </fieldset>
-        <div className="career-keyword-filters">
-          <label>관심 기업<input value={preferences.companyKeywords} maxLength={200} placeholder="예: 토스, 카카오 (쉼표로 구분)" onChange={event => changePreferences({ companyKeywords: event.target.value })} /></label>
-          <label>근무지<input value={preferences.locationKeywords} maxLength={200} placeholder="예: 서울, 판교 (쉼표로 구분)" onChange={event => changePreferences({ locationKeywords: event.target.value })} /></label>
-        </div>
+        <label className="career-preference-field" htmlFor="career-preference-text">
+          <span>희망하는 방향 <small>선택 사항</small></span>
+          <textarea id="career-preference-text" value={preferences.preferenceText} maxLength={1200} rows={3}
+            placeholder="예: 서울이나 수도권의 핀테크·커머스 백엔드 직무를 우선 보고 싶어. 재택근무가 가능하면 더 좋아."
+            onChange={event => changePreferences({ preferenceText: event.target.value })} />
+          <small className="career-preference-help">비워두면 확정한 경력 정보로 열린 공고 전체를 살펴봐요. 선호 조건은 편하게 문장으로 적어주세요.</small>
+        </label>
+        <details className="career-advanced-settings">
+          <summary><span>상세 조건</span><small>{selectedCategoryNames.length + selectedCompanyNames.length + (preferences.locationKeywords.trim() ? 1 : 0) > 0
+            ? [selectedCategoryNames.length ? `직군 ${selectedCategoryNames.length}` : '', selectedCompanyNames.length ? `회사 ${selectedCompanyNames.length}` : '', preferences.locationKeywords.trim() ? `지역 ${preferences.locationKeywords.trim()}` : ''].filter(Boolean).join(' · ')
+            : '직군·회사 자동완성, 지역으로 범위를 좁혀요'}</small></summary>
+          <div className="career-advanced-grid">
+            <CareerMultiAutocomplete label="직군" placeholder="직군을 입력해 찾아보세요" options={roleCategories.map(category => ({ id: category.id, label: category.name }))}
+              value={preferences.categoryIds} onChange={categoryIds => changePreferences({ categoryIds })} />
+            <CareerMultiAutocomplete label="회사" placeholder="회사를 입력해 찾아보세요" options={companies.map(company => ({ id: company.id, label: company.name }))}
+              value={preferences.companyIds} onChange={companyIds => changePreferences({ companyIds })} />
+            <label className="career-location-filter">지역<input value={preferences.locationKeywords} maxLength={200} placeholder="예: 서울, 판교" onChange={event => changePreferences({ locationKeywords: event.target.value })} /><small>여러 지역은 쉼표로 구분해요.</small></label>
+          </div>
+        </details>
         <div className="career-plan-actions"><p>마감 공고는 제외해요. 추천은 ‘잘 맞음 / 검토해볼 만함 / 자료가 부족함’으로 보여주고, 이유와 경력 근거를 함께 붙입니다.</p>
           <button className="button primary" disabled={busy || !readiness || readiness.verifiedFactCount === 0 || readiness.openPostingCount === 0} onClick={() => void requestRecommendations()}>{busy ? '작업 등록 중…' : '추천 공고 찾기'}</button>
         </div>
@@ -229,11 +269,86 @@ export function CareerAssistant({
         </header>
         {selected && selected.status !== 'COMPLETED' && <TaskStatusCard task={selected} workerConnected={workerConnected} busy={busy} onRetry={() => void retry(selected.id)} />}
         {selected?.factsTruncated && <p className="career-context-note">확정된 경력 정보 {selected.verifiedFactCount}개 중 최근 80개를 추천에 사용했어요.</p>}
-        {selected?.candidatesTruncated && <p className="career-context-note">본문이 저장된 조건 일치 공고 {selected.candidateCount}개 중 경력과 제목·본문의 연관도가 높은 최대 36개를 비교했어요.</p>}
-        {result && (result.recommendations.length ? <div className="career-recommendation-list">{result.recommendations.map(item => <RecommendationCard key={item.posting.id} item={item} recommendationId={selected?.id ?? ''} draft={drafts.find(task => task.postingId === item.posting.id) ?? null} busy={busy} copiedId={copiedId} workerConnected={workerConnected} onOpenPosting={onOpenPosting} onCreateDraft={createDraft} onRetry={retry} onCopy={copyDraft} />)}</div> : <div className="career-plan-empty"><strong>근거를 들어 추천할 공고가 없어요.</strong><span>다른 직군·기업·근무지 조건을 선택해 다시 찾아보세요.</span></div>)}
+        {selected?.candidatesTruncated && <p className="career-context-note">본문이 저장된 열린 공고 {selected.candidateCount}개 중 경력과 입력 조건의 연관도가 높은 최대 36개를 비교했어요.</p>}
+        {result && <div className="career-preference-interpretation">
+          <div><strong>적용한 조건</strong><span>{[
+            result.criteria?.preferenceText ? `희망: ${result.criteria.preferenceText}` : '',
+            result.criteria?.categoryNames?.length ? `직군: ${result.criteria.categoryNames.join(', ')}` : '',
+            result.criteria?.companyNames?.length ? `회사: ${result.criteria.companyNames.join(', ')}` : '',
+            result.criteria?.locationKeywords ? `지역: ${result.criteria.locationKeywords}` : '',
+          ].filter(Boolean).join(' · ') || '별도 조건 없이 확정 경력과 열린 공고를 비교했어요.'}</span></div>
+          {result.preferenceSummary && <div><strong>AI가 이해한 방향</strong><span>{result.preferenceSummary}</span></div>}
+        </div>}
+        {result && (result.recommendations.length ? <div className="career-recommendation-list">{result.recommendations.map(item => <RecommendationCard key={item.posting.id} item={item} recommendationId={selected?.id ?? ''} draft={drafts.find(task => task.postingId === item.posting.id) ?? null} busy={busy} copiedId={copiedId} workerConnected={workerConnected} onOpenPosting={onOpenPosting} onCreateDraft={createDraft} onRetry={retry} onCopy={copyDraft} />)}</div> : <div className="career-plan-empty"><strong>근거를 들어 추천할 공고가 없어요.</strong><span>희망하는 방향이나 상세 조건을 바꿔 다시 찾아보세요.</span></div>)}
       </section>}
     </>}
   </section>
+}
+
+interface AutocompleteOption { id: string; label: string }
+
+function CareerMultiAutocomplete({ label, placeholder, options, value, onChange }: {
+  label: string
+  placeholder: string
+  options: AutocompleteOption[]
+  value: string[]
+  onChange: (value: string[]) => void
+}) {
+  const id = useId().replaceAll(':', '')
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(0)
+  const normalizedQuery = query.trim().toLocaleLowerCase()
+  const suggestions = options
+    .filter(option => !value.includes(option.id) && (!normalizedQuery || option.label.toLocaleLowerCase().includes(normalizedQuery)))
+    .slice(0, 8)
+  const selected = value.map(id => options.find(option => option.id === id)).filter((option): option is AutocompleteOption => !!option)
+
+  const add = (option: AutocompleteOption) => {
+    if (!value.includes(option.id)) onChange([...value, option.id])
+    setQuery('')
+    setOpen(true)
+    setActiveIndex(0)
+    inputRef.current?.focus()
+  }
+
+  const remove = (idToRemove: string) => onChange(value.filter(id => id !== idToRemove))
+
+  return <div className="career-autocomplete-field">
+    <label htmlFor={`${id}-input`}>{label}</label>
+    <div className="career-autocomplete-control">
+      <input ref={inputRef} id={`${id}-input`} value={query} placeholder={placeholder}
+        role="combobox" aria-autocomplete="list" aria-expanded={open && suggestions.length > 0}
+        aria-controls={`${id}-listbox`} aria-activedescendant={open && suggestions[activeIndex] ? `${id}-option-${activeIndex}` : undefined}
+        onFocus={() => { setOpen(true); setActiveIndex(0) }}
+        onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+        onChange={event => { setQuery(event.target.value); setOpen(true); setActiveIndex(0) }}
+        onKeyDown={event => {
+          if (event.key === 'ArrowDown' && suggestions.length) {
+            event.preventDefault(); setOpen(true); setActiveIndex(index => Math.min(index + 1, suggestions.length - 1))
+          } else if (event.key === 'ArrowUp' && suggestions.length) {
+            event.preventDefault(); setActiveIndex(index => Math.max(index - 1, 0))
+          } else if (event.key === 'Enter' && open && suggestions[activeIndex]) {
+            event.preventDefault(); add(suggestions[activeIndex])
+          } else if (event.key === 'Escape') {
+            setOpen(false)
+          } else if (event.key === 'Backspace' && !query && value.length) {
+            remove(value[value.length - 1])
+          }
+        }} />
+      {open && suggestions.length > 0 && <ul id={`${id}-listbox`} className="career-autocomplete-options" role="listbox" aria-label={`${label} 추천 목록`}>
+        {suggestions.map((option, index) => <li key={option.id} id={`${id}-option-${index}`} role="option" aria-selected={index === activeIndex}
+          className={index === activeIndex ? 'active' : ''} onMouseDown={event => event.preventDefault()} onClick={() => add(option)}>
+          {option.label}
+        </li>)}
+      </ul>}
+      {open && normalizedQuery && suggestions.length === 0 && <div className="career-autocomplete-empty" role="status">일치하는 {label}이 없어요.</div>}
+    </div>
+    {selected.length > 0 && <div className="career-autocomplete-selected" aria-label={`선택한 ${label}`}>
+      {selected.map(option => <span key={option.id}>{option.label}<button type="button" aria-label={`${option.label} ${label} 선택 취소`} onClick={() => remove(option.id)}>×</button></span>)}
+    </div>}
+  </div>
 }
 
 function TaskStatusCard({ task, workerConnected, busy, onRetry }: { task: TaskView; workerConnected: boolean; busy: boolean; onRetry: () => void }) {

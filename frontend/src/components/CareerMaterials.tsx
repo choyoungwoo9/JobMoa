@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api'
-import type { Category } from '../types'
+import type { Category, Company } from '../types'
 import { Icon } from './Icon'
 import { CareerAssistant } from './CareerAssistant'
 import './CareerMaterials.css'
@@ -39,7 +39,7 @@ const kindLabel: Record<CareerFact['kind'], string> = {
 }
 const factStatusLabel: Record<CareerFact['status'], string> = { UNVERIFIED: '확인 전', VERIFIED: '확정', REJECTED: '제외' }
 
-export function CareerMaterials({ demo, categories, tab, onTabChange, onOpenPosting }: { demo: boolean; categories: Category[]; tab: 'materials' | 'assistant'; onTabChange: (tab: 'materials' | 'assistant') => void; onOpenPosting: (postingId: number) => void }) {
+export function CareerMaterials({ demo, categories, companies, tab, onTabChange, onOpenPosting }: { demo: boolean; categories: Category[]; companies: Company[]; tab: 'materials' | 'assistant'; onTabChange: (tab: 'materials' | 'assistant') => void; onOpenPosting: (postingId: number) => void }) {
   const [items, setItems] = useState<MaterialSummary[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [detail, setDetail] = useState<MaterialDetail | null>(null)
@@ -148,7 +148,7 @@ export function CareerMaterials({ demo, categories, tab, onTabChange, onOpenPost
         <button className={tab === 'materials' ? 'active' : ''} aria-current={tab === 'materials' ? 'page' : undefined} onClick={() => onTabChange('materials')}>자료 확인 · 등록</button>
         <button className={tab === 'assistant' ? 'active' : ''} aria-current={tab === 'assistant' ? 'page' : undefined} onClick={() => onTabChange('assistant')}>추천 · 맞춤 이력서</button>
       </nav>
-      {tab === 'assistant' ? <CareerAssistant categories={categories} workerConnected={worker?.connected ?? false} onBackToMaterials={() => onTabChange('materials')} onOpenPosting={onOpenPosting} /> : <>
+      {tab === 'assistant' ? <CareerAssistant categories={categories} companies={companies} workerConnected={worker?.connected ?? false} onBackToMaterials={() => onTabChange('materials')} onOpenPosting={onOpenPosting} /> : <>
       <div className="career-toolbar">
         <div><strong>{items.length}개 자료</strong><span> 형식은 자동 판별하고, 같은 파일은 중복 저장하지 않아요.</span></div>
         <button className="button primary" disabled={busy} onClick={() => fileInput.current?.click()}><Icon name="plus" size={17} />{busy ? '파일 처리 중' : '파일 추가'}</button>

@@ -32,7 +32,10 @@ data class CareerRecommendationProposal(
     val verifiedFactIds: List<String> = emptyList(),
 )
 
-data class CareerRecommendationProposalResult(val recommendations: List<CareerRecommendationProposal> = emptyList())
+data class CareerRecommendationProposalResult(
+    val preferenceSummary: String = "",
+    val recommendations: List<CareerRecommendationProposal> = emptyList(),
+)
 
 data class CareerDraftSectionProposal(
     val heading: String,
@@ -79,7 +82,18 @@ data class CareerRecommendationItem(
     val evidence: List<CareerFactView>,
 )
 
-data class CareerRecommendationResult(val recommendations: List<CareerRecommendationItem>)
+data class CareerRecommendationCriteria(
+    val preferenceText: String,
+    val categoryNames: List<String>,
+    val companyNames: List<String>,
+    val locationKeywords: String,
+)
+
+data class CareerRecommendationResult(
+    val criteria: CareerRecommendationCriteria,
+    val preferenceSummary: String,
+    val recommendations: List<CareerRecommendationItem>,
+)
 
 data class CareerDraftSection(
     val heading: String,
