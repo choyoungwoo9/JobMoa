@@ -44,7 +44,7 @@ MySQL 격리 수준은 `READ_COMMITTED`입니다. 여러 작업자가 서로 다
 | POST | `/api/collections` | `{ "sourceIds": ["kakao"], "categoryId": "web-backend", "companyIds": ["kakaostyle"] }` |
 | POST | `/api/collections/{id}/retry` | `{ "failureIds": ["..."] }`, 생략 시 미해결 실패 전체 |
 
-수집기는 8개 사이트·기업군별로 구현되어 있습니다. 사이트 어댑터가 공식 직군 등으로 후보를 추리고, `CategoryClassifier`가 회사 × 분야별 제목과 본문 근거를 확인합니다. 공통 실행부에는 개발 직군 키워드 필터가 없습니다.
+수집기는 8개 사이트·기업군별로 구현되어 있습니다. 사이트 어댑터가 공식 직군 등으로 후보를 추리고, `CategoryClassifier`가 회사 × 분야별 제목과 본문 근거를 확인합니다. 공통 실행부에는 개발 직군 키워드 필터가 없습니다. 신규 사이트 구현과 기존 크롤러 변경의 절차·문서 갱신 기준은 [크롤러 어댑터 표준](../docs/crawler-adapter-standard.md)을 따릅니다.
 
 - 네이버: 통합·클라우드·SNOW/KREAM·랩스·웹툰·파이낸셜·I&S·Z.
 - 토스: 통합 포털의 실제 계열사별 개별 포지션.
