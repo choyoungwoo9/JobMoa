@@ -62,16 +62,17 @@ export function ApplicationRequirementsPanel({ job }: { job: Job }) {
     finally { setBusy(false) }
   }
   const savedBody = job.versions[0]?.body?.trim() ?? ''
+  const hasPublicPageHistory = items.some(item => item.source === 'PUBLIC_PAGE')
   return <section className="application-requirements" aria-label="지원서 요구 정보">
     <div className="application-requirements-heading"><div><h3>지원서 요구 정보</h3><p>지원 전 필요한 서류와 문항을 공고별로 정리해요.</p></div><span>{items.length}건</span></div>
     <label className="application-requirements-input-label" htmlFor="application-requirements-text">공고의 지원 안내 또는 지원서 문항 붙여넣기</label>
     <textarea id="application-requirements-text" value={rawText} onChange={event => setRawText(event.target.value)} placeholder="지원서에 표시된 빈 문항과 제출 안내를 복사해 붙여넣으세요. 개인정보나 작성한 답변은 넣지 않아도 돼요." rows={5} maxLength={100000} />
     <div className="application-requirements-actions"><span>{rawText.length.toLocaleString()} / 100,000자</span><button className="button primary" disabled={busy || rawText.trim().length < 20} onClick={() => void submit(rawText, 'USER_PASTED')}>AI로 문항 분석</button></div>
     <div className="application-requirements-actions application-secondary-actions">
-      <button className="button secondary" disabled={busy} onClick={() => void collectPublicPage()}>공개 지원 페이지 자동 확인</button>
+      <button className="button secondary" disabled={busy} onClick={() => void collectPublicPage()}>{hasPublicPageHistory ? '공개 지원 페이지 다시 확인' : '공개 지원 페이지 지금 확인'}</button>
       {savedBody.length >= 20 && <button className="text-button application-body-analysis" disabled={busy} onClick={() => void submit(savedBody, 'POSTING_BODY')}>저장된 공고 본문으로 분석</button>}
     </div>
-    <p className="application-requirements-note">공개된 지원 링크만 열어 텍스트를 읽어요. 로그인 화면은 건너뛰고, 쿠키 동의·폼 입력·지원 제출은 하지 않아요. 자동 확인이나 AI 분석을 요청하면 원문이 Codex 서비스로 전달돼요. 개인정보나 작성한 답변은 넣지 마세요. 크롤러 또는 Codex 워커가 꺼져 있으면 작업은 대기해요.</p>
+    <p className="application-requirements-note">공고를 수집하면 지원 페이지 확인 이력이 없는 열린 공고와 내용이 바뀐 공고의 공개 지원 페이지도 자동으로 확인해요. 여기서 다시 확인할 수도 있어요. 공개된 지원 링크만 열어 텍스트를 읽고, 로그인 화면은 건너뛰며 쿠키 동의·폼 입력·지원 제출은 하지 않아요. 자동 확인이나 AI 분석을 요청하면 원문이 Codex 서비스로 전달돼요. 개인정보나 작성한 답변은 넣지 마세요. 크롤러 또는 Codex 워커가 꺼져 있으면 작업은 대기해요.</p>
     {error && <p className="application-requirements-error" role="alert">{error}</p>}
     {loading ? <p className="application-requirements-empty">지원서 정보를 불러오는 중이에요.</p> : items.length === 0 ? <p className="application-requirements-empty">아직 정리된 지원서 정보가 없어요.</p> : <div className="application-requirements-list">{items.map(item => <article className="application-requirement-card" key={item.id}>
       <header><span className={`application-requirement-status ${item.status.toLowerCase()}`}>{statusLabel[item.status]}</span><div className="application-requirement-meta">{item.sourceUrl && item.source === 'PUBLIC_PAGE' && <a href={item.sourceUrl} target="_blank" rel="noreferrer">확인한 공개 페이지</a>}<time>{new Date(item.createdAt).toLocaleString('ko-KR')}</time></div></header>

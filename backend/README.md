@@ -152,7 +152,11 @@ V13 `posting_application_requirement`는 공고에 종속된 원문·분석 이�
 
 공개 지원 페이지 확인은 `CrawlerRuntime`의 기존 Playwright 작업자에서 공고 단위 큐로 처리하며 `/api/application-requirements/public-page` 등록 즉시 `WAITING_PUBLIC` 이력을 만든다. 빈 작업자가 해당 항목을 `FETCHING_PUBLIC`으로 임대하고, URL 호스트별 활성 페이지 제한 및 요청 간격을 적용한다. 렌더링 후 지원 문구가 있는 공개 앵커 링크만 최대 5개 확인한다. 로그인/계정/동의 페이지 조작, 버튼 클릭, 입력, 업로드, 제출은 없다. 사용자 로그인 쿠키가 없는 새 컨텍스트이며 HTTPS와 공개 IP만 허용하고 redirect·하위 요청의 사설/로컬 주소를 막는다. 원문이 발견되면 `WAITING_AI`로 바뀌고, 크롤러 작업자가 꺼져 있으면 `WAITING_PUBLIC`에 남는다. 네트워크·접근 제한·지원 링크 탐지 실패는 해당 이력에 오류를 저장하고 재시도할 수 있다.
 
+`TaskService.finish()`는 열린 공고 저장이 끝나면 공개 페이지 확인 이력을 검사한다. 해당 공고의 공개 페이지 이력이 없으면 `WAITING_PUBLIC` 작업을 자동 등록하며, 내용 변경(`CHANGED`) 때는 새 이력을 등록한다. 동일(`IDENTICAL`) 공고는 이미 공개 페이지 이력이 있으면 재방문하지 않는다. 실패 이력은 자동 재시도 대상으로 삼지 않는다. 첫 적용 뒤 다음 수집에서는 선택 범위 내 미확인 기존 공고도 작업 대상이 될 수 있으므로 회사·직군을 좁혀 실행할 수 있다. 이 큐는 공고 캡처 큐와 작업자·사이트 제한을 공유하지만 수집 실행의 완료·진행 건수와는 별도로 동작한다.
+
 Codex 작업자는 `/api/application-requirements/worker/tasks/**`, `/api/career-materials/worker/tasks/**`, `/api/ai/worker/tasks/**`를 순환 조회한다. 지원서 텍스트 분석은 웹 검색을 비활성화한다. 각 단계의 임대 만료 시 해당 건을 다시 claim할 수 있다. 공개 페이지 원문과 붙여넣은 텍스트 모두 AI 분석 시 Codex 서비스로 전달된다.
+
+2026-11-22 확인: `./gradlew compileKotlin`과 Docker 재빌드·백엔드 health check를 통과했다. 실제 공고 수집 버튼은 누르지 않았으며 공개 지원 페이지의 회사별 접근·문항 추출 성공은 아직 검증하지 않았다.
 
 ## 경력 자료와 Codex 분석
 

@@ -45,15 +45,32 @@ class ApplicationRequirementService(
     fun collectPublicPage(postingId: Long): ApplicationRequirementView {
         access.writing()
         val posting = postings.requirePosting(postingId)
+        return queuePublicPage(posting)
+    }
+
+    private fun queuePublicPage(posting: com.youngwoo.jobmoa.posting.domain.model.Posting): ApplicationRequirementView {
         PostingUrl.normalize(posting.url)
-        requirements.findByPosting(postingId).firstOrNull { it.source == RequirementSource.PUBLIC_PAGE &&
+        requirements.findByPosting(posting.id).firstOrNull { it.source == RequirementSource.PUBLIC_PAGE &&
             it.status in setOf(RequirementStatus.WAITING_PUBLIC, RequirementStatus.FETCHING_PUBLIC, RequirementStatus.WAITING_AI, RequirementStatus.ANALYZING) }
             ?.let { return view(it) }
         val now = Instant.now()
-        val requirement = ApplicationRequirement(UUID.randomUUID().toString(), postingId, RequirementSource.PUBLIC_PAGE,
+        val requirement = ApplicationRequirement(UUID.randomUUID().toString(), posting.id, RequirementSource.PUBLIC_PAGE,
             posting.url, "", null, RequirementStatus.WAITING_PUBLIC, 0, null, null, null, now, now, null)
         requirements.save(requirement)
         return view(requirement)
+    }
+
+    /** 공고 수집 완료 후 최초 자동 확인 또는 변경 공고의 새 확인 이력을 예약한다. */
+    @Transactional
+    fun collectAfterPostingCrawl(postingId: Long, contentChanged: Boolean): ApplicationRequirementView {
+        access.writing()
+        val posting = postings.requirePosting(postingId)
+        if (!contentChanged) {
+            requirements.findByPosting(postingId)
+                .firstOrNull { it.source == RequirementSource.PUBLIC_PAGE }
+                ?.let { return view(it) }
+        }
+        return queuePublicPage(posting)
     }
 
     @Transactional

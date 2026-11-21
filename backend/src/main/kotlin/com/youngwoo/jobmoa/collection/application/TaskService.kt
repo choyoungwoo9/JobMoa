@@ -2,6 +2,7 @@ package com.youngwoo.jobmoa.collection.application
 
 import com.youngwoo.jobmoa.analytics.domain.model.PostingObservation
 import com.youngwoo.jobmoa.analytics.domain.repository.ObservationRepository
+import com.youngwoo.jobmoa.applicationrequirements.application.ApplicationRequirementService
 import com.youngwoo.jobmoa.collection.domain.model.*
 import com.youngwoo.jobmoa.collection.domain.repository.CrawlTaskRepository
 import com.youngwoo.jobmoa.crawler.domain.model.*
@@ -12,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 
 @Service
-class TaskService(private val tasks: CrawlTaskRepository, private val postings: PostingRepository, private val observations: ObservationRepository, private val classifier: com.youngwoo.jobmoa.classification.domain.model.PostingClassifier, private val changes: CollectionChangeRepository, private val interests: com.youngwoo.jobmoa.interest.domain.repository.PostingInterestRepository) {
+class TaskService(private val tasks: CrawlTaskRepository, private val postings: PostingRepository, private val observations: ObservationRepository, private val classifier: com.youngwoo.jobmoa.classification.domain.model.PostingClassifier, private val changes: CollectionChangeRepository, private val interests: com.youngwoo.jobmoa.interest.domain.repository.PostingInterestRepository, private val applicationRequirements: ApplicationRequirementService) {
     @Transactional
     fun body(id: String, token: String, body: ExtractedPosting): CrawlTask {
         val task = tasks.lock(id).also { it.requireOwnership(token, Instant.now()) }
@@ -68,6 +69,7 @@ class TaskService(private val tasks: CrawlTaskRepository, private val postings: 
             sourceId = task.sourceId, company = task.company, title = task.title, location = task.location,
             url = task.url, urlHash = task.urlHash, firstSeen = task.discoveredAt, lastSeen = now,
             closed = task.closed, lastChange = "new", categories = classification.categories, classification = classification.details))
+        if (!task.closed) applicationRequirements.collectAfterPostingCrawl(posting.id, contentChanged = outcome == TaskOutcome.CHANGED)
         if (outcome != TaskOutcome.IDENTICAL) postings.saveVersion(PostingVersion(postingId = posting.id,
             taskId = task.id, contentHash = task.contentHash, bodyText = checkNotNull(task.bodyText), capturePath = task.capturePath, savedAt = now))
         changes.append(CollectionChange(task.id, task.runId, posting.id, outcome.name, interests.find(posting.id)?.starred ?: false,
