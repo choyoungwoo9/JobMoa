@@ -115,3 +115,44 @@ export interface DemoState {
   jobs: Job[]
   runs: CollectionRun[]
 }
+
+export interface AiWorkerStatus {
+  connected: boolean
+  workerId?: string | null
+  model: string
+  webSearch: boolean
+  lastSeenAt?: string | null
+}
+export type AiCitationType = 'POSTING' | 'WEB' | 'WORKSPACE'
+export interface AiCitation {
+  type: AiCitationType
+  postingId?: number | null
+  versionId?: number | null
+  company?: string | null
+  title: string
+  url?: string | null
+  reason?: string | null
+  position: number
+}
+export type AiMessageRole = 'USER' | 'ASSISTANT'
+export type AiMessageStatus = 'COMPLETE' | 'QUEUED' | 'PROCESSING' | 'FAILED'
+export interface AiMessage {
+  id: string
+  conversationId: string
+  role: AiMessageRole
+  status: AiMessageStatus
+  content: string
+  errorMessage?: string | null
+  createdAt: string
+  updatedAt: string
+  citations: AiCitation[]
+  taskId?: string | null
+  lastEventId: number
+  searchPerformed: boolean
+}
+export interface AiConversationPreview {
+  id: string
+  title: string
+  updatedAt: string
+  preview: string
+}

@@ -13,6 +13,7 @@ import { Statistics, type StatisticsScope } from './components/Statistics'
 import { InterestBoard } from './components/InterestBoard'
 import { InterestStar } from './components/InterestControls'
 import { interestOf } from './interest'
+import { AiChat } from './components/AiChat'
 import './App.css'
 
 const PAGE_SIZE = 8
@@ -22,7 +23,7 @@ function App() {
 }
 function Workspace({ collection }: { collection: ReturnType<typeof useCollection> }) {
   const { data, notice, start, retryFailures, toggleRead, markRead, running, demo, connected, error, availableSources, categories, companies, loadJob, setStarred, saveInterest } = collection
-  const [view, setView] = useState<'jobs' | 'history' | 'statistics' | 'interests' | 'my'>('jobs')
+  const [view, setView] = useState<'jobs' | 'history' | 'statistics' | 'interests' | 'ai' | 'my'>('jobs')
   const [changeScope, setChangeScope] = useState<{ ids: string[]; label: string } | null>(null)
   const [categoryId, setCategoryId] = useState('all')
   const [source, setSource] = useState<SourceId | 'all'>('all')
@@ -150,6 +151,22 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
     setSelectedJob(null)
   }
 
+  const openAiPosting = (postingId: number) => {
+    const id = String(postingId)
+    setView('jobs')
+    setChangeScope(null)
+    setCategoryId('all')
+    setSource('all')
+    setCompanyFilter(null)
+    setTab('all')
+    setQuery('')
+    setIncludeClosed(true)
+    setPage(1)
+    setBrowseQueue([id])
+    markRead(id)
+    setSelectedJob(id)
+  }
+
   return (
     <div
       className={`app-shell ${view === 'jobs' && activeJob ? 'reading-mode' : ''}`}
@@ -189,6 +206,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
             {running && <span className="live-dot" />}
           </button>
           <button className={view === 'statistics' ? 'active' : ''} onClick={() => { setSelectedJob(null); setCategoryId('all'); setSource('all'); setCompanyFilter(null); setView('statistics') }}><Icon name="chart" size={18} /><span>채용 통계</span></button>
+          <button className={view === 'ai' ? 'active' : ''} onClick={() => { setSelectedJob(null); setView('ai') }}><Icon name="spark" size={18} /><span>AI에게 질문</span></button>
           <button className={view === 'my' ? 'active' : ''} onClick={() => { setSelectedJob(null); setView('my') }}><Icon name="layers" size={18} /><span>마이페이지</span></button>
         </nav>
         <div className="source-section-heading">
@@ -248,7 +266,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
             <Icon name="layers" size={16} />
             <span>내 워크스페이스</span>
             <Icon name="chevron" size={12} />
-            <strong>{view === 'jobs' ? '공고 모아보기' : view === 'my' ? '마이페이지' : view === 'interests' ? '관심 공고' : view === 'statistics' ? '채용 통계' : '수집 기록'}</strong>
+            <strong>{view === 'jobs' ? '공고 모아보기' : view === 'my' ? '마이페이지' : view === 'interests' ? '관심 공고' : view === 'statistics' ? '채용 통계' : view === 'ai' ? 'AI에게 질문' : '수집 기록'}</strong>
           </div>
           <div className="topbar-right">
             <span className="preview-badge">
@@ -272,16 +290,16 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
                   ? source === 'all'
                     ? categoryId === 'all' ? '공고 모아보기' : `${categoryName(categoryId)} 공고`
                     : `${sourceById(source).name} 공고`
-                  : view === 'my' ? '마이페이지' : view === 'interests' ? '관심 공고' : view === 'statistics' ? '채용 통계' : '수집 기록'}
+                  : view === 'my' ? '마이페이지' : view === 'interests' ? '관심 공고' : view === 'statistics' ? '채용 통계' : view === 'ai' ? 'AI에게 질문' : '수집 기록'}
                 <span className="heading-dot">.</span>
               </h1>
               <p>
                 {view === 'jobs'
                   ? '관심 있는 회사와 직무의 채용공고를 한곳에 모아요.'
-                  : view === 'my' ? '내 데이터를 백업하고 필요한 범위만 초기화해요.' : view === 'interests' ? '지원하고 싶은 공고와 다음 할 일을 차곡차곡 관리해요.' : view === 'statistics' ? '쌓아온 공고에서 채용의 흐름을 살펴봐요.' : '언제, 어디에서, 얼마나 모았는지 확인해요.'}
+                  : view === 'my' ? '내 데이터를 백업하고 필요한 범위만 초기화해요.' : view === 'interests' ? '지원하고 싶은 공고와 다음 할 일을 차곡차곡 관리해요.' : view === 'statistics' ? '쌓아온 공고에서 채용의 흐름을 살펴봐요.' : view === 'ai' ? '전체 공고를 바탕으로 질문하고 근거를 확인해요.' : '언제, 어디에서, 얼마나 모았는지 확인해요.'}
               </p>
             </div>
-            <button
+            {view === 'jobs' && <button
               className="button primary collect-button"
               disabled={running || !connected}
               onClick={() => setCollectOpen(true)}
@@ -293,7 +311,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
               />
               {running ? '공고 수집 중' : collectionCategoryId === 'all' ? '공고 수집' : `${categoryName(categoryId)} 수집`}
               {!running && <span className="button-plus">+</span>}
-            </button>
+            </button>}
           </div>
           {error && <div className="backend-error" role="alert">{error} 연결을 자동으로 다시 확인하고 있어요.</div>}
           {view === 'jobs' ? (
@@ -808,7 +826,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
                 </span>
               </div>
             </>
-          ) : view === 'my' ? <MyPage key={data.workspaceRevision} demo={demo} running={running} /> : view === 'interests' ? <InterestBoard key={data.workspaceRevision} jobs={data.jobs} categories={categories} onStar={setStarred} onSave={saveInterest} markRead={markRead} toggleRead={toggleRead} loadJob={loadJob} onBrowse={() => changeSource('all')} /> : view === 'statistics' ? <Statistics categories={categories} companies={companies} demo={demo} onBrowse={browseStatistics} /> : (
+          ) : view === 'my' ? <MyPage key={data.workspaceRevision} demo={demo} running={running} /> : view === 'interests' ? <InterestBoard key={data.workspaceRevision} jobs={data.jobs} categories={categories} onStar={setStarred} onSave={saveInterest} markRead={markRead} toggleRead={toggleRead} loadJob={loadJob} onBrowse={() => changeSource('all')} /> : view === 'statistics' ? <Statistics categories={categories} companies={companies} demo={demo} onBrowse={browseStatistics} /> : view === 'ai' ? <AiChat demo={demo} onOpenPosting={openAiPosting} /> : (
             <section className="history-view">
               <div className="section-heading">
                 <h2>
