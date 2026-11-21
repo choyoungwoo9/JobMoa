@@ -286,11 +286,11 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
           </div>
         </header>
         <main>
-          <div className="page-heading">
+          <div className={`page-heading ${view === 'jobs' ? 'jobs-page-heading' : ''}`}>
             <div>
-              <div className="eyebrow">
+              {view !== 'jobs' && <div className="eyebrow">
                 A LITTLE CLOSER TO YOUR NEXT CHAPTER
-              </div>
+              </div>}
               <h1>
                 {view === 'jobs'
                   ? source === 'all'
@@ -299,11 +299,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
                   : view === 'my' ? '마이페이지' : view === 'interests' ? '관심 공고' : view === 'statistics' ? '채용 통계' : view === 'ai' ? 'AI에게 질문' : '수집 기록'}
                 <span className="heading-dot">.</span>
               </h1>
-              <p>
-                {view === 'jobs'
-                  ? '관심 있는 회사와 직무의 채용공고를 한곳에 모아요.'
-                  : view === 'my' ? '내 데이터를 백업하고 필요한 범위만 초기화해요.' : view === 'interests' ? '지원하고 싶은 공고와 다음 할 일을 차곡차곡 관리해요.' : view === 'statistics' ? '쌓아온 공고에서 채용의 흐름을 살펴봐요.' : view === 'ai' ? '전체 공고를 바탕으로 질문하고 근거를 확인해요.' : '언제, 어디에서, 얼마나 모았는지 확인해요.'}
-              </p>
+              {view !== 'jobs' && <p>{view === 'my' ? '내 데이터를 백업하고 필요한 범위만 초기화해요.' : view === 'interests' ? '지원하고 싶은 공고와 다음 할 일을 차곡차곡 관리해요.' : view === 'statistics' ? '쌓아온 공고에서 채용의 흐름을 살펴봐요.' : view === 'ai' ? '전체 공고를 바탕으로 질문하고 근거를 확인해요.' : '언제, 어디에서, 얼마나 모았는지 확인해요.'}</p>}
             </div>
             {view === 'jobs' && <button
               className="button primary collect-button"
@@ -323,7 +319,6 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
           {view === 'jobs' ? (
             <>
               {changeScope && <div className="stats-job-scope">{changeScope.label} · {changeScope.ids.filter(id => data.jobs.some(job => job.id === id)).length}개 공고<button className="text-button" onClick={() => { setChangeScope(null); setSelectedJob(null); setPage(1) }}>변화 요약 필터 해제</button></div>}
-              {!demo && latestRun?.finishedAt && <CollectionChanges key={latestRun.id} run={latestRun} onBrowse={browseChanges} />}
               {companyFilter && <div className="stats-job-scope">{companies.find(c => c.id === companyFilter)?.name} 공고 <button className="text-button" onClick={() => setCompanyFilter(null)}>회사 필터 해제</button></div>}
               <div className="classification-filters">
                 <div className="category-tabs" role="tablist" aria-label="공고 분류">
@@ -342,44 +337,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
                 </select>
                 <span className="classification-hint">한 공고가 여러 직군에 포함될 수 있어요.</span>
               </div>
-              <section className="overview" aria-label="공고 요약">
-                <div className="overview-intro">
-                  <span className="overview-art">
-                    <Icon name="layers" size={32} />
-                    <span className="art-dot" />
-                  </span>
-                  <div>
-                    <span className="overview-caption">
-                      나의 다음 기회를 차곡차곡
-                    </span>
-                    <p>좋은 공고, 놓치지 않도록.</p>
-                    <span className="overview-rule">
-                      선택한 직무의 공고만 · 계열사까지 함께
-                    </span>
-                  </div>
-                </div>
-                <div className="overview-stat">
-                  <span>모아둔 공고</span>
-                  <strong>
-                    {categoryJobs.length}
-                    <small>개</small>
-                  </strong>
-                </div>
-                <div className="overview-stat">
-                  <span>아직 읽지 않은 공고</span>
-                  <strong>
-                    {unread}
-                    <small>개</small>
-                  </strong>
-                </div>
-                <div className="overview-stat stat-accent">
-                  <span>이번 수집 신규</span>
-                  <strong>
-                    +{newCount}
-                    <small>개</small>
-                  </strong>
-                </div>
-              </section>
+              {!demo && latestRun?.finishedAt && <CollectionChanges key={latestRun.id} run={latestRun} onBrowse={browseChanges} compact onOpenRun={() => openRun(latestRun.id)} />}
               {latestRun &&
                 latest &&
                 (running ? (
@@ -430,7 +388,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
                       />
                     </div>
                   </section>
-                ) : (
+                ) : demo ? (
                   <button
                     className="last-collection"
                     onClick={() => openRun(latestRun.id)}
@@ -454,7 +412,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
                       <Icon name="chevron" size={12} />
                     </span>
                   </button>
-                ))}
+                ) : null)}
               <div className="browse-layout">
                 <section
                   className="jobs-section"
