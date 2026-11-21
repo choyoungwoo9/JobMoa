@@ -117,7 +117,7 @@ Flyway V6은 기존 공고의 마지막 상태를 기준점으로 보존합니�
 
 ## 개인 데이터 관리·프리셋·변화 요약 API
 
-설계와 삭제 범위는 [`docs/workspace-tools-spec.md`](../docs/workspace-tools-spec.md)를 따른다. V9는 프리셋·실행별 변화·작업공간 리비전을, V10은 한 실행의 다중 직군 범위를, V12는 경력 자료와 AI 정리 후보를 추가한다. 일반 CRUD는 Spring Data JPA를 사용하며, 전체 백업/복원과 일괄 초기화만 고정 테이블 목록의 JDBC 배치와 트랜잭션을 사용한다. FK를 끄거나 TRUNCATE하지 않는다.
+설계와 삭제 범위는 [`docs/workspace-tools-spec.md`](../docs/workspace-tools-spec.md)를 따른다. V9는 프리셋·실행별 변화·작업공간 리비전을, V10은 한 실행의 다중 직군 범위를, V12는 경력 자료와 AI 정리 후보를, V13은 공고별 지원서 요구사항 이력을 추가한다. 일반 CRUD는 Spring Data JPA를 사용하며, 전체 백업/복원과 일괄 초기화만 고정 테이블 목록의 JDBC 배치와 트랜잭션을 사용한다. FK를 끄거나 TRUNCATE하지 않는다.
 
 | API | 용도 |
 | --- | --- |
@@ -135,6 +135,25 @@ Flyway V6은 기존 공고의 마지막 상태를 기준점으로 보존합니�
 | `POST /api/workspace/backups/{token}/restore` | `{confirmation: "복원"}`, 현재 전체 데이터 교체 |
 | `DELETE /api/workspace/backups/{token}` | 미리보기 취소 및 임시 파일 삭제 |
 
+## 공고별 지원서 요구 정보
+
+V13 `posting_application_requirement`는 공고에 종속된 원문·분석 이력 테이블이다. 공고 삭제 시 FK cascade로 함께 삭제된다. `POSTING_BODY`는 저장된 공개 공고 본문, `USER_PASTED`는 사용자가 붙여넣은 빈 지원 문항/안내다. 로그인 정보와 세션을 사용하거나 지원 제출을 실행하지 않는다.
+
+| 요청 | 동작 |
+| --- | --- |
+| `GET /api/postings/{postingId}/application-requirements` | 해당 공고의 원문·분석 결과·상태 이력 최신순 조회 |
+| `POST /api/postings/{postingId}/application-requirements` | `{source, sourceUrl, rawText}` 저장 후 AI 작업 대기열 등록 |
+| `POST /api/postings/{postingId}/application-requirements/public-page` | 공개 공고 페이지에서 지원 링크·문항 텍스트를 비동기 확인한 뒤 AI 분석 등록 |
+| `POST /api/application-requirements/{id}/confirm` | 검토 상태의 결과를 사용자 확정 상태로 변경 |
+| `POST /api/application-requirements/{id}/retry` | 실패한 분석 이력을 재대기열에 등록 |
+| `/api/application-requirements/worker/tasks/**` | claim·lease 갱신·구조화 결과 완료·실패 보고 |
+
+원문은 최대 100,000자다. 출력은 제출 서류와 문항 최대 100개, confidence·안내로 정규화한다. 서버는 인용이 원문에 실제 포함되는지 확인하고, 문항 원문도 입력에 존재하는 경우만 저장한다. 필수 여부는 `REQUIRED/OPTIONAL/UNKNOWN`; 불확실한 길이 제한은 `null`로 둔다. 저장 결과는 사용자가 확인하기 전 `REVIEW`다. 재입력은 과거를 덮어쓰지 않는 새 이력이다.
+
+공개 지원 페이지 확인은 `CrawlerRuntime`의 기존 Playwright 작업자에서 공고 단위 큐로 처리하며 `/api/application-requirements/public-page` 등록 즉시 `WAITING_PUBLIC` 이력을 만든다. 빈 작업자가 해당 항목을 `FETCHING_PUBLIC`으로 임대하고, URL 호스트별 활성 페이지 제한 및 요청 간격을 적용한다. 렌더링 후 지원 문구가 있는 공개 앵커 링크만 최대 5개 확인한다. 로그인/계정/동의 페이지 조작, 버튼 클릭, 입력, 업로드, 제출은 없다. 사용자 로그인 쿠키가 없는 새 컨텍스트이며 HTTPS와 공개 IP만 허용하고 redirect·하위 요청의 사설/로컬 주소를 막는다. 원문이 발견되면 `WAITING_AI`로 바뀌고, 크롤러 작업자가 꺼져 있으면 `WAITING_PUBLIC`에 남는다. 네트워크·접근 제한·지원 링크 탐지 실패는 해당 이력에 오류를 저장하고 재시도할 수 있다.
+
+Codex 작업자는 `/api/application-requirements/worker/tasks/**`, `/api/career-materials/worker/tasks/**`, `/api/ai/worker/tasks/**`를 순환 조회한다. 지원서 텍스트 분석은 웹 검색을 비활성화한다. 각 단계의 임대 만료 시 해당 건을 다시 claim할 수 있다. 공개 페이지 원문과 붙여넣은 텍스트 모두 AI 분석 시 Codex 서비스로 전달된다.
+
 ## 경력 자료와 Codex 분석
 
 V12가 원본 문서·추출 구간·AI 사실 후보·근거 인용 테이블을 만든다. 원본은 `${STORAGE_DIRECTORY}/career-materials/{uuid}.bin`에 두고, 문서 내용은 Apache Tika 표준 파서로 감지·추출한다. 페이지 구분과 제목/문단 구간을 저장하며, OCR은 Tesseract 한국어·영어 사전을 사용한다. 파서가 처리하지 못하거나 본문이 비어 있어도 원본과 실패 이유는 남긴다. 업로드는 파일당 50 MiB, 한 번에 20개·총 200 MiB까지 받는다. 추출 본문 저장은 파일당 400만 자, Codex 전달은 파일당 16만 자까지 제한한다. 확장자 검증은 하지 않고 SHA-256 내용 해시로 동일 파일 중복을 막는다.
@@ -150,13 +169,13 @@ V12가 원본 문서·추출 구간·AI 사실 후보·근거 인용 테이블�
 | `GET /api/career-materials/worker/status` | 선택 Codex 워커 상태 |
 | `/api/career-materials/worker/tasks/**` | 작업 claim·lease 갱신·완료·실패 보고 |
 
-작업자는 기존 `/api/ai/worker/**` 질문 큐와 경력 자료 큐를 번갈아 poll해 한 종류가 계속 앞서지 않게 한다. 질문 답변은 기존처럼 웹 검색을 허용하고, 경력 자료 prompt는 웹 검색을 켜지 않고 제출된 본문만 사용한다. `gpt-6-luna`에서 생성한 후보의 각 인용은 API가 해당 추출 구간에 실제 포함되는지 재검증하며, 출처가 없는 후보는 저장하지 않는다. 모든 후보는 `UNVERIFIED` 상태로 저장한다. 파일 업로드·본문 추출은 Codex 워커 없이 동작하고 AI 결과는 대기 상태로 유지된다. 워커가 켜져 분석할 때 추출 텍스트와 파일명은 Codex 서비스로 전송되므로 화면에 이를 알린다.
+작업자는 AI 질문·경력 자료·지원서 요구 정보 큐를 순환 조회해 한 종류가 계속 앞서지 않게 한다. 질문 답변은 기존처럼 웹 검색을 허용하고, 경력 자료와 지원서 요구 정보 prompt는 웹 검색을 켜지 않고 전달된 본문만 사용한다. `gpt-6-luna`에서 생성한 경력 후보의 각 인용은 API가 해당 추출 구간에 실제 포함되는지 재검증하며, 출처가 없는 후보는 저장하지 않는다. 지원서 요구 정보도 입력 원문에 없는 근거·문항을 저장하지 않는다. 워커가 켜져 분석할 때 텍스트는 Codex 서비스로 전송된다.
 
 백업·복원은 경력 원본과 추출 자료를 함께 포함하고 `career` 초기화는 경력 원본·구간·후보만 지운다. `postings` 초기화는 경력 자료를 유지한다. AI 사실 후보 편집·검증, 추천 공고, 맞춤 이력서·포트폴리오, 지원서 문항 답변 생성은 아직 구현하지 않았다.
 
 2026-11-21 워크트리 빌드 확인: `./gradlew clean compileKotlin --no-daemon` 통과. 이 확인은 Kotlin 컴파일만 포함하며 DB 마이그레이션을 실행하거나 Codex 분석·개인 파일 업로드를 요청하지 않았다.
 
-백업 형식은 `jobmoa` v2 / DB 스키마 11이며, 복원은 스키마 10·11과 형식 v1·v2를 지원한다. ZIP은 `workspace.json`, `captures/{sha256}.png`, `career-materials/{uuid}.bin`으로 구성된다. 스키마 10 백업은 경력 자료가 없는 전체 교체로 복원되며 마이페이지에서 이를 알린다. ZIP 2 GiB·해제 4 GiB·개별 경력 원본 50 MiB·캡처/JSON 128 MiB 제한이다. 임시 파일은 `${STORAGE_DIRECTORY}/workspace-tmp`에 저장하고 만료·재시작 잔여물을 정리한다. Spring multipart와 Docker 프론트 NGINX의 업로드 크기/타임아웃을 함께 조정했다. 백업 생성은 파일 스트리밍을 사용하지만 스냅샷 JSON·DB 행은 메모리에 보관하므로 한도까지의 대규모 복원 성능은 별도 검증이 필요하다.
+백업 형식은 `jobmoa` v2 / DB 스키마 12이며, 복원은 스키마 10·11·12와 형식 v1·v2를 지원한다. ZIP은 `workspace.json`, `captures/{sha256}.png`, `career-materials/{uuid}.bin`으로 구성된다. 스키마 10 백업은 경력 자료가 없는 전체 교체로, 스키마 10·11 백업은 지원서 요구 정보가 없는 전체 교체로 복원된다. 백업 생성 시 진행 중인 AI 작업은 다시 대기하도록 정리한다. ZIP 2 GiB·해제 4 GiB·개별 경력 원본 50 MiB·캡처/JSON 128 MiB 제한이다. 임시 파일은 `${STORAGE_DIRECTORY}/workspace-tmp`에 저장하고 만료·재시작 잔여물을 정리한다. Spring multipart와 Docker 프론트 NGINX의 업로드 크기/타임아웃을 함께 조정했다. 백업 생성은 파일 스트리밍을 사용하지만 스냅샷 JSON·DB 행은 메모리에 보관하므로 한도까지의 대규모 복원 성능은 별도 검증이 필요하다.
 
 `/api/state`의 `workspaceRevision`은 초기화·복원 때 바뀐다. 클라이언트는 리비전이 바뀌면 이전 버전 ID의 본문 캐시를 버린다. 유지보수는 수집 중 409로 차단하며, 사용자 확인 문구도 서버에서 검증한다.
 

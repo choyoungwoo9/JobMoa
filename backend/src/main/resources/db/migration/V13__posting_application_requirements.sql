@@ -1,0 +1,20 @@
+CREATE TABLE posting_application_requirement (
+    id VARCHAR(36) PRIMARY KEY,
+    posting_id BIGINT NOT NULL,
+    source VARCHAR(24) NOT NULL,
+    source_url VARCHAR(2048),
+    raw_text LONGTEXT NOT NULL,
+    result_json LONGTEXT,
+    status VARCHAR(24) NOT NULL,
+    attempts INT NOT NULL DEFAULT 0,
+    error_message LONGTEXT,
+    lease_token VARCHAR(36),
+    lease_expires_at DATETIME(6),
+    created_at DATETIME(6) NOT NULL,
+    updated_at DATETIME(6) NOT NULL,
+    confirmed_at DATETIME(6),
+    INDEX idx_application_requirement_posting (posting_id, created_at, id),
+    INDEX idx_application_requirement_status (status, created_at),
+    INDEX idx_application_requirement_lease (status, lease_expires_at),
+    FOREIGN KEY (posting_id) REFERENCES posting(id) ON DELETE CASCADE
+);

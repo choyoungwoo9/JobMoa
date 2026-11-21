@@ -772,6 +772,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
                     total={browseQueue.length}
                     onPrevious={() => navigateJob(-1)}
                     onNext={() => navigateJob(1)}
+                    demo={demo}
                   />
                 )}
               </div>
@@ -782,7 +783,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
                 </span>
               </div>
             </>
-          ) : view === 'career' ? <CareerMaterials demo={demo} /> : view === 'my' ? <MyPage key={data.workspaceRevision} demo={demo} running={running} /> : view === 'interests' ? <InterestBoard key={data.workspaceRevision} jobs={data.jobs} categories={categories} onStar={setStarred} onSave={saveInterest} markRead={markRead} toggleRead={toggleRead} loadJob={loadJob} onBrowse={() => changeSource('all')} /> : view === 'statistics' ? <Statistics categories={categories} companies={companies} demo={demo} onBrowse={browseStatistics} /> : view === 'ai' ? <AiChat demo={demo} onOpenPosting={openAiPosting} /> : (
+          ) : view === 'career' ? <CareerMaterials demo={demo} /> : view === 'my' ? <MyPage key={data.workspaceRevision} demo={demo} running={running} /> : view === 'interests' ? <InterestBoard key={data.workspaceRevision} jobs={data.jobs} categories={categories} onStar={setStarred} onSave={saveInterest} markRead={markRead} toggleRead={toggleRead} loadJob={loadJob} onBrowse={() => changeSource('all')} demo={demo} /> : view === 'statistics' ? <Statistics categories={categories} companies={companies} demo={demo} onBrowse={browseStatistics} /> : view === 'ai' ? <AiChat demo={demo} onOpenPosting={openAiPosting} /> : (
             <section className="history-view">
               <div className="section-heading">
                 <h2>

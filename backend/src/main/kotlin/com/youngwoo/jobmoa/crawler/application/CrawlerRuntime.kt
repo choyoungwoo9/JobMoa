@@ -3,7 +3,10 @@ package com.youngwoo.jobmoa.crawler.application
 import com.youngwoo.jobmoa.collection.application.*
 import com.youngwoo.jobmoa.collection.domain.model.*
 import com.youngwoo.jobmoa.collection.domain.repository.*
+import com.youngwoo.jobmoa.applicationrequirements.application.ApplicationRequirementService
+import com.youngwoo.jobmoa.applicationrequirements.domain.PublicPageFetchLease
 import com.youngwoo.jobmoa.crawler.domain.model.*
+import com.youngwoo.jobmoa.crawler.domain.port.BrowserPage
 import com.youngwoo.jobmoa.crawler.infrastructure.browser.*
 import com.youngwoo.jobmoa.crawler.infrastructure.storage.CaptureStorage
 import com.youngwoo.jobmoa.shared.*
@@ -22,12 +25,14 @@ import java.util.concurrent.atomic.AtomicInteger
 class CrawlerRuntime(private val properties: CrawlerProperties, private val tasks: CrawlTaskRepository,
     private val runs: CollectionRepository, private val collections: CollectionService,
     private val taskService: TaskService, private val sources: SourceRegistry,
-    private val limiter: SiteLimiter, private val captures: CaptureStorage, private val classifier: CategoryClassifier) {
+    private val limiter: SiteLimiter, private val captures: CaptureStorage, private val classifier: CategoryClassifier,
+    private val applicationRequirements: ApplicationRequirementService) {
     private val log = LoggerFactory.getLogger(javaClass)
     private val sequence = AtomicInteger()
     private val workers = Executors.newFixedThreadPool(properties.workers) { r -> Thread(r, "crawl-worker-${sequence.incrementAndGet()}") }
     private val discovery = Executors.newSingleThreadExecutor { r -> Thread(r, "crawl-discovery") }
     private val owned = ConcurrentHashMap<String, String>()
+    private val ownedPublicFetches = ConcurrentHashMap<String, String>()
     @Volatile private var running = false
     @Volatile private var discovering: String? = null
 
@@ -43,12 +48,42 @@ class CrawlerRuntime(private val properties: CrawlerProperties, private val task
     private fun workerLoop() {
         var browser: BrowserSession? = null
         var browserHeadless: Boolean? = null
+        var browserPublicOnly = false
         var offset = 0
+        var preferPublicFetch = true
+        fun processPublicFetch(publicFetch: PublicPageFetchLease) {
+            ownedPublicFetches[publicFetch.id] = publicFetch.leaseToken
+            try {
+                if (browser != null && (browserHeadless != true || !browserPublicOnly)) {
+                    browser?.close(); browser = null
+                }
+                val session = browser ?: BrowserSession(properties.copy(headless = true), limiter, publicOnly = true).also {
+                    browser = it; browserHeadless = true; browserPublicOnly = true
+                }
+                fetchPublicApplicationPage(publicFetch, session)
+            } catch (interrupted: InterruptedException) {
+                Thread.currentThread().interrupt()
+            } catch (error: Exception) {
+                try { applicationRequirements.failPublicPage(publicFetch.id, publicFetch.leaseToken, error.message ?: "공개 지원 페이지를 읽지 못했습니다.") }
+                catch (_: LeaseLost) { log.info("공개 페이지 작업 임대 만료: {}", publicFetch.id) }
+                catch (failure: Exception) { log.warn("공개 페이지 실패 상태 저장 실패: {}", publicFetch.id, failure) }
+                log.info("공개 지원 페이지 확인 실패: {} · {}", publicFetch.id, error.message)
+                try { browser?.close() } catch (_: Exception) { }; browser = null; browserPublicOnly = false; browserHeadless = null
+            } finally { ownedPublicFetches.remove(publicFetch.id) }
+        }
         try {
             while (running && !Thread.currentThread().isInterrupted) {
                 var task: CrawlTask? = null
                 var permit: AutoCloseable? = null
                 try {
+                    if (preferPublicFetch) {
+                        val publicFetch = applicationRequirements.claimPublicPage()
+                        if (publicFetch != null) {
+                            processPublicFetch(publicFetch)
+                            preferPublicFetch = false
+                            continue
+                        }
+                    }
                     val hosts = tasks.pendingSites()
                     for (index in hosts.indices) {
                         val host = hosts[(index + offset) % hosts.size]
@@ -57,7 +92,14 @@ class CrawlerRuntime(private val properties: CrawlerProperties, private val task
                         if (candidate == null) { slot.close(); continue }
                         task = candidate; permit = slot; offset++; break
                     }
-                    if (task == null) { Thread.sleep(400); continue }
+                    if (task == null) {
+                        val publicFetch = applicationRequirements.claimPublicPage()
+                        if (publicFetch != null) {
+                            processPublicFetch(publicFetch)
+                            preferPublicFetch = false
+                        } else Thread.sleep(400)
+                        continue
+                    }
                     val token = task.leaseToken!!
                     owned[task.id] = token
                     if (task.stage != CrawlStage.SAVE) {
@@ -65,9 +107,11 @@ class CrawlerRuntime(private val properties: CrawlerProperties, private val task
                         val headless = properties.headless && !adapter.requiresWindowedBrowser
                         // 사이트에 필요한 모드가 바뀌면 이전 브라우저를 정리한다. 작업자당 하나만 유지한다.
                         if (browser != null && browserHeadless != headless) {
-                            browser.close()
+                            browser?.close()
                             browser = null
+                            browserPublicOnly = false
                         }
+                        if (browserPublicOnly && browser != null) { browser?.close(); browser = null; browserHeadless = null; browserPublicOnly = false }
                         val session = browser ?: BrowserSession(properties.copy(headless = headless), limiter).also {
                             browser = it
                             browserHeadless = headless
@@ -133,7 +177,8 @@ class CrawlerRuntime(private val properties: CrawlerProperties, private val task
                     // 브라우저 장애는 다음 작업에서 새 세션으로 복구한다. 정리도 동일 스레드에서 수행한다.
                     try { browser?.close() } catch (_: Exception) { }
                     browser = null
-                } finally { task?.let { owned.remove(it.id) }; permit?.close() }
+                    browserPublicOnly = false
+                } finally { task?.let { owned.remove(it.id) }; permit?.close(); if (task != null) preferPublicFetch = true }
             }
         } finally { try { browser?.close() } catch (_: Exception) { } }
     }
@@ -170,8 +215,75 @@ class CrawlerRuntime(private val properties: CrawlerProperties, private val task
         if (!running) return
         if (discovering == null) runs.recoverDiscovery()
         owned.forEach { (id, token) -> tasks.renew(id, token, properties.leaseDuration) }
+        ownedPublicFetches.forEach { (id, token) -> applicationRequirements.renewPublicPage(id, token) }
         tasks.recoverExpired(Instant.now())
         runs.recentRuns().filter { it.active }.forEach { runs.finishIfReady(it.id, Instant.now()) }
+    }
+
+    private fun fetchPublicApplicationPage(fetch: PublicPageFetchLease, session: BrowserSession) {
+        session.withPage { page ->
+            fun navigatePublic(url: String) {
+                PublicUrlGuard.validate(url)
+                val host = PostingUrl.siteKey(url)
+                var slot: AutoCloseable? = null
+                while (slot == null) { slot = limiter.tryAcquire(host); if (slot == null) Thread.sleep(200) }
+                try { limiter.beforeNavigation(host); page.navigate(url) } finally { slot.close() }
+                page.evaluate("() => new Promise(resolve => setTimeout(resolve, 700))")
+                val resolved = page.currentUrl().orEmpty()
+                PublicUrlGuard.validate(resolved)
+                check(page.responseStatus()?.let { it in 200..399 } != false) { "공개 페이지가 HTTP ${page.responseStatus()} 응답을 반환했습니다." }
+                check(!resolved.contains(Regex("(?i)/(login|signin|sign-in|auth)(/|$|\\?)"))) { "지원 페이지에서 로그인을 요구합니다. 로그인하지 않고 직접 복사해 주세요." }
+            }
+
+            navigatePublic(fetch.postingUrl)
+            val links = page.evaluate("""() => Array.from(document.querySelectorAll('a[href]')).map(a => ({href:a.href, text:(a.innerText || a.getAttribute('aria-label') || '').trim()})).filter(x => /지원하기|입사지원|지원서 작성|지원서|^지원$|apply(?: now)?|submit application/i.test(x.text)).filter(x => x.href && !/login|signin|sign-in|logout|terms|privacy/i.test(x.href + ' ' + x.text)).slice(0, 12)""") as? List<*> ?: emptyList<Any>()
+            val candidates = links.mapNotNull { raw ->
+                val row = raw as? Map<*, *> ?: return@mapNotNull null
+                val url = row["href"]?.toString()?.takeIf(String::isNotBlank) ?: return@mapNotNull null
+                val label = row["text"]?.toString().orEmpty()
+                val score = (if (Regex("지원하기|입사지원|지원서 작성|apply(?: now)?|submit application", RegexOption.IGNORE_CASE).containsMatchIn(label)) 2 else 0) +
+                    (if (Regex("/apply|/application|/job-application", RegexOption.IGNORE_CASE).containsMatchIn(url)) 1 else 0)
+                url to score
+            }.sortedByDescending { it.second }.take(5)
+
+            var selectedText: String? = null
+            var selectedUrl = page.currentUrl().orEmpty()
+            val directText = visibleText(page)
+            if (directText.isNotBlank() && isApplicationPage(page, directText)) selectedText = directText
+            for ((url, _) in candidates) {
+                if (selectedText != null) break
+                try {
+                    navigatePublic(url)
+                    val text = visibleText(page)
+                    if (text.isNotBlank() && isApplicationPage(page, text) && !looksLikeLoginPage(page, text)) {
+                        selectedText = text
+                        selectedUrl = page.currentUrl().orEmpty()
+                    }
+                } catch (error: Exception) {
+                    // 한 링크가 비공개이거나 로그인으로 이어져도 다른 공개 지원 링크는 확인한다.
+                    log.debug("공개 지원 링크 확인 생략: {} · {}", url, error.message)
+                }
+            }
+            val content = selectedText ?: throw IllegalStateException(
+                if (candidates.isEmpty()) "공개 지원 링크를 찾지 못했습니다. 빈 문항을 직접 복사해 주세요."
+                else "공개 문항을 확인하지 못했습니다. 로그인 없이 볼 수 있는 문항을 직접 복사해 주세요.",
+            )
+            applicationRequirements.completePublicPage(fetch.id, fetch.leaseToken, selectedUrl, content)
+        }
+    }
+
+    private fun visibleText(page: BrowserPage): String = (page.evaluate("""() => document.body?.innerText || ''""") as? String)
+        ?.replace(Regex("\\n{3,}"), "\n\n")?.trim()?.take(ApplicationRequirementService.MAX_TEXT_CHARS).orEmpty()
+
+    private fun isApplicationPage(page: BrowserPage, text: String): Boolean {
+        val hasForm = page.evaluate("""() => !!document.querySelector('textarea, input[type="file"], input[type="radio"], input[type="checkbox"]') || document.querySelectorAll('form input:not([type="hidden"]):not([type="search"])').length >= 3""") as? Boolean ?: false
+        return hasForm || Regex("지원서|자기소개서|제출 서류|resume|cover letter|application question", RegexOption.IGNORE_CASE).containsMatchIn(text)
+    }
+
+    private fun looksLikeLoginPage(page: BrowserPage, text: String): Boolean {
+        val url = page.currentUrl().orEmpty()
+        return Regex("(?i)/(login|signin|sign-in|auth)(/|$|\\?)").containsMatchIn(url) ||
+            Regex("로그인 후 이용|로그인하고 지원|sign in to apply|log in to continue", RegexOption.IGNORE_CASE).containsMatchIn(text)
     }
 
     @PreDestroy

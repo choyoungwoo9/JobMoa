@@ -9,7 +9,7 @@ import com.youngwoo.jobmoa.shared.CrawlerProperties
 
 /** 생성·탐색·정리까지 작업자 한 스레드에서만 호출한다. */
 class BrowserSession(private val properties: CrawlerProperties, private val limiter: SiteLimiter,
-    private val manageSitePermit: Boolean = false) : AutoCloseable {
+    private val manageSitePermit: Boolean = false, private val publicOnly: Boolean = false) : AutoCloseable {
     private val owner = Thread.currentThread()
     private val playwright = Playwright.create(Playwright.CreateOptions().setEnv(System.getenv() + ("PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD" to "1")))
     private val browser: Browser = try {
@@ -20,8 +20,15 @@ class BrowserSession(private val properties: CrawlerProperties, private val limi
     fun <T> withPage(block: (BrowserPage) -> T): T {
         checkOwner()
         var permit: AutoCloseable? = null
-        try { return browser.newContext(Browser.NewContextOptions().setViewportSize(1440, 1000).setLocale("ko-KR").setTimezoneId("Asia/Seoul")).use { context ->
+        try { return browser.newContext(Browser.NewContextOptions().setViewportSize(1440, 1000).setLocale("ko-KR").setTimezoneId("Asia/Seoul")
+            .also { if (publicOnly) it.setServiceWorkers(ServiceWorkerPolicy.BLOCK) }).use { context ->
+            if (publicOnly) context.routeWebSocket("**/*") { it.close() }
             val page = context.newPage()
+            if (publicOnly) page.route("**/*") { route ->
+                runCatching { PublicUrlGuard.validate(route.request().url()) }
+                    .onSuccess { route.resume() }
+                    .onFailure { route.abort() }
+            }
             page.setDefaultTimeout(properties.navigationTimeout.toMillis().toDouble())
             var navigationSite: String? = null
             var status: Int? = null
