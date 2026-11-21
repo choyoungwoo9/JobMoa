@@ -3357,8 +3357,34 @@ dialog::backdrop {
 
 .classification-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 20px; }
 .classification-filters .category-tabs { margin: 0; }
-.classification-filters > select { min-width: 225px; max-width: 100%; border: 1px solid #dce5d4; border-radius: 8px; padding: 12px; background: #fff; color: #3e5630; font: inherit; font-size: 13px; }
-.classification-hint { font-size: 12px; color: #7d8875; }
+.category-picker { position: relative; z-index: 20; }
+.category-picker-trigger { display: flex; align-items: center; gap: 9px; min-width: 225px; max-width: min(340px, calc(100vw - 40px)); height: 43px; padding: 0 12px; border: 1px solid #dce5d4; border-radius: 8px; background: #fff; color: #3e5630; text-align: left; cursor: pointer; }
+.category-picker-trigger:hover, .category-picker-trigger[aria-expanded="true"] { border-color: #a8bc91; background: #fcfdf9; }
+.category-picker-trigger:focus-visible, .category-picker-option:focus-visible { outline: 3px solid #c2d6a9; outline-offset: 2px; }
+.category-picker-trigger strong { flex: 1; min-width: 0; overflow: hidden; color: #475b39; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.category-picker-count { color: #8a9a7b; font-size: 10px; font-variant-numeric: tabular-nums; }
+.category-picker-trigger > svg { flex: 0 0 auto; color: #879775; transition: transform .15s; }
+.category-picker-trigger[aria-expanded="true"] > svg { transform: rotate(180deg); }
+.category-picker-panel { position: absolute; top: calc(100% + 7px); left: 0; z-index: 50; width: min(390px, calc(100vw - 40px)); overflow: hidden; border: 1px solid #e0e7d8; border-radius: 11px; background: #fff; box-shadow: 0 16px 36px #2c3a2424; }
+.category-picker-search { display: flex; align-items: center; gap: 8px; margin: 12px; padding: 0 10px; height: 38px; border: 1px solid #e3e9dd; border-radius: 7px; color: #96a48a; }
+.category-picker-search:focus-within { border-color: #a8bc91; box-shadow: 0 0 0 2px #eef4e7; }
+.category-picker-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: #506044; font: inherit; font-size: 12px; }
+.category-picker-options { max-height: min(390px, calc(100dvh - 250px)); overflow-y: auto; overscroll-behavior: contain; padding: 0 8px 8px; }
+.category-picker-option { width: 100%; display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 6px 9px; border: 0; border-radius: 6px; background: transparent; color: #65745a; text-align: left; font-size: 12px; cursor: pointer; }
+.category-picker-option > span:first-child { flex: 1; }
+.category-picker-option > span:nth-child(2) { color: #96a28a; font-size: 10px; font-variant-numeric: tabular-nums; }
+.category-picker-option > svg { color: #70944e; }
+.category-picker-option:hover, .category-picker-option.selected { background: #f1f6e9; color: #456133; }
+.category-picker-option.category-picker-all { border-bottom: 1px solid #edf0e8; border-radius: 0; margin-bottom: 5px; font-weight: 600; }
+.category-picker-group { padding: 5px 0 7px; }
+.category-picker-group + .category-picker-group { border-top: 1px solid #edf0e8; }
+.category-picker-group h3 { margin: 4px 9px 5px; color: #99a28e; font-size: 10px; font-weight: 600; letter-spacing: .2px; }
+.category-picker-empty { padding: 18px 10px; color: #89947d; text-align: center; font-size: 11px; }
+.category-picker-footnote { margin: 0; padding: 9px 13px; border-top: 1px solid #edf0e8; background: #fafbf8; color: #919d84; font-size: 10px; }
+@media (max-width: 550px) {
+  .category-picker-panel { position: fixed; inset: auto 16px 16px; width: auto; max-height: calc(100dvh - 32px); display: flex; flex-direction: column; }
+  .category-picker-options { flex: 0 1 auto; min-height: 0; max-height: min(390px, calc(100dvh - 250px)); }
+}
 .classification-detail { margin: 16px 0; padding: 12px; background: #f6f8f3; border-radius: 8px; font-size: 12px; line-height: 1.7; }
 .classification-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .classification-detail summary { margin-top: 8px; cursor: pointer; color: #567246; }

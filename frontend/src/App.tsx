@@ -15,6 +15,7 @@ import { InterestStar } from './components/InterestControls'
 import { interestOf } from './interest'
 import { AiChat } from './components/AiChat'
 import { PostingMockGallery } from './components/PostingMockGallery'
+import { CategoryPicker } from './components/CategoryPicker'
 import { CareerMaterials } from './components/CareerMaterials'
 import './App.css'
 
@@ -57,6 +58,19 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
   const unread = available.filter((job) => !job.read).length
   const newCount = available.filter((job) => job.latestChange === 'new').length
   const closedCount = categoryJobs.filter((job) => job.closed).length
+  const categoryCounts = useMemo(() => {
+    const scoped = data.jobs.filter(job =>
+      (!changeScope || changeScope.ids.includes(job.id)) &&
+      (includeClosed || !job.closed) &&
+      (source === 'all' || job.sourceId === source) &&
+      (!companyFilter || job.companyId === companyFilter),
+    )
+    const counts: Record<string, number> = { all: scoped.length }
+    for (const job of scoped) {
+      for (const id of job.categories ?? []) counts[id] = (counts[id] ?? 0) + 1
+    }
+    return counts
+  }, [data.jobs, changeScope, includeClosed, source, companyFilter])
 
   const filtered = useMemo(
     () =>
@@ -326,18 +340,12 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
                 <div className="category-tabs" role="tablist" aria-label="공고 분류">
                   {[{ id: 'all', name: '전체 공고' }, { id: 'unclassified', name: '미분류' }].map(category => <button key={category.id} role="tab" aria-selected={categoryId === category.id} className={categoryId === category.id ? 'active' : ''} onClick={() => { setCategoryId(category.id); setPage(1); setSelectedJob(null) }}>{category.name}<span>{data.jobs.filter(job => (includeClosed || !job.closed) && (source === 'all' || job.sourceId === source) && (!companyFilter || job.companyId === companyFilter) && (category.id === 'all' || !job.categories?.length)).length}</span></button>)}
                 </div>
-                <select aria-label="세부 직군 선택" value={categoryId === 'all' || categoryId === 'unclassified' ? '' : categoryId} onChange={event => { setCategoryId(event.target.value); setPage(1); setSelectedJob(null) }}>
-                  <option value="" disabled>직군별로 보기</option>
-                  {[
-                    { name: '서비스·시스템 개발', ids: ['web-backend', 'web-frontend', 'android', 'ios', 'fullstack', 'embedded-system', 'robotics', 'qa-test'] },
-                    { name: '데이터·AI·인프라', ids: ['data-engineer', 'ml-engineer', 'ai-application', 'ml-platform', 'devops-sre', 'cloud-infrastructure', 'database', 'data-analysis-bi'] },
-                    { name: '기획·비즈니스·디자인', ids: ['planning', 'product-management', 'design', 'marketing', 'sales'] },
-                  ].map(group => <optgroup label={group.name} key={group.name}>{group.ids.flatMap(id => {
-                    const category = categories.find(item => item.id === id)
-                    return category ? <option key={id} value={id}>{category.name} · {data.jobs.filter(job => (includeClosed || !job.closed) && (source === 'all' || job.sourceId === source) && (!companyFilter || job.companyId === companyFilter) && job.categories?.includes(id)).length}</option> : []
-                  })}</optgroup>)}
-                </select>
-                <span className="classification-hint">한 공고가 여러 직군에 포함될 수 있어요.</span>
+                <CategoryPicker
+                  categories={categories}
+                  counts={categoryCounts}
+                  value={categoryId}
+                  onSelect={id => { setCategoryId(id); setPage(1); setSelectedJob(null) }}
+                />
               </div>
               {!demo && latestRun?.finishedAt && <CollectionChanges key={latestRun.id} run={latestRun} onBrowse={browseChanges} compact onOpenRun={() => openRun(latestRun.id)} />}
               {latestRun &&
