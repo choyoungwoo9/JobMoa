@@ -160,6 +160,22 @@
 }
 .ai-message.user .ai-message-content { border: 1px solid #e0e9d8; background: #edf4e8; color: #3f5534; }
 .ai-answer { padding: 0; background: transparent; color: #45523f; }
+.ai-answer strong { color: #34482b; font-weight: 720; }
+.ai-inline-posting-ref {
+  display: inline;
+  margin: 0 1px;
+  padding: 0 3px;
+  border: 0;
+  border-bottom: 1px dotted currentColor;
+  border-radius: 3px;
+  background: #edf4e8;
+  color: #526d42;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+.ai-inline-posting-ref:hover { background: #e2edda; color: #3d5a2d; }
+.ai-inline-posting-ref:focus-visible { outline: 2px solid #718b5d; outline-offset: 2px; }
 .ai-waiting { display: inline-flex; align-items: center; gap: 9px; width: fit-content; padding: 10px 13px; color: #84917a; font-size: 10px; }
 .ai-typing-dots { display: inline-flex; gap: 3px; }
 .ai-typing-dots i { width: 4px; height: 4px; border-radius: 50%; background: #8fa17d; animation: ai-dot 1s infinite ease-in-out; }

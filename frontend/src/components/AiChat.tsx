@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { api } from '../api'
 import { Icon } from './Icon'
 import type { AiCitation, AiConversationPreview, AiMessage, AiWorkerStatus } from '../types'
@@ -319,7 +319,7 @@ export function AiChat({ demo, onOpenPosting }: AiChatProps) {
               <div className="ai-message-label">{message.role === 'USER' ? '나' : <><Icon name="spark" size={13} />JobMoa AI</>}</div>
               {message.role === 'USER' ? <div className="ai-message-content">{message.content}</div> : (
                 <>
-                  {message.content ? <div className="ai-message-content ai-answer">{message.content}</div> : message.status === 'QUEUED' || message.status === 'PROCESSING' ? <div className="ai-message-content ai-waiting"><span className="ai-typing-dots"><i /><i /><i /></span>{progress || '답변을 준비하고 있어요'}</div> : null}
+                  {message.content ? <div className="ai-message-content ai-answer"><AnswerContent content={message.content} citations={message.citations} onOpenPosting={onOpenPosting} /></div> : message.status === 'QUEUED' || message.status === 'PROCESSING' ? <div className="ai-message-content ai-waiting"><span className="ai-typing-dots"><i /><i /><i /></span>{progress || '답변을 준비하고 있어요'}</div> : null}
                   {message.status === 'FAILED' && <div className="ai-failed"><span>{message.errorMessage || '답변 생성에 실패했습니다.'}</span><button className="text-button" onClick={() => void retry(message.id, message.taskId)}>다시 시도</button></div>}
                   {message.searchPerformed && message.status === 'COMPLETE' && <div className="ai-search-used"><Icon name="search" size={13} />외부 웹 검색 포함</div>}
                   {message.citations.length > 0 && <CitationList citations={message.citations} onOpenPosting={onOpenPosting} />}
@@ -338,6 +338,51 @@ export function AiChat({ demo, onOpenPosting }: AiChatProps) {
       </div>
     </section>
   )
+}
+
+function AnswerContent({ content, citations, onOpenPosting }: {
+  content: string
+  citations: AiCitation[]
+  onOpenPosting: (postingId: number) => void
+}) {
+  const postings = new Map(citations
+    .filter(citation => citation.type === 'POSTING' && citation.postingId != null)
+    .map(citation => [citation.postingId!, citation]))
+  const parts: ReactNode[] = []
+  const token = /\*\*([\s\S]+?)\*\*|\[공고:(\d+)\]/g
+  let cursor = 0
+  let match: RegExpExecArray | null
+
+  while ((match = token.exec(content)) !== null) {
+    if (match.index > cursor) parts.push(content.slice(cursor, match.index))
+    if (match[1] !== undefined) {
+      parts.push(<strong key={`bold-${match.index}`}>{match[1]}</strong>)
+    } else {
+      const postingId = Number(match[2])
+      const citation = postings.get(postingId)
+      if (citation) {
+        const label = [citation.company, citation.title].filter(Boolean).join(' · ')
+        parts.push(
+          <button
+            key={`posting-${match.index}`}
+            className="ai-inline-posting-ref"
+            type="button"
+            aria-label={`${label || `공고 ${postingId}`} 열기`}
+            title={`${label || `공고 ${postingId}`} 공고 보기`}
+            onClick={() => onOpenPosting(postingId)}
+          >
+            {match[0]}
+          </button>,
+        )
+      } else {
+        parts.push(match[0])
+      }
+    }
+    cursor = token.lastIndex
+  }
+
+  if (cursor < content.length) parts.push(content.slice(cursor))
+  return <>{parts}</>
 }
 
 function CitationList({ citations, onOpenPosting }: { citations: AiCitation[]; onOpenPosting: (postingId: number) => void }) {
