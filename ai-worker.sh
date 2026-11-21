@@ -78,7 +78,7 @@ case "$action" in
       </dev/null >>"$log_file" 2>&1 &
     pid=$!
     printf '%s\n' "$pid" >"$pid_file"
-    for _ in {1..30}; do
+    for _ in {1..60}; do
       if ! kill -0 "$pid" 2>/dev/null; then
         rm -f "$pid_file"
         tail -n 30 "$log_file" >&2 || true
