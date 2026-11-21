@@ -14,7 +14,7 @@ class WorkspaceController(private val service: WorkspaceService) {
     @PostMapping("/reset") fun reset(@RequestBody r: ResetRequest) = service.reset(r.scope, r.confirmation)
     @PostMapping("/captures/cleanup") fun cleanup(@RequestBody r: ConfirmationRequest): Map<String, Int> {
         require(r.confirmation == "정리") { "확인 문구 '정리'를 입력하세요." }
-        return mapOf("deleted" to service.garbageCollect())
+        return mapOf("deleted" to service.garbageCollectFiles())
     }
     @GetMapping("/backup") fun backup(): ResponseEntity<StreamingResponseBody> {
         val file = service.backup()

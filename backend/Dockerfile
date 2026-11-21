@@ -11,7 +11,7 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
     PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
     DISPLAY=:99
 RUN --mount=from=build,source=/app/build/runtime-libs,target=/tmp/playwright-libs \
-    apt-get update && apt-get install -y --no-install-recommends curl fonts-noto-cjk libatomic1 xvfb xauth \
+    apt-get update && apt-get install -y --no-install-recommends curl fonts-noto-cjk libatomic1 tesseract-ocr tesseract-ocr-kor xvfb xauth \
     && java -cp '/tmp/playwright-libs/*' com.microsoft.playwright.CLI install --with-deps chromium \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
