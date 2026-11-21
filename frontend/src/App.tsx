@@ -14,10 +14,17 @@ import { InterestBoard } from './components/InterestBoard'
 import { InterestStar } from './components/InterestControls'
 import { interestOf } from './interest'
 import { AiChat } from './components/AiChat'
+import { PostingMockGallery } from './components/PostingMockGallery'
 import './App.css'
 
 const PAGE_SIZE = 8
 function App() {
+  if (new URLSearchParams(window.location.search).get('mock') === 'postings') {
+    return <PostingMockGallery />
+  }
+  return <LiveApp />
+}
+function LiveApp() {
   const collection = useCollection()
   return <Workspace key={collection.data.workspaceRevision} collection={collection} />
 }
