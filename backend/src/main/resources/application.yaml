@@ -39,6 +39,9 @@ jobmoa:
     workers: ${CRAWLER_WORKERS:3}
     site-concurrency: ${CRAWLER_SITE_CONCURRENCY:1}
     minimum-navigation-interval: 700ms
+    minimum-navigation-interval-overrides:
+      www.coupang.jobs: 5s
+      boards-api.greenhouse.io: 3s
     lease-duration: 2m
     navigation-timeout: 30s
     browser-channel: ${BROWSER_CHANNEL:}

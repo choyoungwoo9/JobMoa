@@ -22,7 +22,8 @@ class SiteLimiter(private val properties: CrawlerProperties) {
         val delay = synchronized(site) {
             val now = System.nanoTime()
             val at = maxOf(now, site.nextNavigation)
-            site.nextNavigation = at + properties.minimumNavigationInterval.toNanos()
+            val interval = properties.minimumNavigationIntervalOverrides[host] ?: properties.minimumNavigationInterval
+            site.nextNavigation = at + interval.toNanos()
             at - now
         }
         if (delay > 0) java.util.concurrent.TimeUnit.NANOSECONDS.sleep(delay)

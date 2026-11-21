@@ -73,16 +73,24 @@ class CrawlerRuntime(private val properties: CrawlerProperties, private val task
                             browserHeadless = headless
                         }
                         session.withPage { page ->
-                            page.navigatePosting(task.url)
-                            val candidate = DiscoveredPosting(task.url, task.company, task.title, task.location)
-                            adapter.closureReason(page, candidate)?.let { throw PostingClosed(it) }
-                            check(page.responseStatus()?.let { it in 200..399 } != false) { "공고의 마감을 확인할 수 없는 HTTP ${page.responseStatus()} 응답: ${task.url}" }
-                            var checkpoint: CrawlTask = task
                             var posting = DiscoveredPosting(task.url, task.company, task.title, task.location)
+                            var pageNavigated = false
+                            fun navigateAndCheck() {
+                                page.navigatePosting(posting.url)
+                                pageNavigated = true
+                                adapter.closureReason(page, posting)?.let { throw PostingClosed(it) }
+                                check(page.responseStatus()?.let { it in 200..399 } != false) {
+                                    "공고의 마감을 확인할 수 없는 HTTP ${page.responseStatus()} 응답: ${posting.url}"
+                                }
+                            }
+                            // 기본 사이트는 기존 순서를 유지한다. API 우선 사이트는 상세 본문을 확인한 뒤
+                            // 실제 새 캡처가 필요한 경우에만 원문 페이지를 연다.
+                            if (task.stage == CrawlStage.BODY && !adapter.extractBeforeDetailNavigation) navigateAndCheck()
+                            var checkpoint: CrawlTask = task
                             if (task.stage == CrawlStage.BODY) {
                                 val extracted = try { adapter.extract(page, posting) } catch (error: Exception) {
                                     // 클라이언트 리다이렉트/네이티브 알림이 늦게 나타나는 사이트도 재확인한다.
-                                    if (error is PostingClosed || error is PostingExcluded || error is BrowserHttpFailure) throw error
+                                    if (error is PostingClosed || error is PostingExcluded || error is BrowserHttpFailure || !pageNavigated) throw error
                                     adapter.closureReason(page, posting)?.let { throw PostingClosed(it) }
                                     throw error
                                 }
@@ -96,7 +104,8 @@ class CrawlerRuntime(private val properties: CrawlerProperties, private val task
                             // 동일 본문은 SAVE로 이동하여 캡처·버전 저장을 모두 생략한다.
                             // CAPTURE 재시도는 저장된 본문을 유지하고 렌더링·캡처만 수행한다.
                             if (checkpoint.stage == CrawlStage.CAPTURE) {
-                                adapter.prepareCapture(page, posting)
+                                if (!pageNavigated) navigateAndCheck()
+                                adapter.prepareCapture(page, posting, checkpoint.bodyText)
                                 val path = captures.save(page.capture())
                                 taskService.captured(task.id, token, path)
                             }

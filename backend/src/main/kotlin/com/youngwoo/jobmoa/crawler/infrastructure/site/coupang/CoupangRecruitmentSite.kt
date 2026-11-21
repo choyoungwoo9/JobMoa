@@ -12,6 +12,7 @@ import java.time.OffsetDateTime
 class CoupangRecruitmentSite : RecruitmentSite {
     override val definition = SourceDefinition("coupang", "쿠팡", "https://www.coupang.jobs/en/jobs/")
     override val requiresWindowedBrowser = true
+    override val extractBeforeDetailNavigation = true
     private val boardUrl = "https://boards-api.greenhouse.io/v1/boards/coupang"
 
     override fun discover(browser: BrowserPage, emit: (DiscoveredPosting) -> Unit) {
@@ -62,14 +63,9 @@ class CoupangRecruitmentSite : RecruitmentSite {
     }
 
     override fun extract(browser: BrowserPage, posting: DiscoveredPosting): ExtractedPosting {
-        // 보안 확인 화면을 공고로 저장하지 않는다. 접근 제한은 일반 실패로 기록하고 재시도한다.
-        val pageText = browser.text("body").orEmpty()
-        check(!Regex("checking your browser|verify you are human|보안 확인 수행 중|사람인지 확인|Just a moment", RegexOption.IGNORE_CASE).containsMatchIn(pageText)) {
-            "쿠팡 상세 페이지 접근이 보안 확인으로 제한되었습니다. 확인 화면은 공고 본문·캡처로 저장하지 않습니다."
-        }
         val id = Regex("(?:^|&)gh_jid=(\\d+)(?:&|$)").find(URI(posting.url).rawQuery.orEmpty())?.groupValues?.get(1)
             ?: error("쿠팡 상세 주소에 gh_jid가 없습니다.")
-        // 원문에 렌더링된 내용과 공식 보드 본문을 대조한다. API만 성공해도 차단 화면을 캡처하지 않는다.
+        // 공식 Greenhouse API에서 먼저 본문을 읽어 변경이 없는 공고의 원문 페이지 방문을 생략한다.
         val apiUrl = "https://boards-api.greenhouse.io/v1/boards/coupang/jobs/$id"
         val job = try { browser.readJson(apiUrl) } catch (failure: BrowserHttpFailure) {
             val missing = failure.status == 404 && failure.url == apiUrl && runCatching {
@@ -86,32 +82,55 @@ class CoupangRecruitmentSite : RecruitmentSite {
             documentBody.querySelectorAll('script,style').forEach(e => e.remove());
             documentBody.querySelectorAll('p,div,li,h1,h2,h3,h4,br').forEach(e => e.append(document.createTextNode('\n')));
             const body = documentBody.textContent.trim();
-            const normalize = text => text.replace(/\s+/g, ' ').trim();
-            const visible = normalize(document.body.innerText);
-            const bodyBeginning = normalize(body).slice(0, 120);
-            return {job, body, rendered: visible.includes(normalize(job.title)) && bodyBeginning.length > 40 && visible.includes(bodyBeginning)};
+            return {job, body};
         }""", job) as? Map<*, *> ?: error("쿠팡 상세 응답 형식 변경")
         val row = response["job"] as? Map<*, *> ?: error("쿠팡 상세 공고 정보 누락")
         val title = row["title"]?.toString().orEmpty()
         val departments = departmentNames(row)
         if (!CoupangDeveloperRule.accepts(title, departments)) throw PostingExcluded("쿠팡 개발 직무·조직 규칙에서 제외: $title / $departments")
-        check(response["rendered"] == true) { "쿠팡 원문 페이지에 공고 제목·본문이 정상 렌더링되지 않았습니다. 차단/오류 화면을 저장하지 않습니다." }
         val body = response["body"]?.toString().orEmpty()
         check(body.length >= 100) { "쿠팡 공고 본문이 비어 있거나 너무 짧습니다: $title" }
         val deadline = row["application_deadline"]?.toString()?.let {
             runCatching { Instant.parse(it) }.getOrElse { _ -> runCatching { OffsetDateTime.parse(it).toInstant() }.getOrNull() }
         }
-        val closed = browser.evaluate("""() => Array.from(document.querySelectorAll('main h1, main h2, main [role="alert"], .job-closed, .job-expired')).some(e => /^(This job is no longer available|This job has expired|채용이 마감되었습니다|마감된 공고)[.!\s]*$/i.test(e.innerText.trim()))""") == true
         return ExtractedPosting(title, companyName(title, departments), (row["location"] as? Map<*, *>)?.get("name")?.toString().orEmpty().ifBlank { posting.location }, body,
-            closed || deadline?.isBefore(Instant.now()) == true)
+            deadline?.isBefore(Instant.now()) == true)
     }
 
-    override fun prepareCapture(browser: BrowserPage, posting: DiscoveredPosting) {
-        // CAPTURE 체크포인트 재시도에서도 보안 확인 화면을 저장하지 않는다.
+    override fun closureReason(browser: BrowserPage, posting: DiscoveredPosting): String? {
+        val pageText = browser.text("body").orEmpty()
+        check(!Regex("checking your browser|verify you are human|보안 확인 수행 중|사람인지 확인|Just a moment", RegexOption.IGNORE_CASE).containsMatchIn(pageText)) {
+            "쿠팡 상세 페이지 접근이 보안 확인으로 제한되었습니다. 확인 화면은 공고 본문·캡처로 저장하지 않습니다."
+        }
+        val closed = browser.evaluate("""() => Array.from(document.querySelectorAll('main h1, main h2, main [role="alert"], .job-closed, .job-expired')).some(e => /^(This job is no longer available|This job has expired|채용이 마감되었습니다|마감된 공고)[.!\s]*$/i.test(e.innerText.trim()))""") == true
+        return if (closed) "쿠팡 원문 페이지에서 공고 종료 안내를 확인했습니다." else null
+    }
+
+    override fun prepareCapture(browser: BrowserPage, posting: DiscoveredPosting, expectedBodyText: String?) {
+        // API 본문과 실제 화면이 일치할 때만 캡처해 보안 확인/목록 화면을 저장하지 않는다.
         browser.waitFor("h1")
         val expected = posting.title.replace(Regex("\\s+"), " ").trim()
-        val rendered = browser.text("h1").orEmpty().replace(Regex("\\s+"), " ").trim()
-        check(expected.isNotEmpty() && rendered == expected) { "쿠팡 캡처 화면에 실제 공고 제목이 없습니다: $rendered" }
+        val body = expectedBodyText.orEmpty()
+        check(expected.isNotEmpty() && body.isNotBlank()) { "쿠팡 캡처 검증에 제목 또는 API 본문이 없습니다." }
+        val rendered = browser.evaluate("""async expected => {
+            const normalize = text => (text || '').replace(/\s+/g, ' ').trim();
+            const title = normalize(expected.title);
+            const excerpt = normalize(expected.body).slice(0, 120);
+            const deadline = Date.now() + 15000;
+            let actualTitle = '';
+            let hasBody = false;
+            while (Date.now() < deadline) {
+                const visible = normalize(document.body?.innerText);
+                actualTitle = normalize(document.querySelector('h1')?.innerText);
+                hasBody = excerpt.length > 40 && visible.includes(excerpt);
+                if (actualTitle === title && hasBody) return {title: actualTitle, hasBody};
+                await new Promise(resolve => setTimeout(resolve, 150));
+            }
+            return {title: actualTitle, hasBody};
+        }""", mapOf("title" to expected, "body" to body)) as? Map<*, *>
+        check(rendered?.get("title") == expected && rendered["hasBody"] == true) {
+            "쿠팡 원문 페이지에서 공고 제목과 Greenhouse 본문을 확인하지 못했습니다. 보안 확인·오류 화면은 저장하지 않습니다: ${rendered?.get("title")}"
+        }
     }
 
     override fun acceptsUrl(url: String): Boolean = runCatching {

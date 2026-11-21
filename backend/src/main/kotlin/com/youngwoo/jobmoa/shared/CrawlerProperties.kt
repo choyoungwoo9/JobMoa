@@ -10,6 +10,7 @@ data class CrawlerProperties(
     val siteConcurrency: Int = 1,
     val siteOverrides: Map<String, Int> = emptyMap(),
     val minimumNavigationInterval: Duration = Duration.ofMillis(700),
+    val minimumNavigationIntervalOverrides: Map<String, Duration> = emptyMap(),
     val leaseDuration: Duration = Duration.ofMinutes(2),
     val navigationTimeout: Duration = Duration.ofSeconds(30),
     val browserChannel: String = "",
@@ -21,5 +22,6 @@ data class CrawlerProperties(
         require(siteConcurrency > 0 && siteOverrides.values.all { it > 0 })
         require(leaseDuration >= navigationTimeout.multipliedBy(2))
         require(!minimumNavigationInterval.isNegative)
+        require(minimumNavigationIntervalOverrides.values.all { !it.isNegative })
     }
 }
