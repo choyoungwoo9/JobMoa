@@ -301,7 +301,7 @@ export function AiChat({ demo, onOpenPosting }: AiChatProps) {
           {selectedId && <button className="icon-button ai-delete-chat" aria-label="대화 삭제" title="대화 삭제" onClick={() => void deleteConversation()}><Icon name="trash" size={16} /></button>}
         </header>
 
-        {!workerReady && <div className="ai-connection-note" role="status"><Icon name="info" size={16} /><span>질문은 작업 대기열에 저장돼요. Codex 워커가 꺼져 있어 답변은 <code>./start.sh --ai-worker</code>를 실행하면 시작됩니다. 공고 수집과 관리는 워커 없이도 사용할 수 있어요.</span></div>}
+        {!workerReady && <div className="ai-connection-note" role="status"><Icon name="info" size={16} /><span>질문은 작업 대기열에 저장돼요. Codex 워커가 연결되지 않았어요. 앱 시작 시 자동 연결을 시도하며, 계속 연결되지 않으면 Codex CLI 설치·로그인을 확인한 뒤 로컬에서 <code>./ai-worker.sh start</code>로 다시 시도하세요. 공고 수집과 관리는 워커 없이도 사용할 수 있어요.</span></div>}
         {error && <div className="ai-error" role="alert">{error}</div>}
 
         <div className="ai-thread" aria-live="polite">

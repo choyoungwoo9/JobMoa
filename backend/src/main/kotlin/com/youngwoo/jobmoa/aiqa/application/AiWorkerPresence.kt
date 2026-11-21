@@ -25,7 +25,7 @@ class AiWorkerPresence {
     }
 
     fun requireConnected() {
-        if (!status().connected) throw ServiceUnavailable("AI 워커가 연결되지 않았습니다. ./start.sh --ai-worker 로 워커를 켜세요.")
+        if (!status().connected) throw ServiceUnavailable("AI 워커가 연결되지 않았습니다. 로컬에서 ./ai-worker.sh start 로 시작하세요.")
     }
 
     companion object { const val MODEL = "gpt-6-luna" }

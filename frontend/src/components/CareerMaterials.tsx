@@ -129,7 +129,7 @@ export function CareerMaterials({ demo }: { demo: boolean }) {
         <button className="button primary" disabled={busy} onClick={() => fileInput.current?.click()}><Icon name="plus" size={17} />{busy ? '파일 처리 중' : '파일 추가'}</button>
         <input ref={fileInput} className="career-file-input" type="file" multiple onChange={event => void upload(event.target.files)} aria-label="경력 자료 파일 선택" />
       </div>
-      {!worker?.connected && <div className="career-worker-state"><span className="career-worker-dot" /><div><strong>Codex 워커가 꺼져 있어요</strong><p>파일 등록과 본문 추출은 계속할 수 있고, AI 정리는 대기합니다. 처리하려면 로컬에서 <code>./start.sh --ai-worker</code>로 실행하세요.</p></div></div>}
+      {!worker?.connected && <div className="career-worker-state"><span className="career-worker-dot" /><div><strong>Codex 워커가 연결되지 않았어요</strong><p>파일 등록과 본문 추출은 계속할 수 있고, AI 정리는 대기합니다. 시작 시 자동 연결을 시도하며, 연결되지 않으면 Codex CLI 설치·로그인을 확인한 뒤 로컬에서 <code>./ai-worker.sh start</code>로 다시 시도하세요.</p></div></div>}
 
       {loading ? <div className="career-loading">자료를 불러오는 중…</div> : items.length === 0 ? (
         <div className="career-empty"><Icon name="file" size={28} /><h2>아직 등록한 경력 자료가 없어요</h2><p>이력서, 포트폴리오, 프로젝트 문서 등 파일을 한 번에 올려주세요. 형식을 고르거나 자료 종류를 나누지 않아도 됩니다.</p><button className="button primary" onClick={() => fileInput.current?.click()}>첫 파일 등록</button></div>

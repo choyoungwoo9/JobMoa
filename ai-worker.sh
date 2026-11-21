@@ -22,7 +22,7 @@ case "$action" in
       echo "AI 워커 실행 중 (PID $pid)"
       [[ -f "$log_file" ]] && tail -n 8 "$log_file"
     else
-      echo "AI 워커가 실행되고 있지 않습니다. ./start.sh --ai-worker 또는 ./ai-worker.sh start 로 켜세요."
+      echo "AI 워커가 실행되고 있지 않습니다. ./ai-worker.sh start 로 켜세요."
     fi
     ;;
   stop)
