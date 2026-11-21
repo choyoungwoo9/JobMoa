@@ -54,7 +54,8 @@ class CodexCli(
                 executable, "exec", "--ephemeral", "--ignore-user-config", "--json", "--color", "never",
                 "--model", MODEL, "--config", "web_search=\"live\"", "--disable", "shell_tool", "--sandbox", "read-only",
                 "--ask-for-approval", "never", "--skip-git-repo-check", "--cd", directory.toString(),
-                "--output-schema", schema.toString(), "--output-last-message", output.toString(), "-",
+                "--config", "approval_policy=\"never\"", "--output-schema", schema.toString(),
+                "--output-last-message", output.toString(), "-",
             )
             val process = ProcessBuilder(arguments).directory(directory.toFile()).start()
             activeProcess.set(process)
