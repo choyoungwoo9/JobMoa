@@ -12,7 +12,7 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
     // 부모 → 자식 순서. 삭제는 역순으로 하며 FK를 끄거나 TRUNCATE하지 않는다.
     private val tables = listOf("collection_run", "collection_run_source", "crawl_task", "posting", "posting_version",
         "posting_category", "posting_observation", "posting_interest", "collection_preset", "collection_change",
-        "career_material", "career_material_fragment", "career_fact", "career_fact_evidence")
+        "career_material", "career_material_fragment", "career_fact", "career_fact_evidence", "posting_application_requirement")
     private data class Column(val name: String, val type: Int)
     private fun metadata(table: String): List<Column> = jdbc.execute(org.springframework.jdbc.core.ConnectionCallback { connection ->
         connection.prepareStatement("SELECT * FROM `$table` LIMIT 0").use { statement -> statement.executeQuery().use { rs ->
@@ -26,6 +26,7 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
         "interests" to (jdbc.queryForObject("SELECT COUNT(*) FROM posting_interest WHERE starred=1", Long::class.java) ?: 0),
         "management" to count("posting_interest"), "presets" to count("collection_preset"),
         "careerMaterials" to count("career_material"), "careerFacts" to count("career_fact"),
+        "applicationRequirements" to count("posting_application_requirement"),
         "read" to (jdbc.queryForObject("SELECT COUNT(*) FROM posting WHERE is_read=1", Long::class.java) ?: 0))
     private fun count(table: String) = jdbc.queryForObject("SELECT COUNT(*) FROM `$table`", Long::class.java) ?: 0
     override fun captureNames(): Set<String> = jdbc.queryForList("SELECT capture_path FROM posting_version UNION SELECT capture_path FROM crawl_task WHERE capture_path IS NOT NULL", String::class.java).filterNotNull().toSet()
@@ -43,8 +44,12 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
         SnapshotTable(columns.map { it.name }, rows)
     }
     override fun validate(snapshot: WorkspaceSnapshot) {
-        require(snapshot.format == "jobmoa" && snapshot.version in setOf(1, 2) && snapshot.schema in setOf(10, 11)) { "이 버전에서 지원하는 JobMoa 백업 파일이 아닙니다." }
-        val expectedTables = if (snapshot.schema == 10) tables.filterNot { it.startsWith("career_") }.toSet() else tables.toSet()
+        require(snapshot.format == "jobmoa" && snapshot.version in setOf(1, 2) && snapshot.schema in setOf(10, 11, 12)) { "이 버전에서 지원하는 JobMoa 백업 파일이 아닙니다." }
+        val expectedTables = when (snapshot.schema) {
+            10 -> tables.filterNot { it.startsWith("career_") || it == "posting_application_requirement" }.toSet()
+            11 -> tables.filterNot { it == "posting_application_requirement" }.toSet()
+            else -> tables.toSet()
+        }
         require(snapshot.tables.keys == expectedTables) { "백업에 필요한 데이터가 없거나 알 수 없는 테이블이 포함되어 있습니다." }
         require(snapshot.tables.values.sumOf { it.rows.size.toLong() } <= 1_000_000) { "백업 데이터가 너무 큽니다." }
         snapshot.tables.keys.forEach { table ->
@@ -89,7 +94,7 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
         require(values("crawl_task", "stage").all { it in setOf("BODY", "CAPTURE", "SAVE") } && values("crawl_task", "outcome").all { it == null || it in setOf("NEW", "CHANGED", "IDENTICAL", "CLOSED", "EXCLUDED") }) { "작업 단계가 올바르지 않습니다." }
         val captureReferences = (values("posting_version", "capture_path") + values("crawl_task", "capture_path")).filterNotNull().map { it.toString() }.toSet()
         require(captureReferences == snapshot.captures.toSet() && snapshot.captures.distinct().size == snapshot.captures.size) { "백업의 캡처 목록이 데이터와 일치하지 않습니다." }
-        if (snapshot.schema == 11) {
+        if (snapshot.schema >= 11) {
             references("career_material_fragment", "material_id", "career_material")
             references("career_fact", "material_id", "career_material")
             references("career_fact_evidence", "fact_id", "career_fact")
@@ -101,6 +106,11 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
             require(values("career_material", "storage_key").none { it == null } && values("career_material", "content_hash").all { it.toString().matches(Regex("[a-f0-9]{64}")) }) { "경력 자료 원본 참조가 올바르지 않습니다." }
         } else {
             require(snapshot.careerFiles.isEmpty()) { "이전 백업 형식에는 경력 원본 파일을 포함할 수 없습니다." }
+        }
+        if (snapshot.schema == 12) {
+            references("posting_application_requirement", "posting_id", "posting")
+            require(values("posting_application_requirement", "source").all { it in setOf("POSTING_BODY", "USER_PASTED") }) { "지원서 정보 출처가 올바르지 않습니다." }
+            require(values("posting_application_requirement", "status").all { it in setOf("WAITING_AI", "ANALYZING", "REVIEW", "CONFIRMED", "FAILED") }) { "지원서 정보 상태가 올바르지 않습니다." }
         }
     }
     override fun replace(snapshot: WorkspaceSnapshot) {

@@ -48,22 +48,25 @@ private class AiWorker {
         }, HEARTBEAT_SECONDS, HEARTBEAT_SECONDS, TimeUnit.SECONDS)
         log.info("JobMoa AI 워커 시작: model={}, endpoint={}", CodexCli.MODEL, baseUrl)
 
-        var preferCareerMaterials = true
+        var nextQueue = 0
+        val queues = listOf("application-requirements", "career-materials", "ai")
         while (!Thread.currentThread().isInterrupted) {
             try {
-                val careerFirst = preferCareerMaterials
-                preferCareerMaterials = !preferCareerMaterials
-                val careerTask = if (careerFirst) request("POST", "/api/career-materials/worker/tasks/claim", "{}") else null
-                val aiTask = if (careerTask == null || careerTask.isNull || careerTask.isMissingNode) request("POST", "/api/ai/worker/tasks/claim", "{}") else null
-                val task = careerTask?.takeUnless { it.isNull || it.isMissingNode }
-                    ?: aiTask?.takeUnless { it.isNull || it.isMissingNode }
-                    ?: if (!careerFirst) request("POST", "/api/career-materials/worker/tasks/claim", "{}") else null
-                if (task == null || task.isNull || task.isMissingNode) {
+                var claimed: Pair<JsonNode, String>? = null
+                for (offset in queues.indices) {
+                    val queue = queues[(nextQueue + offset) % queues.size]
+                    val task = request("POST", "/api/$queue/worker/tasks/claim", "{}")
+                    if (!task.isNull && !task.isMissingNode) {
+                        claimed = task to queue
+                        nextQueue = (queues.indexOf(queue) + 1) % queues.size
+                        break
+                    }
+                }
+                if (claimed == null) {
                     Thread.sleep(POLL_MILLIS)
                     continue
                 }
-                val isCareerMaterial = task.has("fragments")
-                process(task, isCareerMaterial)
+                process(claimed.first, claimed.second)
             } catch (interrupted: InterruptedException) {
                 Thread.currentThread().interrupt()
             } catch (error: Exception) {
@@ -75,11 +78,11 @@ private class AiWorker {
         deltaScheduler.shutdownNow()
     }
 
-    private fun process(task: JsonNode, careerMaterial: Boolean) {
+    private fun process(task: JsonNode, queue: String) {
         val taskId = task["taskId"].asString()
         val leaseToken = task["leaseToken"].asString()
-        val lease = Lease(taskId, leaseToken, careerMaterial)
-        val progress = if (careerMaterial) null else ProgressReporter(taskId, leaseToken)
+        val lease = Lease(taskId, leaseToken, queue)
+        val progress = if (queue != "ai") null else ProgressReporter(taskId, leaseToken)
         active.set(lease)
         reporter.set(progress)
         val flushJob: ScheduledFuture<*>? = progress?.let { reporter ->
@@ -89,7 +92,7 @@ private class AiWorker {
             )
         }
         try {
-            if (careerMaterial) {
+            if (queue == "career-materials") {
                 val result = codex.analyzeCareer(task)
                 request("POST", "/api/career-materials/worker/tasks/$taskId/complete", mapper.writeValueAsString(mapOf(
                     "leaseToken" to leaseToken,
@@ -101,6 +104,13 @@ private class AiWorker {
                     ) },
                 )))
                 log.info("경력 자료 분석 완료: {} (facts={})", taskId, result.facts.size)
+            } else if (queue == "application-requirements") {
+                val result = codex.analyzeApplicationRequirements(task)
+                request("POST", "/api/application-requirements/worker/tasks/$taskId/complete", mapper.writeValueAsString(mapOf(
+                    "leaseToken" to leaseToken,
+                    "result" to result,
+                )))
+                log.info("지원서 요구 정보 분석 완료: {}", taskId)
             } else {
                 val aiProgress = requireNotNull(progress)
                 aiProgress.status("공고 자료를 확인하고 있어요")
@@ -122,7 +132,7 @@ private class AiWorker {
             progress?.flushQuietly()
             val message = safeError(error.message ?: "Codex CLI가 작업을 완료하지 못했습니다.")
             runCatching {
-                val endpoint = if (careerMaterial) "/api/career-materials/worker/tasks/$taskId/fail" else "/api/ai/worker/tasks/$taskId/fail"
+                val endpoint = "/api/$queue/worker/tasks/$taskId/fail"
                 request("POST", endpoint, mapper.writeValueAsString(mapOf(
                     "leaseToken" to leaseToken,
                     "message" to message,
@@ -144,7 +154,7 @@ private class AiWorker {
     }
 
     private fun renew(lease: Lease) {
-        val endpoint = if (lease.careerMaterial) "/api/career-materials/worker/tasks/${lease.taskId}/renew" else "/api/ai/worker/tasks/${lease.taskId}/renew"
+        val endpoint = "/api/${lease.queue}/worker/tasks/${lease.taskId}/renew"
         request("POST", endpoint, mapper.writeValueAsString(mapOf("leaseToken" to lease.token)))
     }
 
@@ -216,7 +226,7 @@ private class AiWorker {
         }
     }
 
-    private data class Lease(val taskId: String, val token: String, val careerMaterial: Boolean)
+    private data class Lease(val taskId: String, val token: String, val queue: String)
 
     companion object {
         private const val HEARTBEAT_SECONDS = 10L

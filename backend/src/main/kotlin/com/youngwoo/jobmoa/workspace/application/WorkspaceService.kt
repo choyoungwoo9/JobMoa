@@ -63,7 +63,19 @@ class WorkspaceService(private val repository: WorkspaceSnapshotRepository, priv
                 values[expiresIndex] = null
             }
         }
-        return tables + ("career_material" to table.copy(rows = rows))
+        val requirementTable = tables.getValue("posting_application_requirement")
+        val requirementStatus = requirementTable.columns.indexOf("status")
+        val requirementToken = requirementTable.columns.indexOf("lease_token")
+        val requirementExpires = requirementTable.columns.indexOf("lease_expires_at")
+        val requirementRows = requirementTable.rows.map { row ->
+            if (row[requirementStatus] != "ANALYZING") row else row.toMutableList().also { values ->
+                values[requirementStatus] = "WAITING_AI"
+                values[requirementToken] = null
+                values[requirementExpires] = null
+            }
+        }
+        return tables + ("career_material" to table.copy(rows = rows)) +
+            ("posting_application_requirement" to requirementTable.copy(rows = requirementRows))
     }
     private fun hash(path: Path): String {
         val digest = MessageDigest.getInstance("SHA-256")
@@ -164,7 +176,8 @@ class WorkspaceService(private val repository: WorkspaceSnapshotRepository, priv
             return mapOf("token" to id, "exportedAt" to snapshot.exportedAt, "expiresAt" to expires, "counts" to snapshotCounts(snapshot),
                 "captureBytes" to snapshot.captures.sumOf { Files.size(directory.resolve("captures/$it")) },
                 "careerBytes" to snapshot.careerFiles.sumOf { Files.size(directory.resolve("career-materials/$it")) },
-                "careerMaterialsIncluded" to (snapshot.schema >= 11))
+                "careerMaterialsIncluded" to (snapshot.schema >= 11),
+                "applicationRequirementsIncluded" to (snapshot.schema >= 12))
         } catch (e: Exception) {
             removeDirectory(directory)
             if (e is IllegalArgumentException) throw e
@@ -201,7 +214,8 @@ class WorkspaceService(private val repository: WorkspaceSnapshotRepository, priv
     private fun snapshotCounts(s: WorkspaceSnapshot) = mapOf("postings" to s.tables.getValue("posting").rows.size,
         "versions" to s.tables.getValue("posting_version").rows.size, "runs" to s.tables.getValue("collection_run").rows.size,
         "management" to s.tables.getValue("posting_interest").rows.size, "presets" to s.tables.getValue("collection_preset").rows.size, "captureFiles" to s.captures.size,
-        "careerMaterials" to (s.tables["career_material"]?.rows?.size ?: 0), "careerFiles" to s.careerFiles.size)
+        "careerMaterials" to (s.tables["career_material"]?.rows?.size ?: 0), "careerFiles" to s.careerFiles.size,
+        "applicationRequirements" to (s.tables["posting_application_requirement"]?.rows?.size ?: 0))
     @Synchronized fun discard(token: String) { previews.remove(token)?.let { removeDirectory(it.directory) } }
     @Synchronized fun restore(token: String, confirmation: String): Map<String, Any> {
         require(confirmation == "복원") { "확인 문구 '복원'을 입력하세요." }
