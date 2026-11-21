@@ -48,14 +48,22 @@ private class AiWorker {
         }, HEARTBEAT_SECONDS, HEARTBEAT_SECONDS, TimeUnit.SECONDS)
         log.info("JobMoa AI 워커 시작: model={}, endpoint={}", CodexCli.MODEL, baseUrl)
 
+        var preferCareerMaterials = true
         while (!Thread.currentThread().isInterrupted) {
             try {
-                val task = request("POST", "/api/ai/worker/tasks/claim", "{}")
-                if (task.isNull || task.isMissingNode) {
+                val careerFirst = preferCareerMaterials
+                preferCareerMaterials = !preferCareerMaterials
+                val careerTask = if (careerFirst) request("POST", "/api/career-materials/worker/tasks/claim", "{}") else null
+                val aiTask = if (careerTask == null || careerTask.isNull || careerTask.isMissingNode) request("POST", "/api/ai/worker/tasks/claim", "{}") else null
+                val task = careerTask?.takeUnless { it.isNull || it.isMissingNode }
+                    ?: aiTask?.takeUnless { it.isNull || it.isMissingNode }
+                    ?: if (!careerFirst) request("POST", "/api/career-materials/worker/tasks/claim", "{}") else null
+                if (task == null || task.isNull || task.isMissingNode) {
                     Thread.sleep(POLL_MILLIS)
                     continue
                 }
-                process(task)
+                val isCareerMaterial = task.has("fragments")
+                process(task, isCareerMaterial)
             } catch (interrupted: InterruptedException) {
                 Thread.currentThread().interrupt()
             } catch (error: Exception) {
@@ -67,44 +75,62 @@ private class AiWorker {
         deltaScheduler.shutdownNow()
     }
 
-    private fun process(task: JsonNode) {
+    private fun process(task: JsonNode, careerMaterial: Boolean) {
         val taskId = task["taskId"].asString()
         val leaseToken = task["leaseToken"].asString()
-        val lease = Lease(taskId, leaseToken)
-        val progress = ProgressReporter(taskId, leaseToken)
+        val lease = Lease(taskId, leaseToken, careerMaterial)
+        val progress = if (careerMaterial) null else ProgressReporter(taskId, leaseToken)
         active.set(lease)
         reporter.set(progress)
-        val flushJob: ScheduledFuture<*> = deltaScheduler.scheduleAtFixedRate(
-            { runCatching { progress.flush() }.onFailure { log.warn("AI 답변 중간 저장 실패: {}", it.message) } },
-            DELTA_FLUSH_MILLIS, DELTA_FLUSH_MILLIS, TimeUnit.MILLISECONDS,
-        )
-        try {
-            progress.status("공고 자료를 확인하고 있어요")
-            progress.status("Codex가 답변을 작성하고 있어요")
-            val result = codex.answer(task, progress::search, progress::delta)
-            progress.flush()
-            val body = mapOf(
-                "leaseToken" to leaseToken,
-                "answer" to result.answer,
-                "postingCitationIds" to result.postingSources.map { it.first },
-                "webSources" to result.webSources.map { mapOf("title" to it.title, "url" to it.url, "reason" to it.reason) },
-                "searchPerformed" to result.searchPerformed,
-                "workspaceUsed" to result.workspaceUsed,
+        val flushJob: ScheduledFuture<*>? = progress?.let { reporter ->
+            deltaScheduler.scheduleAtFixedRate(
+                { runCatching { reporter.flush() }.onFailure { log.warn("AI 답변 중간 저장 실패: {}", it.message) } },
+                DELTA_FLUSH_MILLIS, DELTA_FLUSH_MILLIS, TimeUnit.MILLISECONDS,
             )
-            request("POST", "/api/ai/worker/tasks/$taskId/complete", mapper.writeValueAsString(body))
-            log.info("AI 작업 완료: {} (webSearch={})", taskId, result.searchPerformed)
+        }
+        try {
+            if (careerMaterial) {
+                val result = codex.analyzeCareer(task)
+                request("POST", "/api/career-materials/worker/tasks/$taskId/complete", mapper.writeValueAsString(mapOf(
+                    "leaseToken" to leaseToken,
+                    "facts" to result.facts.map { fact -> mapOf(
+                        "kind" to fact.kind.name,
+                        "title" to fact.title,
+                        "summary" to fact.summary,
+                        "evidence" to fact.evidence.map { evidence -> mapOf("fragmentId" to evidence.fragmentId, "excerpt" to evidence.excerpt) },
+                    ) },
+                )))
+                log.info("경력 자료 분석 완료: {} (facts={})", taskId, result.facts.size)
+            } else {
+                val aiProgress = requireNotNull(progress)
+                aiProgress.status("공고 자료를 확인하고 있어요")
+                aiProgress.status("Codex가 답변을 작성하고 있어요")
+                val result = codex.answer(task, aiProgress::search, aiProgress::delta)
+                aiProgress.flush()
+                val body = mapOf(
+                    "leaseToken" to leaseToken,
+                    "answer" to result.answer,
+                    "postingCitationIds" to result.postingSources.map { it.first },
+                    "webSources" to result.webSources.map { mapOf("title" to it.title, "url" to it.url, "reason" to it.reason) },
+                    "searchPerformed" to result.searchPerformed,
+                    "workspaceUsed" to result.workspaceUsed,
+                )
+                request("POST", "/api/ai/worker/tasks/$taskId/complete", mapper.writeValueAsString(body))
+                log.info("AI 작업 완료: {} (webSearch={})", taskId, result.searchPerformed)
+            }
         } catch (error: Exception) {
-            progress.flushQuietly()
+            progress?.flushQuietly()
             val message = safeError(error.message ?: "Codex CLI가 작업을 완료하지 못했습니다.")
             runCatching {
-                request("POST", "/api/ai/worker/tasks/$taskId/fail", mapper.writeValueAsString(mapOf(
+                val endpoint = if (careerMaterial) "/api/career-materials/worker/tasks/$taskId/fail" else "/api/ai/worker/tasks/$taskId/fail"
+                request("POST", endpoint, mapper.writeValueAsString(mapOf(
                     "leaseToken" to leaseToken,
                     "message" to message,
                 )))
             }.onFailure { log.warn("AI 작업 실패 기록 저장 불가: {}", it.message) }
             log.warn("AI 작업 실패: {} · {}", taskId, message)
         } finally {
-            flushJob.cancel(false)
+            flushJob?.cancel(false)
             reporter.set(null)
             active.set(null)
         }
@@ -118,7 +144,8 @@ private class AiWorker {
     }
 
     private fun renew(lease: Lease) {
-        request("POST", "/api/ai/worker/tasks/${lease.taskId}/renew", mapper.writeValueAsString(mapOf("leaseToken" to lease.token)))
+        val endpoint = if (lease.careerMaterial) "/api/career-materials/worker/tasks/${lease.taskId}/renew" else "/api/ai/worker/tasks/${lease.taskId}/renew"
+        request("POST", endpoint, mapper.writeValueAsString(mapOf("leaseToken" to lease.token)))
     }
 
     private fun request(method: String, path: String, body: String): JsonNode {
@@ -189,7 +216,7 @@ private class AiWorker {
         }
     }
 
-    private data class Lease(val taskId: String, val token: String)
+    private data class Lease(val taskId: String, val token: String, val careerMaterial: Boolean)
 
     companion object {
         private const val HEARTBEAT_SECONDS = 10L

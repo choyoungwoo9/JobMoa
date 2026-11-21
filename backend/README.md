@@ -117,7 +117,7 @@ Flyway V6은 기존 공고의 마지막 상태를 기준점으로 보존합니�
 
 ## 개인 데이터 관리·프리셋·변화 요약 API
 
-설계와 삭제 범위는 [`docs/workspace-tools-spec.md`](../docs/workspace-tools-spec.md)를 따른다. V9는 프리셋·실행별 변화·작업공간 리비전을, V10은 한 실행의 다중 직군 범위를 추가한다. 일반 CRUD는 Spring Data JPA를 사용하며, 전체 백업/복원과 일괄 초기화만 고정 테이블 목록의 JDBC 배치와 트랜잭션을 사용한다. FK를 끄거나 TRUNCATE하지 않는다.
+설계와 삭제 범위는 [`docs/workspace-tools-spec.md`](../docs/workspace-tools-spec.md)를 따른다. V9는 프리셋·실행별 변화·작업공간 리비전을, V10은 한 실행의 다중 직군 범위를, V12는 경력 자료와 AI 정리 후보를 추가한다. 일반 CRUD는 Spring Data JPA를 사용하며, 전체 백업/복원과 일괄 초기화만 고정 테이블 목록의 JDBC 배치와 트랜잭션을 사용한다. FK를 끄거나 TRUNCATE하지 않는다.
 
 | API | 용도 |
 | --- | --- |
@@ -127,15 +127,36 @@ Flyway V6은 기존 공고의 마지막 상태를 기준점으로 보존합니�
 | `DELETE /api/collection-presets/{id}` | 프리셋 삭제 |
 | `POST /api/collection-presets/{id}/start` | 저장된 조합으로 수집 실행 |
 | `GET /api/collections/{id}/changes` | 신규·변경·마감 및 당시 관심 공고 변화의 ID 목록, 과거 기록 여부 |
-| `GET /api/workspace` | 데이터 건수·캡처 용량 |
-| `POST /api/workspace/reset` | `{scope: interests\|postings\|read\|presets, confirmation: "초기화"}` |
-| `POST /api/workspace/captures/cleanup` | `{confirmation: "정리"}`로 미사용 캡처 삭제 |
+| `GET /api/workspace` | 데이터 건수·캡처 및 경력 원본 용량 |
+| `POST /api/workspace/reset` | `{scope: interests\|postings\|read\|presets\|career, confirmation: "초기화"}` |
+| `POST /api/workspace/captures/cleanup` | `{confirmation: "정리"}`로 미사용 캡처와 경력 원본 삭제 |
 | `GET /api/workspace/backup` | ZIP 다운로드, 수집 중 409 |
 | `POST /api/workspace/backups/preview` | multipart `file` 업로드, 검증 후 토큰·건수 반환 |
 | `POST /api/workspace/backups/{token}/restore` | `{confirmation: "복원"}`, 현재 전체 데이터 교체 |
 | `DELETE /api/workspace/backups/{token}` | 미리보기 취소 및 임시 파일 삭제 |
 
-백업 형식은 `jobmoa` v2 / DB 스키마 10 (복원은 v1·v2 지원), ZIP의 `workspace.json`과 `captures/{sha256}.png`로 구성된다. 현재 스키마가 다른 백업은 거부한다. ZIP 2 GiB·해제 4 GiB·개별 파일/JSON 128 MiB 제한이다. 임시 파일은 `${STORAGE_DIRECTORY}/workspace-tmp`에 저장하고 만료·재시작 잔여물을 정리한다. Spring multipart와 Docker 프론트 NGINX의 업로드 크기/타임아웃을 함께 조정했다. 백업 생성은 파일 스트리밍을 사용하지만 스냅샷 JSON·DB 행은 메모리에 보관하므로 한도까지의 대규모 복원 성능은 별도 검증이 필요하다.
+## 경력 자료와 Codex 분석
+
+V12가 원본 문서·추출 구간·AI 사실 후보·근거 인용 테이블을 만든다. 원본은 `${STORAGE_DIRECTORY}/career-materials/{uuid}.bin`에 두고, 문서 내용은 Apache Tika 표준 파서로 감지·추출한다. 페이지 구분과 제목/문단 구간을 저장하며, OCR은 Tesseract 한국어·영어 사전을 사용한다. 파서가 처리하지 못하거나 본문이 비어 있어도 원본과 실패 이유는 남긴다. 업로드는 파일당 50 MiB, 한 번에 20개·총 200 MiB까지 받는다. 추출 본문 저장은 파일당 400만 자, Codex 전달은 파일당 16만 자까지 제한한다. 확장자 검증은 하지 않고 SHA-256 내용 해시로 동일 파일 중복을 막는다.
+
+| API | 용도 |
+| --- | --- |
+| `GET /api/career-materials` | 등록 파일·형식·크기·처리 상태 목록 |
+| `POST /api/career-materials` | multipart `files` 여러 개 등록·본문 추출·비동기 분석 큐 등록 |
+| `GET /api/career-materials/{id}` | 본문 구간과 AI 사실 후보·근거 인용 조회 |
+| `GET /api/career-materials/{id}/original` | 원본 파일 다운로드 |
+| `DELETE /api/career-materials/{id}` | 원본·추출 본문·후보를 함께 삭제 |
+| `POST /api/career-materials/{id}/retry` | AI 분석 실패 파일을 다시 대기열에 등록 |
+| `GET /api/career-materials/worker/status` | 선택 Codex 워커 상태 |
+| `/api/career-materials/worker/tasks/**` | 작업 claim·lease 갱신·완료·실패 보고 |
+
+작업자는 기존 `/api/ai/worker/**` 질문 큐와 경력 자료 큐를 번갈아 poll해 한 종류가 계속 앞서지 않게 한다. 질문 답변은 기존처럼 웹 검색을 허용하고, 경력 자료 prompt는 웹 검색을 켜지 않고 제출된 본문만 사용한다. `gpt-6-luna`에서 생성한 후보의 각 인용은 API가 해당 추출 구간에 실제 포함되는지 재검증하며, 출처가 없는 후보는 저장하지 않는다. 모든 후보는 `UNVERIFIED` 상태로 저장한다. 파일 업로드·본문 추출은 Codex 워커 없이 동작하고 AI 결과는 대기 상태로 유지된다. 워커가 켜져 분석할 때 추출 텍스트와 파일명은 Codex 서비스로 전송되므로 화면에 이를 알린다.
+
+백업·복원은 경력 원본과 추출 자료를 함께 포함하고 `career` 초기화는 경력 원본·구간·후보만 지운다. `postings` 초기화는 경력 자료를 유지한다. AI 사실 후보 편집·검증, 추천 공고, 맞춤 이력서·포트폴리오, 지원서 문항 답변 생성은 아직 구현하지 않았다.
+
+2026-11-21 워크트리 빌드 확인: `./gradlew clean compileKotlin --no-daemon` 통과. 이 확인은 Kotlin 컴파일만 포함하며 DB 마이그레이션을 실행하거나 Codex 분석·개인 파일 업로드를 요청하지 않았다.
+
+백업 형식은 `jobmoa` v2 / DB 스키마 11이며, 복원은 스키마 10·11과 형식 v1·v2를 지원한다. ZIP은 `workspace.json`, `captures/{sha256}.png`, `career-materials/{uuid}.bin`으로 구성된다. 스키마 10 백업은 경력 자료가 없는 전체 교체로 복원되며 마이페이지에서 이를 알린다. ZIP 2 GiB·해제 4 GiB·개별 경력 원본 50 MiB·캡처/JSON 128 MiB 제한이다. 임시 파일은 `${STORAGE_DIRECTORY}/workspace-tmp`에 저장하고 만료·재시작 잔여물을 정리한다. Spring multipart와 Docker 프론트 NGINX의 업로드 크기/타임아웃을 함께 조정했다. 백업 생성은 파일 스트리밍을 사용하지만 스냅샷 JSON·DB 행은 메모리에 보관하므로 한도까지의 대규모 복원 성능은 별도 검증이 필요하다.
 
 `/api/state`의 `workspaceRevision`은 초기화·복원 때 바뀐다. 클라이언트는 리비전이 바뀌면 이전 버전 ID의 본문 캐시를 버린다. 유지보수는 수집 중 409로 차단하며, 사용자 확인 문구도 서버에서 검증한다.
 
@@ -169,7 +190,7 @@ Docker 반영 전후 공고 메타데이터·버전 목록·읽음 상태·개�
 
 작업 결과 `CLOSED`는 `COMPLETED`에 속한다. `GET /api/collections/{id}/tasks`의 `closed` 및 진단 메시지(`error`)로 판별 결과를 확인할 수 있다. 기업별 결과의 `closed`는 성공 처리된 마감 공고 수로, `succeeded`에 포함된다. 본문이 달라지지 않았음을 확인한 `IDENTICAL`과 구별한다. 수집 후 변화 요약의 새로 마감된 공고·관심 공고도 같은 트랜잭션에서 기록한다.
 
-추가 결과값을 포함한 백업은 v2로 내보내며 복원은 v1/v2를 지원한다(DB 스키마 10 유지). 오늘의집 목록은 제목과 지원 URL이 동시에 없는 작성 중 항목만 건너뛰도록 보완했다. 정상 공고의 필수 정보 누락 오류는 숨기지 않는다.
+마감 결과 추가 당시 백업은 v2 / DB 스키마 10이었으며, 이후 경력 자료 도입으로 현재 스키마는 11이다. 오늘의집 목록은 제목과 지원 URL이 동시에 없는 작성 중 항목만 건너뛰도록 보완했다. 정상 공고의 필수 정보 누락 오류는 숨기지 않는다.
 
 대표 화면 확인 후 외부 접속을 차단한 HTML/SSR 재현, localhost 브라우저 응답, 임시 MySQL 저장 프로브로 검증했다. 실제 사용자 DB의 수집·재시도는 실행하지 않았고, 원래 실패 기록과 공고 상태를 유지했다. 실패 재시도의 실제 동작 확인은 사용자가 수행한다.
 
