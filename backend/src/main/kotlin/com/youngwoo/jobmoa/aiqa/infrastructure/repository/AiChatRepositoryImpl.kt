@@ -16,7 +16,7 @@ class AiChatRepositoryImpl(
     private val conversations: AiConversationJpaRepository,
     private val messages: AiMessageJpaRepository,
     private val tasks: AiTaskJpaRepository,
-    private val citations: AiCitationJpaRepository,
+    private val citationRows: AiCitationJpaRepository,
     private val events: AiTaskEventJpaRepository,
     private val postings: AiPostingContextJpaRepository,
     private val mapper: JsonMapper,
@@ -39,9 +39,9 @@ class AiChatRepositoryImpl(
     override fun findMessage(id: String): AiMessage? = messages.findById(id).orElse(null)?.let(::withCitations)
     override fun saveMessage(message: AiMessage) { messages.save(message.entity()) }
 
-    override fun saveCitations(messageId: String, values: List<AiCitation>, now: Instant) {
-        citations.deleteAllByMessageId(messageId)
-        if (values.isNotEmpty()) citations.saveAll(values.map { it.entity(messageId, now) })
+    override fun saveCitations(messageId: String, citations: List<AiCitation>, now: Instant) {
+        citationRows.deleteAllByMessageId(messageId)
+        if (citations.isNotEmpty()) citationRows.saveAll(citations.map { it.entity(messageId, now) })
     }
 
     override fun claimNextTask(now: Instant, lease: Duration): AiTask? {
@@ -78,7 +78,7 @@ class AiChatRepositoryImpl(
                 message.errorMessage = null
                 message.updatedAt = now
             }
-            appendTaskEvent(task.id!!, "status", mapper.writeValueAsString(mapOf(
+            appendTaskEvent(task.id, "status", mapper.writeValueAsString(mapOf(
                 "message" to "워커 연결이 끊겨 작업을 다시 대기 중입니다.",
                 "resetAnswer" to "true",
             )), now)
@@ -90,9 +90,9 @@ class AiChatRepositoryImpl(
         if (ids.isEmpty()) emptyList() else postings.contextsByIds(ids.distinct()).map(::context)
 
     private fun withCitations(message: AiMessageEntity): AiMessage {
-        val task = if (message.role == AiMessageRole.ASSISTANT.name) tasks.findFirstByAssistantMessageId(message.id!!) else null
+        val task = if (message.role == AiMessageRole.ASSISTANT.name) tasks.findFirstByAssistantMessageId(message.id) else null
         return message.domain(
-            citations.findAllByMessageIdOrderByPositionAsc(message.id!!).map { it.domain() },
+            citationRows.findAllByMessageIdOrderByPositionAsc(message.id).map { it.domain() },
             task?.id, task?.lastEventId ?: 0, task?.searchPerformed ?: false,
         )
     }

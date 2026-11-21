@@ -180,7 +180,7 @@ Docker 반영 전후 공고 메타데이터·버전 목록·읽음 상태·개�
 
 `GET /api/ai/tasks/{taskId}/events?after={eventId}`는 DB에 저장된 상태·검색·답변 조각·완료·실패 이벤트를 SSE로 재생한 뒤 실시간 이벤트를 보낸다. 이벤트는 트랜잭션 커밋 후 현재 구독자에 전송한다. 15초 keepalive와 NGINX `proxy_buffering off`로 오랜 응답과 재연결을 지원한다. 브라우저 연결과 Codex 프로세스는 서로 독립적이다.
 
-작업자는 선택 로컬 Kotlin 프로세스로 실행한다. Java 21 이상, Codex CLI 설치 및 `codex login`이 필요하다. `./start.sh --ai-worker`는 전체 앱과 선택 워커를 시작하고, `./ai-worker.sh status|start|stop`은 워커만 관리한다. `./stop.sh`는 워커와 Docker 앱을 함께 종료한다. 기본 `./start.sh`에는 워커가 포함되지 않으며 수집·일반 화면은 그대로 쓸 수 있다. Gradle의 `aiWorker` 실행 작업도 제공한다.
+작업자는 선택 로컬 Kotlin 프로세스로 실행한다. Java 21 이상, Codex CLI 설치 및 `codex login`이 필요하다. `./start.sh --ai-worker`는 전체 앱과 선택 워커를 시작하고, `./ai-worker.sh status|start|stop`은 워커만 관리한다. `./stop.sh`는 워커와 Docker 앱을 함께 종료한다. 기본 `./start.sh`에는 워커가 포함되지 않으며 수집·일반 화면은 그대로 쓸 수 있다. Gradle의 `aiWorker` 실행 작업도 제공한다. 워커와 Spring 애플리케이션의 Kotlin `main()`이 별도이므로 Spring Boot `mainClass`는 `JobMoaApplicationKt`로 지정한다.
 
 Codex CLI 호출은 `gpt-6-luna`를 고정 사용하고, 셸 도구를 끄고 읽기 전용 샌드박스로 실행한다. `--search`를 통해 질문에 필요한 경우에만 외부 검색을 허용하며, 출처 URL은 HTTP(S) 주소로 검증해 저장한다. 공고 검색은 모든 수집 공고(마감 포함)의 메타데이터·직군·최신 본문을 조회하고, 키워드 점수 상위 12건의 본문 발췌(각 6,000자까지)를 작업 컨텍스트에 보관한다. 대화 요약·답변·공고/웹 출처는 MySQL에 저장하고 외부 검색 페이지 본문은 저장하지 않는다.
 

@@ -10,6 +10,8 @@ group = 'com.youngwoo'
 version = '0.1.0'
 description = 'JobMoa local recruitment collector'
 
+springBoot { mainClass = 'com.youngwoo.jobmoa.JobMoaApplicationKt' }
+
 java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
 repositories { mavenCentral() }
 

@@ -20,8 +20,8 @@ class AiWorkerPresence {
 
     fun status(): AiWorkerStatus {
         val current = latest.get()
-        val connected = current?.lastSeenAt?.plus(expiration)?.isAfter(Instant.now()) == true
-        return if (connected) current!! else AiWorkerStatus(false, model = MODEL, webSearch = true, lastSeenAt = current?.lastSeenAt)
+        val connected = current != null && current.lastSeenAt?.plus(expiration)?.isAfter(Instant.now()) == true
+        return if (connected) current else AiWorkerStatus(false, model = MODEL, webSearch = true, lastSeenAt = current?.lastSeenAt)
     }
 
     fun requireConnected() {
