@@ -74,11 +74,12 @@ Codex 워커는 Docker 밖에서 실행하는 로컬 Kotlin 프로세스다. `./
 ./start.sh             # 전체 Docker 앱과 Codex 워커 자동 시작
 ./ai-worker.sh start   # Docker 앱이 실행 중일 때 워커만 시작
 ./ai-worker.sh status  # 워커 상태와 최근 로그 확인
+./ai-worker.sh restart # 이전·고아 워커를 정리하고 현재 코드로 다시 시작
 ./ai-worker.sh stop    # 워커만 종료
 ./stop.sh              # 워커와 전체 Docker 앱 종료
 ```
 
-`CODEX_BIN`으로 Codex 실행 파일을 지정할 수 있고 `AI_WORKER_API_URL`로 worker API 주소를 바꿀 수 있다. 기본 모델 ID는 `gpt-6-luna`이며 변경 가능한 설정으로 노출하지 않는다. CLI는 사용자 프로필 설정을 읽지 않도록 실행하고, 셸 도구를 끄고 읽기 전용 샌드박스를 사용한다. 워커는 `backend/storage/ai-worker.log`에 로그를 남긴다.
+`CODEX_BIN`으로 Codex 실행 파일을 지정할 수 있고 `AI_WORKER_API_URL`로 worker API 주소를 바꿀 수 있다. 기본 모델 ID는 `gpt-6-luna`이며 변경 가능한 설정으로 노출하지 않는다. CLI는 사용자 프로필 설정을 읽지 않도록 실행하고, 셸 도구를 끄고 읽기 전용 샌드박스를 사용한다. 워커는 `backend/storage/ai-worker.log`에 로그를 남긴다. 시작 스크립트는 실행별 고유 `workerId`를 저장하고 같은 ID가 `/api/ai/status`에 heartbeat로 확인된 뒤에만 성공을 반환한다. 이전 워커의 최근 heartbeat만 남아 있는 경우에는 새 프로세스가 연결된 것으로 오인하지 않는다. `status`도 PID와 저장한 `workerId`를 대조하며, 코드 변경을 적용할 때는 `restart` 또는 `start.sh --ai-worker`를 사용한다.
 
 ## 경계와 개인정보
 
