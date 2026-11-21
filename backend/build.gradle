@@ -25,6 +25,7 @@ dependencies {
     implementation 'org.jetbrains.kotlin:kotlin-reflect'
     implementation 'tools.jackson.module:jackson-module-kotlin'
     implementation 'com.microsoft.playwright:playwright:1.65.0'
+    implementation 'org.apache.tika:tika-parsers-standard-package:4.2.0'
     runtimeOnly 'com.mysql:mysql-connector-j'
 }
 
