@@ -166,6 +166,7 @@ export function createSeedState(): DemoState {
         location,
         url: sourceById(sourceId).url,
         firstSeen,
+        lastSeenAt: index >= 30 ? new Date(now - (index - 29) * 86_400_000).toISOString() : undefined,
         read: index > 5 && index % 3 === 0,
         closed: index >= 30,
         latestChange:

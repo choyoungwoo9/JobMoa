@@ -71,6 +71,7 @@ export interface Job {
   location: string
   url: string
   firstSeen: string
+  lastSeenAt?: string
   read: boolean
   closed: boolean
   latestChange: 'new' | 'changed' | null

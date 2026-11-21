@@ -17,7 +17,7 @@ import { AiChat } from './components/AiChat'
 import { PostingMockGallery } from './components/PostingMockGallery'
 import './App.css'
 
-const PAGE_SIZE = 8
+const PAGE_SIZES = [8, 20, 50]
 function App() {
   if (new URLSearchParams(window.location.search).get('mock') === 'postings') {
     return <PostingMockGallery />
@@ -39,6 +39,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState('newest')
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
   const [includeClosed, setIncludeClosed] = useState(false)
   const [collectOpen, setCollectOpen] = useState(false)
   const [selectedJob, setSelectedJob] = useState<string | null>(null)
@@ -81,14 +82,12 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
         ),
     [data.jobs, changeScope, categoryId, companyFilter, includeClosed, source, tab, query, sort],
   )
-  const listJobs = selectedJob
-    ? browseQueue.flatMap((id) => data.jobs.find((job) => job.id === id) ?? [])
-    : filtered
-  const totalPages = Math.max(1, Math.ceil(listJobs.length / PAGE_SIZE))
+  const listJobs = filtered
+  const totalPages = Math.max(1, Math.ceil(listJobs.length / pageSize))
   const safePage = Math.min(page, totalPages)
   const visibleJobs = listJobs.slice(
-    (safePage - 1) * PAGE_SIZE,
-    safePage * PAGE_SIZE,
+    (safePage - 1) * pageSize,
+    safePage * pageSize,
   )
   const activeJob = data.jobs.find((job) => job.id === selectedJob)
   const activeVersionId = activeJob?.versions[0]?.id
@@ -117,7 +116,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
     if (id) {
       markRead(id)
       setSelectedJob(id)
-      setPage(Math.floor(position / PAGE_SIZE) + 1)
+      setPage(Math.floor(position / pageSize) + 1)
     }
   }
   const openRun = (id: string) => {
@@ -456,12 +455,11 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
                     </span>
                   </button>
                 ))}
-              <div
-                className={`browse-layout ${activeJob ? 'has-preview' : ''}`}
-              >
+              <div className="browse-layout">
                 <section
-                  className={`jobs-section ${activeJob ? 'compact-list' : ''}`}
+                  className="jobs-section"
                   aria-label="수집된 공고 목록"
+                  tabIndex={-1}
                 >
                   <div
                     className="list-tabs"
@@ -573,181 +571,77 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
                         </select>
                         <Icon name="down" size={13} />
                       </label>
+                      <label className="page-size-select">
+                        <span>페이지당</span>
+                        <select aria-label="페이지 크기" value={pageSize} onChange={(event) => { setPageSize(Number(event.target.value)); setPage(1) }}>
+                          {PAGE_SIZES.map(size => <option key={size} value={size}>{size}개</option>)}
+                        </select>
+                      </label>
                     </div>
                   </div>
-                  {activeJob ? (
-                    <div className="compact-jobs" aria-label="공고 탐색 목록">
-                      {visibleJobs.map((job) => (
-                        <article
-                          key={job.id}
-                          className={`compact-job ${job.id === selectedJob ? 'selected' : ''} ${job.read ? 'read' : ''}`}
-                        >
-                          <label className="read-checkbox">
-                            <input
-                              type="checkbox"
-                              checked={job.read}
-                              aria-label={`${job.title} 읽음 표시`}
-                              onChange={() => toggleRead(job.id)}
-                            />
-                            <span>
-                              <Icon name="check" size={12} />
-                            </span>
-                          </label>
-                          <button
-                            className="compact-job-main"
-                            onClick={() => openJob(job.id)}
-                            aria-current={
-                              job.id === selectedJob ? 'true' : undefined
-                            }
-                          >
-                            <span className="compact-job-company">
-                              <BrandMark sourceId={job.sourceId} small />
-                              {job.company}
-                              {job.latestChange === 'new' && (
-                                <span className="new-badge">NEW</span>
-                              )}
-                              {job.latestChange === 'changed' && (
-                                <span className="changed-badge">변경</span>
-                              )}
-                              {job.closed && (
-                                <span className="closed-badge">마감</span>
-                              )}
-                            </span>
-                            <span className="compact-job-title">
-                              {job.title}
-                            </span>
-                            <span className="compact-job-meta">
-                              <span>{job.location}</span>
-                              <span>{dateLabel(job.firstSeen)}</span>
-                            </span>
-                          </button>
-                          <InterestStar job={job} onChange={setStarred} />
-                          <a
-                            className="original-link"
-                            href={job.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            aria-label={`${job.company} 공식 채용 사이트 열기`}
-                          >
-                            <Icon name="external" size={13} />
-                          </a>
-                        </article>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="table-scroll">
-                      <table className="jobs-table">
-                        <thead>
-                          <tr>
-                            <th>
-                              <span className="sr-only">읽음</span>
-                              <Icon name="check" size={16} />
-                            </th>
-                            <th>회사</th>
-                            <th>공고명</th>
-                            <th>근무지</th>
-                            <th>최초 발견일</th>
-                            <th>원문</th>
+                  <div className="table-scroll">
+                    <table className="jobs-table">
+                      <thead>
+                        <tr>
+                          <th><span className="sr-only">읽음</span><Icon name="check" size={16} /></th>
+                          <th>회사</th>
+                          <th>공고명</th>
+                          <th>직군</th>
+                          <th>근무지</th>
+                          <th>최초 발견일</th>
+                          <th>원문</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {visibleJobs.map((job) => (
+                          <tr key={job.id} className={`${job.read ? 'job-read' : ''} ${job.closed ? 'job-closed' : ''}`}>
+                            <td>
+                              <label className="read-checkbox" title={job.read ? '안 읽음으로 변경' : '읽음으로 표시'}>
+                                <input type="checkbox" checked={job.read} aria-label={`${job.title} 읽음 표시`} onChange={() => toggleRead(job.id)} />
+                                <span><Icon name="check" size={12} /></span>
+                              </label>
+                            </td>
+                            <td>
+                              <div className="company-cell">
+                                <BrandMark sourceId={job.sourceId} />
+                                <span>{job.company}<small>{sourceById(job.sourceId).name} 기업군</small></span>
+                              </div>
+                            </td>
+                            <td className="title-cell">
+                              <div className="posting-title-line">
+                                <InterestStar job={job} onChange={setStarred} />
+                                <button className="job-title-open" data-job-id={job.id} aria-label={`${job.title} 상세 보기`} onClick={() => openJob(job.id)}>
+                                  <span className="job-title-text">{job.title}</span>
+                                  {job.latestChange === 'new' && <span className="new-badge">NEW</span>}
+                                  {job.latestChange === 'changed' && <span className="changed-badge">변경</span>}
+                                  {job.closed && <span className="closed-badge">마감 · 보관</span>}
+                                  <span className="job-open-hint">상세 보기 <Icon name="chevron" size={12} /></span>
+                                </button>
+                              </div>
+                              <span className="saved-indicator">
+                                <Icon name="image" size={12} />
+                                <span>캡처 {job.versions[0].captureAvailable ? demo ? '예시' : '저장됨' : '미저장'}</span>
+                                <span className="saved-dot">·</span>
+                                <Icon name="file" size={12} />
+                                <span>본문</span>
+                                {job.versions.length > 1 && <><span className="saved-dot">·</span><span>버전 {job.versions.length}</span></>}
+                              </span>
+                            </td>
+                            <td className="job-category-cell">
+                              {job.categories?.length ? job.categories.map(id => <span className="job-category" key={id}>{categoryName(id)}</span>) : <span className="job-category unmapped">미분류</span>}
+                            </td>
+                            <td className="location-cell">{job.location}</td>
+                            <td className="date-cell">{dateLabel(job.firstSeen)}</td>
+                            <td>
+                              <a className="original-link" href={job.url} target="_blank" rel="noreferrer" aria-label={`${job.company} 공식 채용 사이트 열기`} title={demo ? '샘플: 공식 채용 홈으로 이동' : '공고 원문 열기'}>
+                                <Icon name="external" size={16} />
+                              </a>
+                            </td>
                           </tr>
-                        </thead>
-                        <tbody>
-                          {visibleJobs.map((job) => (
-                            <tr
-                              key={job.id}
-                              className={job.read ? 'job-read' : ''}
-                            >
-                              <td>
-                                <label
-                                  className="read-checkbox"
-                                  title={
-                                    job.read
-                                      ? '안 읽음으로 변경'
-                                      : '읽음으로 표시'
-                                  }
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={job.read}
-                                    aria-label={`${job.title} 읽음 표시`}
-                                    onChange={() => toggleRead(job.id)}
-                                  />
-                                  <span>
-                                    <Icon name="check" size={12} />
-                                  </span>
-                                </label>
-                              </td>
-                              <td>
-                                <div className="company-cell">
-                                  <BrandMark sourceId={job.sourceId} />
-                                  <span>
-                                    {job.company}
-                                    <small>
-                                      {sourceById(job.sourceId).name} 기업군
-                                    </small>
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="title-cell">
-                                <div className="posting-title-line"><InterestStar job={job} onChange={setStarred} />
-                                <button
-                                  onClick={() => {
-                                    openJob(job.id)
-                                  }}
-                                >
-                                  <span>{job.title}</span>
-                                  {job.latestChange === 'new' && (
-                                    <span className="new-badge">NEW</span>
-                                  )}
-                                  {job.latestChange === 'changed' && (
-                                    <span className="changed-badge">변경</span>
-                                  )}
-                                  {job.closed && (
-                                    <span className="closed-badge">마감</span>
-                                  )}
-                                </button></div>
-                                <span className="saved-indicator">
-                                  <Icon name="image" size={12} />
-                                  <span>
-                                    캡처{' '}
-                                    {job.versions[0].captureAvailable
-                                      ? demo ? '예시' : '저장됨'
-                                      : '미저장'}
-                                  </span>
-                                  <span className="saved-dot">·</span>
-                                  <Icon name="file" size={12} />
-                                  <span>본문</span>
-                                  {job.categories?.map(id => <span className="job-category" key={id}>{categoryName(id)}</span>)}
-                                  {!job.categories?.length && <span className="job-category unmapped">미분류</span>}
-                                  {job.versions.length > 1 && (
-                                    <>
-                                      <span className="saved-dot">·</span>
-                                      <span>버전 {job.versions.length}</span>
-                                    </>
-                                  )}
-                                </span>
-                              </td>
-                              <td className="location-cell">{job.location}</td>
-                              <td className="date-cell">
-                                {dateLabel(job.firstSeen)}
-                              </td>
-                              <td>
-                                <a
-                                  className="original-link"
-                                  href={job.url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  aria-label={`${job.company} 공식 채용 사이트 열기`}
-                                  title={demo ? '샘플: 공식 채용 홈으로 이동' : '공고 원문 열기'}
-                                >
-                                  <Icon name="external" size={16} />
-                                </a>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                   {!listJobs.length && (
                     <div className="empty-state">
                       <span>
@@ -766,7 +660,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
                   <div className="table-footer">
                     <span>
                       {listJobs.length
-                        ? `${(safePage - 1) * PAGE_SIZE + 1}–${Math.min(safePage * PAGE_SIZE, listJobs.length)}`
+                        ? `${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, listJobs.length)}`
                         : '0'}
                       <span> / {listJobs.length}개 공고</span>
                     </span>
@@ -812,7 +706,6 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
                 </section>
                 {activeJob && (
                   <JobDrawer
-                    key={activeJob.id}
                     job={activeJob}
                     categories={categories}
                     onClose={closeJob}

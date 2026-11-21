@@ -38,7 +38,7 @@ class WorkspaceQuery(private val changes: CollectionChangeRepository, private va
     }
     private fun metadata(p: Posting, change: String?) = mapOf(
         "id" to p.id.toString(), "sourceId" to p.sourceId, "companyId" to companies.resolve(p.sourceId, p.company, p.url).firstOrNull()?.id, "company" to p.company, "title" to p.title,
-        "location" to p.location, "url" to p.url, "firstSeen" to p.firstSeen, "read" to p.read, "closed" to p.closed,
+        "location" to p.location, "url" to p.url, "firstSeen" to p.firstSeen, "lastSeenAt" to p.lastSeen, "read" to p.read, "closed" to p.closed,
         "categories" to p.categories.sorted(), "classification" to p.classification,
         "latestChange" to change?.takeIf { it == "new" || it == "changed" },
     )

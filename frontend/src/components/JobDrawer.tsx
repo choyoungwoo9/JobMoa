@@ -1,5 +1,5 @@
 import { VersionDiff } from './VersionDiff'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { dateLabel, sourceById } from '../data'
 import type { Category, InterestManagement, Job, JobVersion } from '../types'
 import { BrandMark } from './BrandMark'
@@ -48,16 +48,71 @@ export function JobDrawer({
   onPrevious: () => void
   onNext: () => void
 }) {
-  const [tab, setTab] = useState<'capture' | 'text' | 'diff'>('text')
+  const [tab, setTab] = useState<'capture' | 'text' | 'diff'>('capture')
   const [versionId, setVersionId] = useState(job.versions[0].id)
   const [zoomed, setZoomed] = useState(false)
+  const closeButton = useRef<HTMLButtonElement>(null)
+  const zoomedRef = useRef(zoomed)
+  const jobIdRef = useRef(job.id)
   const closeZoom = useCallback(() => setZoomed(false), [])
+  useEffect(() => { zoomedRef.current = zoomed }, [zoomed])
+  useEffect(() => { jobIdRef.current = job.id }, [job.id])
+  useEffect(() => {
+    const body = document.body
+    const previousOverflow = body.style.overflow
+    const previousPaddingRight = body.style.paddingRight
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const scrollY = window.scrollY
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth
+    body.style.overflow = 'hidden'
+    if (scrollbarWidth > 0) {
+      const currentPadding = Number.parseFloat(getComputedStyle(body).paddingRight) || 0
+      body.style.paddingRight = `${currentPadding + scrollbarWidth}px`
+    }
+    closeButton.current?.focus()
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        if (zoomedRef.current) closeZoom()
+        else onClose()
+      } else if (event.key === 'Tab') {
+        const drawer = document.querySelector<HTMLElement>('.job-drawer')
+        const focusable = drawer ? Array.from(drawer.querySelectorAll<HTMLElement>('a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])')) : []
+        const first = focusable[0]
+        const last = focusable.at(-1)
+        if (event.shiftKey && (document.activeElement === first || !drawer?.contains(document.activeElement))) {
+          event.preventDefault()
+          last?.focus()
+        } else if (!event.shiftKey && (document.activeElement === last || !drawer?.contains(document.activeElement))) {
+          event.preventDefault()
+          first?.focus()
+        }
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      body.style.overflow = previousOverflow
+      body.style.paddingRight = previousPaddingRight
+      window.scrollTo(0, scrollY)
+      const returnFocus = previousFocus?.isConnected
+        ? previousFocus
+        : Array.from(document.querySelectorAll<HTMLElement>('[data-job-id]')).find(element => element.dataset.jobId === jobIdRef.current) ?? document.querySelector<HTMLElement>('.jobs-section')
+      returnFocus?.focus({ preventScroll: true })
+    }
+  }, [closeZoom, onClose])
+  useEffect(() => {
+    setTab('capture')
+    setVersionId(job.versions[0].id)
+    setZoomed(false)
+  }, [job.id])
   const version =
     job.versions.find((v) => v.id === versionId) ?? job.versions[0]
   const index = job.versions.findIndex((v) => v.id === version.id)
   const revision = job.versions.length - index
   return (
-    <aside aria-labelledby="job-title" className="job-drawer">
+    <div className="job-drawer-backdrop" onClick={(event) => { if (event.target === event.currentTarget) onClose() }}>
+    <aside aria-labelledby="job-title" aria-modal="true" role="dialog" className="job-drawer">
       <div className="drawer-top">
         <span>
           <Icon name="file" size={17} />
@@ -84,6 +139,7 @@ export function JobDrawer({
             <Icon name="chevron" size={14} />
           </button>
           <button
+            ref={closeButton}
             className="icon-button"
             onClick={onClose}
             aria-label="공고 상세 닫기"
@@ -116,6 +172,10 @@ export function JobDrawer({
             <dt>보관된 버전</dt>
             <dd>{job.versions.length}개</dd>
           </div>
+          {job.closed && <div>
+            <dt>마감 확인</dt>
+            <dd>{job.lastSeenAt ? dateLabel(job.lastSeenAt, true) : '확인 시각 정보 없음'}</dd>
+          </div>}
         </dl>
         <section className="classification-detail" aria-label="직군 분류">
           <div className="classification-tags">{job.categories?.length ? job.categories.map(id => <span className="job-category" key={id}>{categories.find(category => category.id === id)?.name ?? id}</span>) : <span className="job-category unmapped">미분류</span>}</div>
@@ -279,5 +339,6 @@ export function JobDrawer({
         </Modal>
       )}
     </aside>
+    </div>
   )
 }

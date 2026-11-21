@@ -95,7 +95,7 @@ Flyway V6은 기존 공고의 마지막 상태를 기준점으로 보존합니�
 `TaskService.finish`는 변경/동일 여부와 선택한 수집 분야에 관계없이 전체 직군을 판정합니다. 동일 본문은 저장 버전을 재사용합니다. `posting_category` 연결을 결과 집합과 일치시키므로 이전 오분류도 제거됩니다. `posting.classification_json`에는 규칙 버전·판정 시각·입력 해시·본문 구역 모드·직군별 근거 문장·미분류 이유가 저장됩니다. 본문 버전이 아닌 최신 공고의 현재 분류입니다.
 
 - `POST /api/classifications/rebuild`: 저장된 모든 공고의 최신 본문만 재분류. 외부 접속·본문/캡처 추가 없음. 응답: `requested`, `completed`, `failedPostingIds`, `unclassified`, `assignments`.
-- `GET /api/state`, `/api/postings`, `/api/postings/{id}`: 각 공고의 `categories`(복수 가능)와 `classification` 제공. 아직 분류하지 않은 과거 데이터는 `classification: null`.
+- `GET /api/state`, `/api/postings`, `/api/postings/{id}`: 각 공고의 `categories`(복수 가능), `classification`, `firstSeen`, `lastSeenAt`, `closed` 제공. `lastSeenAt`은 마지막 성공 관측 시각이며 마감 공고 상세에서는 마감 확인 관측 시각으로 표시한다. 실제 접수 종료 시각을 뜻하지 않는다. 아직 분류하지 않은 과거 데이터는 `classification: null`.
 - 공고별 비관적 잠금과 짧은 트랜잭션으로 최신 본문을 읽고 연결을 교체합니다. 수집·읽음 변경과 같은 공고 잠금을 사용하며, 개별 실패는 목록으로 반환합니다. 재분류는 브라우저를 만들지 않습니다.
 
 실제 Kotlin 결과 평가 도구: `java -cp 'backend/build/classes/kotlin/main:backend/build/resources/main:backend/build/runtime-libs/*' scripts/analysis/EvaluateKotlinClassifier.java /path/corpus.jsonl /tmp/predictions.json` (루트에서 빌드 후 JDK 21 이상). 고정 정답과 Python 해석기 대조 결과는 [구현 검증](../docs/analysis/classification-implementation-v0.5.md)에 기록합니다.

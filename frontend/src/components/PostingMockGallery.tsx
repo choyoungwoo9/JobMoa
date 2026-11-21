@@ -70,6 +70,7 @@ export function PostingMockGallery() {
   const [pageSize, setPageSize] = useState(8)
   const [page, setPage] = useState(1)
   const [selectedId, setSelectedId] = useState('sample-1')
+  const [detailOpen, setDetailOpen] = useState(true)
   const [readState, setReadState] = useState<Record<string, boolean>>({})
 
   const filtered = useMemo(() => postings.filter((job) =>
@@ -118,7 +119,7 @@ export function PostingMockGallery() {
 
         <nav className="mock-variant-tabs" aria-label="공고 목록 화면 시안">
           {variants.map((option) => (
-            <button key={option.id} className={variant === option.id ? 'active' : ''} onClick={() => setVariant(option.id)} aria-pressed={variant === option.id}>
+            <button key={option.id} className={variant === option.id ? 'active' : ''} onClick={() => { setVariant(option.id); if (option.id === 'table') setDetailOpen(true) }} aria-pressed={variant === option.id}>
               <span className="mock-variant-key">{option.key}</span><span><strong>{option.title}</strong><small>{option.description}</small></span>
             </button>
           ))}
@@ -139,7 +140,7 @@ export function PostingMockGallery() {
           <div className="mock-results-summary"><strong>{filtered.length}개 공고</strong><span>열림 {countOpen} <i>·</i> 보관 마감 {countClosed}</span><span>{filtered.length ? `${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)}개 표시` : '검색 결과 없음'}</span></div>
 
           {variant === 'cards' && <CardVariant jobs={visible} selected={selected} readState={readState} onSelect={selectJob} onToggleRead={toggleRead} onNavigate={navigateJob} />}
-          {variant === 'table' && <TableVariant jobs={visible} selected={selected} readState={readState} onSelect={selectJob} onToggleRead={toggleRead} onNavigate={navigateJob} />}
+          {variant === 'table' && <TableVariant jobs={visible} selected={selected} readState={readState} onSelect={selectJob} onToggleRead={toggleRead} onNavigate={navigateJob} detailOpen={detailOpen} onOpen={() => setDetailOpen(true)} onClose={() => setDetailOpen(false)} />}
           {variant === 'split' && <SplitVariant jobs={visible} selected={selected} readState={readState} onSelect={selectJob} onToggleRead={toggleRead} onNavigate={navigateJob} />}
 
           <div className="mock-pagination"><span>페이지 {currentPage} / {totalPages}</span><div><button aria-label="이전 페이지" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>‹</button><button aria-label="다음 페이지" disabled={currentPage >= totalPages} onClick={() => setPage(currentPage + 1)}>›</button></div></div>
@@ -173,10 +174,11 @@ function CardVariant({ jobs, selected, readState, onSelect, onToggleRead, onNavi
   </div>
 }
 
-function TableVariant({ jobs, selected, readState, onSelect, onToggleRead, onNavigate }: VariantProps) {
-  return <div className="mock-table-layout">
+function TableVariant({ jobs, selected, readState, onSelect, onToggleRead, onNavigate, detailOpen, onOpen, onClose }: VariantProps & { detailOpen: boolean; onOpen: () => void; onClose: () => void }) {
+  return <>
+    <div className="mock-table-layout">
     <div className="mock-table-wrap"><table><thead><tr><th>읽음</th><th>회사</th><th>공고명</th><th>직군</th><th>근무지</th><th>발견</th><th>상태</th></tr></thead>
-      <tbody>{jobs.map((job) => <tr key={job.id} className={`${selected?.id === job.id ? 'selected' : ''} ${job.closed ? 'is-closed' : ''}`} onClick={() => onSelect(job.id)}>
+      <tbody>{jobs.map((job) => <tr key={job.id} className={`${selected?.id === job.id ? 'selected' : ''} ${job.closed ? 'is-closed' : ''}`} onClick={() => { onSelect(job.id); onOpen() }}>
         <td onClick={(event) => event.stopPropagation()}><label className="mock-read-check"><input type="checkbox" checked={readState[job.id] ?? job.read} onChange={() => onToggleRead(job)} /><span /></label></td>
         <td><b>{job.group}</b><small className="mock-table-company">{job.company}</small></td>
         <td><span className="mock-table-title">{job.title}</span><span className="mock-table-version">본문 · 캡처 저장 · 버전 {job.versions}</span></td>
@@ -184,8 +186,9 @@ function TableVariant({ jobs, selected, readState, onSelect, onToggleRead, onNav
         <td><JobStatus job={job} />{job.closed && <small className="mock-table-closed">보관 중</small>}</td>
       </tr>)}</tbody>
     </table></div>
-    {selected && <DetailPreview job={selected} mode="side" onNavigate={onNavigate} />}
-  </div>
+    </div>
+    {selected && detailOpen && <div className="mock-drawer-overlay" onClick={(event) => { if (event.target === event.currentTarget) onClose() }}><div className="mock-drawer-panel"><button className="mock-drawer-close" onClick={onClose} aria-label="공고 상세 닫기">상세 닫기 ×</button><DetailPreview job={selected} mode="side" onNavigate={onNavigate} /></div></div>}
+  </>
 }
 
 function SplitVariant({ jobs, selected, readState, onSelect, onToggleRead, onNavigate }: VariantProps) {
