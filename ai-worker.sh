@@ -8,14 +8,28 @@ worker_id_file="backend/storage/ai-worker.id"
 log_file="backend/storage/ai-worker.log"
 api_url="${AI_WORKER_API_URL:-http://127.0.0.1:18080}"
 worker_class='com.youngwoo.jobmoa.aiqa.worker.AiWorkerMainKt'
+worker_label='com.jobmoa.ai-worker'
+
+is_worker_process() {
+  local pid="$1"
+  kill -0 "$pid" 2>/dev/null || return 1
+  ps -p "$pid" -o command= | rg -q "$worker_class"
+}
 
 worker_pid() {
+  if [[ "$(uname -s)" == "Darwin" ]] && command -v launchctl >/dev/null; then
+    local launch_info launch_pid
+    launch_info="$(launchctl list "$worker_label" 2>/dev/null || true)"
+    launch_pid="$(sed -n 's/^[[:space:]]*"PID" = \([0-9][0-9]*\);$/\1/p' <<<"$launch_info")"
+    if [[ "$launch_pid" =~ ^[0-9]+$ ]] && is_worker_process "$launch_pid"; then
+      printf '%s\n' "$launch_pid"
+      return 0
+    fi
+  fi
   [[ -f "$pid_file" ]] || return 1
   local pid
   pid="$(<"$pid_file")"
-  [[ "$pid" =~ ^[0-9]+$ ]] || return 1
-  kill -0 "$pid" 2>/dev/null || return 1
-  ps -p "$pid" -o command= | rg -q "$worker_class" || return 1
+  [[ "$pid" =~ ^[0-9]+$ ]] && is_worker_process "$pid" || return 1
   printf '%s\n' "$pid"
 }
 
@@ -38,6 +52,15 @@ stop_pid() {
 }
 
 stop_all_workers() {
+  if [[ "$(uname -s)" == "Darwin" ]] && command -v launchctl >/dev/null; then
+    local launch_info launch_pid
+    launch_info="$(launchctl list "$worker_label" 2>/dev/null || true)"
+    launch_pid="$(sed -n 's/^[[:space:]]*"PID" = \([0-9][0-9]*\);$/\1/p' <<<"$launch_info")"
+    if [[ -n "$launch_info" ]]; then
+      launchctl remove "$worker_label" || true
+      if [[ "$launch_pid" =~ ^[0-9]+$ ]]; then stop_pid "$launch_pid"; fi
+    fi
+  fi
   local pids=()
   if pid="$(worker_pid)"; then pids+=("$pid"); fi
   while IFS= read -r pid; do
@@ -55,7 +78,7 @@ api_worker_status() {
 case "$action" in
   status)
     if pid="$(worker_pid)"; then
-      expected_id="$(<"$worker_id_file" 2>/dev/null || true)"
+      expected_id="$(cat "$worker_id_file" 2>/dev/null || true)"
       status="$(api_worker_status)"
       if [[ -n "$expected_id" ]] && printf '%s' "$status" | rg -Fq "\"workerId\":\"$expected_id\""; then
         echo "AI 워커 실행 및 백엔드 연결 확인 (PID $pid, $expected_id)"
@@ -84,7 +107,7 @@ case "$action" in
     ;;
   start)
     if pid="$(worker_pid)"; then
-      expected_id="$(<"$worker_id_file" 2>/dev/null || true)"
+      expected_id="$(cat "$worker_id_file" 2>/dev/null || true)"
       status="$(api_worker_status)"
       if [[ -n "$expected_id" ]] && printf '%s' "$status" | rg -Fq "\"workerId\":\"$expected_id\""; then
         echo "AI 워커가 이미 실행 중입니다. (PID $pid, $expected_id)"
@@ -127,15 +150,39 @@ case "$action" in
 
     base_worker_id="${AI_WORKER_ID:-jobmoa-${HOSTNAME:-mac}}"
     worker_id="${base_worker_id}-$(date +%s)-$$"
-    classpath="backend/build/classes/kotlin/main:backend/build/resources/main:backend/build/runtime-libs/*"
-    CODEX_BIN="$codex_bin" AI_WORKER_API_URL="$api_url" AI_WORKER_ID="$worker_id" \
-      nohup java -cp "$classpath" "$worker_class" </dev/null >>"$log_file" 2>&1 &
-    pid=$!
+    root_dir="$PWD"
+    java_bin="$(command -v java)"
+    classpath="$root_dir/backend/build/classes/kotlin/main:$root_dir/backend/build/resources/main:$root_dir/backend/build/runtime-libs/*"
+    if [[ "$(uname -s)" == "Darwin" ]] && command -v launchctl >/dev/null; then
+      launchctl remove "$worker_label" >/dev/null 2>&1 || true
+      launchctl submit -l "$worker_label" -o "$root_dir/$log_file" -e "$root_dir/$log_file" -- \
+        /bin/sh -c 'cd "$1" && shift && exec env CODEX_BIN="$1" AI_WORKER_API_URL="$2" AI_WORKER_ID="$5" "$3" -cp "$4" com.youngwoo.jobmoa.aiqa.worker.AiWorkerMainKt' \
+        jobmoa-ai-worker "$root_dir" "$codex_bin" "$api_url" "$java_bin" "$classpath" "$worker_id"
+      pid=""
+      for _ in {1..60}; do
+        pid="$(worker_pid || true)"
+        [[ -n "$pid" ]] && break
+        sleep 0.2
+      done
+      if [[ -z "$pid" ]]; then
+        launchctl remove "$worker_label" >/dev/null 2>&1 || true
+        echo "AI 워커 프로세스를 시작하지 못했습니다. $log_file 를 확인하세요." >&2
+        tail -n 30 "$log_file" >&2 || true
+        exit 1
+      fi
+    else
+      CODEX_BIN="$codex_bin" AI_WORKER_API_URL="$api_url" AI_WORKER_ID="$worker_id" \
+        nohup "$java_bin" -cp "$classpath" "$worker_class" </dev/null >>"$log_file" 2>&1 &
+      pid=$!
+    fi
     printf '%s\n' "$pid" >"$pid_file"
     printf '%s\n' "$worker_id" >"$worker_id_file"
     for _ in {1..60}; do
-      if ! kill -0 "$pid" 2>/dev/null; then
+      if ! is_worker_process "$pid"; then
         rm -f "$pid_file" "$worker_id_file"
+        if [[ "$(uname -s)" == "Darwin" ]] && command -v launchctl >/dev/null; then
+          launchctl remove "$worker_label" >/dev/null 2>&1 || true
+        fi
         tail -n 30 "$log_file" >&2 || true
         exit 1
       fi

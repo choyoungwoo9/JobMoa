@@ -94,7 +94,7 @@
 
 `AI에게 질문`에서 공고 상세를 하나씩 열지 않고 모든 저장 공고를 두고 질문할 수 있습니다. 대화는 저장되고 답변은 작업 ID를 받아 비동기로 처리합니다. 문장 단위 진행 상황과 외부 웹 검색 상태를 실시간으로 확인하며, 브라우저를 닫았다 다시 열어도 저장된 답변부터 이어집니다. 답변의 Markdown 강조는 굵게 렌더링하고 본문 속 공고 인용을 누르면 해당 공고를 엽니다. 완료 시 공고와 외부 웹 출처를 나눠 표시합니다.
 
-`./start.sh`는 Docker 앱을 시작한 뒤 Codex 워커도 자동 시작을 시도합니다. Java 21 이상, Codex CLI 설치와 로그인(`codex login`)이 필요하며, 준비되지 않아도 공고 기능은 실행되고 AI 작업은 워커 연결까지 대기합니다. 워커만 시작·재시작할 때 `./ai-worker.sh start|restart`를 사용합니다. 스크립트는 고아 프로세스까지 정리하고 새 `workerId` heartbeat와 PID를 확인합니다. 이전 `./start.sh --ai-worker` 인자도 호환됩니다. 모델은 `gpt-6-luna`로 고정하며, AI는 공고 상태를 바꾸지 않습니다. [AI 질문 상세](docs/ai-chat.md).
+`./start.sh`는 Docker 앱을 시작한 뒤 Codex 워커도 자동 시작을 시도합니다. macOS에서는 워커를 `launchd`가 관리해 시작 명령이 끝나도 프로세스가 유지됩니다. Java 21 이상, Codex CLI 설치와 로그인(`codex login`)이 필요하며, 준비되지 않아도 공고 기능은 실행되고 AI 작업은 워커 연결까지 대기합니다. 워커는 실행별 `workerId`의 백엔드 heartbeat까지 확인하고, `./ai-worker.sh start|status|restart|stop`으로 관리합니다. `./stop.sh`는 워커도 함께 종료합니다. 이전 `./start.sh --ai-worker` 인자도 호환됩니다. 모델은 `gpt-6-luna`로 고정하며, AI는 공고 상태를 바꾸지 않습니다. [AI 질문 상세](docs/ai-chat.md).
 
 ### 경력 자료로 추천·맞춤 초안 만들기
 
