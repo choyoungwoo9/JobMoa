@@ -4,7 +4,7 @@
 
 ## 포털과 후보 범위
 
-Workday 공개 CXS 목록 API `POST /wday/cxs/yanolja/External_Yanolja/jobs`를 사용한다. 제목이 명확한 개발·엔지니어 역할일 때만 후보로 넣으며 R&D 분류만으로는 수집하지 않는다. Product Owner, PM, QA, 분석·연구·보안·비개발 역할을 제외한다. 상세는 같은 Workday 공고 페이지에서 확인한다.
+Workday 공개 CXS 목록 API `POST /wday/cxs/yanolja/External_Yanolja/jobs`를 사용한다. Workday 요청 본문에는 빈 `appliedFacets` 객체를 포함한다. 이를 빠뜨리면 HTTP 400이 발생한다. 제목이 명확한 개발·엔지니어 역할일 때만 후보로 넣으며 R&D 분류만으로는 수집하지 않는다. Product Owner, PM, QA, 분석·연구·보안·비개발 역할을 제외한다. 상세는 같은 Workday 공고 페이지에서 확인한다.
 
 ## 공통 단계
 
@@ -18,3 +18,4 @@ Workday 공개 CXS 목록 API `POST /wday/cxs/yanolja/External_Yanolja/jobs`를 
 | 날짜 | 대상 | 확인한 동작 | 결과와 한계 |
 | --- | --- | --- | --- |
 | 2026-11-21 | 공식 채용 목록/상세 | 2026-11-21에 공개 목록 API HTTP 200과 응답 형식(제목·경로·근무지·직군)을 확인했다. 일반 브라우저에서 Workday 앱 화면은 비어 있어 목록/상세 화면 렌더링과 저장 단계는 확인하지 않았다. | 실제 수집 버튼·DB 저장·캡처 파이프라인 검증은 사용자가 진행한다. |
+| 2026-11-21 | 공식 목록 API, `limit=1` | 최근 전체 수집에서 빈 `appliedFacets`를 누락해 목록 요청이 HTTP 400으로 실패했다. 빈 필드를 포함한 단건 요청으로 HTTP 200과 정상 응답 구조를 확인했다. 당시 API가 반환한 항목은 Product Owner여서 개발 후보가 아니었다. | 수정된 앱 어댑터의 전체 목록 실행·상세 추출·저장·캡처는 아직 확인하지 않았다. 외부 요청은 단건 목록 확인 1회로 제한했다. |

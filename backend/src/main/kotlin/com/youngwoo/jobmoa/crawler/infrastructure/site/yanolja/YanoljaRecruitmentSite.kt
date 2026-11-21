@@ -14,7 +14,7 @@ class YanoljaRecruitmentSite:RecruitmentSite {
     private val excluded=Regex("""product owner|product manager|project manager|QA|analyst|scientist|기획|분석|보안|영업|마케팅|인재풀""",RegexOption.IGNORE_CASE)
     override fun discover(browser:BrowserPage,emit:(DiscoveredPosting)->Unit) {
         browser.navigate(definition.listingUrl)
-        val data=browser.evaluate("""async base=>{const r=await fetch(base+'/jobs',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({limit:100,offset:0,searchText:''})});if(!r.ok)throw new Error('Workday 목록 HTTP '+r.status);return r.json();}""",api) as? Map<*,*> ?: error("야놀자 Workday 목록 구조 변경")
+        val data=browser.evaluate("""async base=>{const r=await fetch(base+'/jobs',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({appliedFacets:{},limit:100,offset:0,searchText:''})});if(!r.ok)throw new Error('Workday 목록 HTTP '+r.status);return r.json();}""",api) as? Map<*,*> ?: error("야놀자 Workday 목록 구조 변경")
         val rows=data["jobPostings"] as? List<*> ?: error("야놀자 Workday 공고 목록 누락")
         val total=(data["total"] as? Number)?.toInt() ?: error("야놀자 Workday 전체 건수 누락")
         check(rows.size>=total) { "야놀자 Workday 목록 일부만 조회됐습니다: ${rows.size}/$total" }
