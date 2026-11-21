@@ -171,3 +171,27 @@ Docker 반영 전후 공고 메타데이터·버전 목록·읽음 상태·개�
 추가 결과값을 포함한 백업은 v2로 내보내며 복원은 v1/v2를 지원한다(DB 스키마 10 유지). 오늘의집 목록은 제목과 지원 URL이 동시에 없는 작성 중 항목만 건너뛰도록 보완했다. 정상 공고의 필수 정보 누락 오류는 숨기지 않는다.
 
 대표 화면 확인 후 외부 접속을 차단한 HTML/SSR 재현, localhost 브라우저 응답, 임시 MySQL 저장 프로브로 검증했다. 실제 사용자 DB의 수집·재시도는 실행하지 않았고, 원래 실패 기록과 공고 상태를 유지했다. 실패 재시도의 실제 동작 확인은 사용자가 수행한다.
+
+## 저장형 AI 질문과 선택 워커
+
+상세 계약은 [`docs/ai-chat.md`](../docs/ai-chat.md)와 [제품 스펙](../docs/spec.md#전체-공고-ai-질문)을 따른다. `aiqa`는 domain 모델·저장 포트, application의 대화/공고 검색/작업 이벤트 서비스, JPA 어댑터, REST API와 별도 Kotlin CLI 워커로 나뉜다. V11은 대화·메시지·작업 큐·이벤트 로그·출처 테이블을 만든다.
+
+`POST /api/ai/conversations/{id}/messages`는 사용자 질문과 비어 있는 답변, 대기 작업을 저장하고 `202`로 `{taskId, messages}`를 즉시 반환한다. Codex가 오프라인이어도 대기 가능하며, `POST /api/ai/worker/tasks/claim`은 `FOR UPDATE SKIP LOCKED`로 대기 작업을 하나 임대한다. 작업자는 10초 간격으로 임대를 갱신한다. 임대가 만료되면 메시지의 부분 답변을 비우고 다시 대기시키며 SSE에 복구 상태를 남긴다.
+
+`GET /api/ai/tasks/{taskId}/events?after={eventId}`는 DB에 저장된 상태·검색·답변 조각·완료·실패 이벤트를 SSE로 재생한 뒤 실시간 이벤트를 보낸다. 이벤트는 트랜잭션 커밋 후 현재 구독자에 전송한다. 15초 keepalive와 NGINX `proxy_buffering off`로 오랜 응답과 재연결을 지원한다. 브라우저 연결과 Codex 프로세스는 서로 독립적이다.
+
+작업자는 선택 로컬 Kotlin 프로세스로 실행한다. Java 21 이상, Codex CLI 설치 및 `codex login`이 필요하다. `./start.sh --ai-worker`는 전체 앱과 선택 워커를 시작하고, `./ai-worker.sh status|start|stop`은 워커만 관리한다. `./stop.sh`는 워커와 Docker 앱을 함께 종료한다. 기본 `./start.sh`에는 워커가 포함되지 않으며 수집·일반 화면은 그대로 쓸 수 있다. Gradle의 `aiWorker` 실행 작업도 제공한다.
+
+Codex CLI 호출은 `gpt-6-luna`를 고정 사용하고, 셸 도구를 끄고 읽기 전용 샌드박스로 실행한다. `--search`를 통해 질문에 필요한 경우에만 외부 검색을 허용하며, 출처 URL은 HTTP(S) 주소로 검증해 저장한다. 공고 검색은 모든 수집 공고(마감 포함)의 메타데이터·직군·최신 본문을 조회하고, 키워드 점수 상위 12건의 본문 발췌(각 6,000자까지)를 작업 컨텍스트에 보관한다. 대화 요약·답변·공고/웹 출처는 MySQL에 저장하고 외부 검색 페이지 본문은 저장하지 않는다.
+
+AI 작업이 수행할 수 있는 상태 변경 도구는 없다. 완료된 답변에만 출처를 저장하며, 모델이 선택한 공고 ID는 작업 시점의 검색 컨텍스트와 대조한다. Codex 로그인·외부 검색을 포함한 실제 대화 흐름은 사용자 데이터나 계정을 사용하므로 이번 변경에서 호출하지 않았다.
+
+| API | 용도 |
+| --- | --- |
+| `GET /api/ai/status` | 선택 워커 heartbeat와 고정 모델 표시 |
+| `GET/POST /api/ai/conversations` | 대화 목록·새 대화 |
+| `GET/DELETE /api/ai/conversations/{id}` | 메시지와 출처를 포함한 대화 조회·삭제 |
+| `POST /api/ai/conversations/{id}/messages` | 질문 저장, 비동기 작업 ID 반환 |
+| `POST /api/ai/messages/{messageId}/retry` | 실패 답변 재대기 |
+| `GET /api/ai/tasks/{taskId}/events` | SSE 상태·웹 검색·답변 조각·최종 이벤트 구독/재생 |
+| `/api/ai/worker/**` | 선택 로컬 작업자의 heartbeat·작업 임대·진행 저장 API |
