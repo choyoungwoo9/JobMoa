@@ -17,6 +17,12 @@
 
 쿠팡 원문 대표 URL은 이번 확인에서 429 보안 확인 화면이 나와 같은 도메인의 추가 방문을 중단했다. 원문 429를 우회해 API만으로 공고를 성공 처리하지 않는다. 원문 렌더링 실패였던 별도 공고의 실제 마감 여부도 단정하지 않는다.
 
+### 쿠팡 Cloudflare 응답 재확인 (2026-11-21)
+
+대표 원문 `https://www.coupang.jobs/en/jobs/?gh_jid=8384816`를 브라우저에서 한 번 탐색했을 때 HTTP 429와 `보안 확인 수행 중` Cloudflare 화면을 확인했다. 이 브라우저 응답의 헤더는 당시 보존하지 못했다. 이후 같은 URL에 단일 진단 GET을 보냈고, 별도의 HTTP 403 응답에서 `server: cloudflare`, `cf-mitigated: challenge`, `cf-ray: a5dbab18fcdddd08-ICN`을 확인했다. 이 403 응답에는 `Retry-After`가 없었다. Cloudflare 문서에 따르면 `cf-mitigated: challenge`는 원래 요청 대상 대신 Challenge Page가 반환됐음을 뜻한다 ([공식 문서](https://developers.cloudflare.com/cloudflare-challenges/challenge-types/challenge-pages/detect-response/)).
+
+브라우저 429와 진단 GET 403은 서로 다른 요청에서 관측한 응답이다. 따라서 Cloudflare Challenge가 응답을 가로막고 있음은 확인했지만, 앞선 429의 `Retry-After` 유무나 차단 원인이 요청 빈도·IP 평판·브라우저 검증 중 무엇인지는 판별하지 못했다. 브라우저 페이지 요청 한 번과 진단 GET 한 번만 수행했으며, 700ms 간격 반복 요청이나 추가 공고 탐색은 하지 않았다.
+
 Greeting 종료 컴포넌트 해석은 같은 플랫폼을 사용하는 카카오 Greeting 포털에도 연결했고, Ninehire 규칙은 카카오스타일에도 연결했다. 이 플랫폼 재사용 경로가 이번에 모두 실제 사이트 검증된 것은 아니다. 당근서비스·해외 포털, LINE/LY, 우아한형제들 등 다른 경로의 기존 마감일·상태 판별은 유지한다. 기존 직군·회사 지원 범위와 직군 분류 규칙은 변경하지 않는다.
 
 ## 처리 흐름
