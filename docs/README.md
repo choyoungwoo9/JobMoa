@@ -44,6 +44,15 @@
 | [adapter-role-coverage-extra.md](adapter-role-coverage-extra.md) | 쿠팡·당근·LINE·우아한형제들 개발 공고의 후보 범위 |
 | [non-development-sources.md](non-development-sources.md) | 기획·PM·디자인·마케팅·영업 후보를 제공하는 사이트와 조건 |
 | [source-bucketplace.md](source-bucketplace.md) | 오늘의집 목록·상세 수집 규칙 |
+| [source-socar.md](source-socar.md) | 쏘카·나인투원 공식 목록 및 Greeting 상세 규칙 |
+| [source-kurly.md](source-kurly.md) | 컬리 Greeting 테크 공고 규칙 |
+| [source-musinsa.md](source-musinsa.md) | 무신사·5개 자회사별 공고 규칙 |
+| [source-yanolja.md](source-yanolja.md) | 야놀자 Workday 공개 목록 규칙 |
+| [source-ridi.md](source-ridi.md) | 리디 RoundHR API 규칙 |
+| [source-channel.md](source-channel.md) | 채널톡 공개 채용 데이터 규칙 |
+| [source-yeogi.md](source-yeogi.md) | 여기어때 채용 페이지 접근 상태·후보 규칙 |
+| [source-banksalad.md](source-banksalad.md) | 뱅크샐러드 공식 목록 및 Greeting 상세 규칙 |
+| [source-zigbang.md](source-zigbang.md) | 직방 Greeting 목록 규칙 |
 | [closure-detection.md](closure-detection.md) | 사이트별 종료 증거, 오탐 방지와 실제 확인 범위 |
 
 ### 분류 규칙과 고정 분석 자료

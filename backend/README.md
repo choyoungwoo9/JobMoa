@@ -44,7 +44,7 @@ MySQL 격리 수준은 `READ_COMMITTED`입니다. 여러 작업자가 서로 다
 | POST | `/api/collections` | `{ "sourceIds": ["kakao"], "categoryId": "web-backend", "companyIds": ["kakaostyle"] }` |
 | POST | `/api/collections/{id}/retry` | `{ "failureIds": ["..."] }`, 생략 시 미해결 실패 전체 |
 
-수집기는 8개 사이트·기업군별로 구현되어 있습니다. 사이트 어댑터가 공식 직군 등으로 후보를 추리고, `CategoryClassifier`가 회사 × 분야별 제목과 본문 근거를 확인합니다. 공통 실행부에는 개발 직군 키워드 필터가 없습니다. 신규 사이트 구현과 기존 크롤러 변경의 절차·문서 갱신 기준은 [크롤러 어댑터 표준](../docs/crawler-adapter-standard.md)을 따릅니다.
+수집기는 17개 사이트·기업군별로 구현되어 있습니다. 사이트 어댑터가 공식 직군 등으로 후보를 추리고, `CategoryClassifier`가 회사 × 분야별 제목과 본문 근거를 확인합니다. 공통 실행부에는 개발 직군 키워드 필터가 없습니다. 신규 사이트 구현과 기존 크롤러 변경의 절차·문서 갱신 기준은 [크롤러 어댑터 표준](../docs/crawler-adapter-standard.md)을 따릅니다.
 
 - 네이버: 통합·클라우드·SNOW/KREAM·랩스·웹툰·파이낸셜·I&S·Z.
 - 토스: 통합 포털의 실제 계열사별 개별 포지션.
@@ -54,6 +54,7 @@ MySQL 격리 수준은 `READ_COMMITTED`입니다. 여러 작업자가 서로 다
 - LINE: LINE Careers 전 지역, LY 일본, LY Communications.
 - 우형: 우아한형제들·우아한청년들.
 - 오늘의집: 버킷플레이스 공식 채용 목록과 Greeting 상세. 개발뿐 아니라 기획·PM·디자인·마케팅·영업을 지원합니다. [수집 규칙](../docs/source-bucketplace.md).
+- 새 사이트 9곳: 쏘카(공식 목록+Greeting 상세), 컬리·무신사·직방(Greeting), 야놀자(Workday), 리디(RoundHR), 채널톡(자체 공개 페이지), 여기어때(인턴 공고 페이지), 뱅크샐러드(공식 목록+Greeting 상세). 구현 범위와 사이트별 실제 확인은 [직무 지원표](../docs/job-categories.md) 및 각 `source-*.md` 문서를 따릅니다.
 
 이 목록은 구현된 공개 포털 범위이며 모든 법인의 존재/채용 여부를 보증하는 법인 목록은 아닙니다. 최신 등록 범위는 `/api/sources`의 `portals`에서 확인합니다. 공고가 0건인 포털도 정상 수집 결과이며, 구조 변경은 실패로 기록합니다.
 
@@ -70,7 +71,7 @@ MySQL 격리 수준은 `READ_COMMITTED`입니다. 여러 작업자가 서로 다
 
 ### 분야별 수집
 
-`/api/state`의 `categories`와 `companies`에서 지원 분야·계열사 조합을 확인합니다. `all`은 각 사이트 어댑터가 지원하는 전체 공고이며 별도 공고 태그로 저장하지 않습니다. 토스·당근 국내·오늘의집은 비개발도 지원하고 다른 포털의 개발 범위는 유지합니다. 개발 분야는 웹 백엔드·프론트엔드·Android·iOS·풀스택·데이터 엔지니어·ML 엔지니어·DevOps/SRE이며, 기획·PM·디자인·마케팅·영업은 토스 9개 계열사·당근·당근페이·오늘의집에서 지원합니다. [회사별 규칙](../docs/non-development-sources.md). 분야별 후보 탐색은 회사별 전략을 유지하고, 최종 본문 판정과 저장 직군은 일반 규칙 v0.5를 적용합니다. 전체 63개 회사 × 분야 지원표와 제외 기준은 [분야 문서](../docs/job-categories.md), 기존 어댑터의 선행 필터는 [네이버·토스·카카오](../docs/adapter-role-coverage.md), [쿠팡·당근·LINE·우형](../docs/adapter-role-coverage-extra.md)을 참고하세요.
+`/api/state`의 `categories`와 `companies`에서 지원 분야·계열사 조합을 확인합니다. `all`은 각 사이트 어댑터가 지원하는 전체 공고이며 별도 공고 태그로 저장하지 않습니다. 개발 분야는 웹 백엔드·프론트엔드·Android·iOS·풀스택·데이터 엔지니어·ML 엔지니어·DevOps/SRE입니다. 비개발 5개 분야는 토스 9개 계열사·당근·당근페이·오늘의집에서만 지원합니다. [회사별 규칙](../docs/non-development-sources.md). 분야별 후보 탐색은 회사별 전략을 유지하고, 최종 본문 판정과 저장 직군은 일반 규칙 v0.5를 적용합니다. 전체 78개 회사 × 분야 지원표와 제외 기준은 [분야 문서](../docs/job-categories.md), 기존 어댑터의 선행 필터는 [네이버·토스·카카오](../docs/adapter-role-coverage.md), [쿠팡·당근·LINE·우형](../docs/adapter-role-coverage-extra.md)을 참고하세요.
 
 회사 카탈로그는 `CompanyRegistry`, 회사 × 분야 판별은 `CategoryClassifier`에 선언합니다. 통합 포털은 한 번 탐색하고 선택한 계열사의 공고만 큐에 넣습니다. 수집 실행과 작업에 분야·계열사 정보를 저장하므로 재시도에도 동일한 범위가 유지됩니다.
 

@@ -111,6 +111,22 @@ class CompanyRegistry(sources: SourceRegistry) {
         company("woowa-youths", "woowa", "woowa-youths", "우아한청년들", "Woowa Youths")
 
         company("bucketplace", "bucketplace", "bucketplace", "오늘의집", "버킷플레이스", "Bucketplace")
+
+        company("socar", "socar", "socar", "쏘카", "SOCAR")
+        company("socar-nineone", "socar", "socar-nineone", "나인투원", "NineToOne", "쏘카일레클")
+        company("kurly", "kurly", "kurly", "컬리", "Kurly")
+        company("musinsa", "musinsa", "musinsa", "무신사", "Musinsa")
+        company("musinsa-29cm", "musinsa", "musinsa-29cm", "29CM", "29센치")
+        company("musinsa-payments", "musinsa", "musinsa-payments", "무신사페이먼츠", "Musinsa Payments")
+        company("musinsa-standard", "musinsa", "musinsa-standard", "무신사 스탠다드", "Musinsa Standard")
+        company("musinsa-logistics", "musinsa", "musinsa-logistics", "무신사로지스틱스", "Musinsa Logistics")
+        company("musinsa-global", "musinsa", "musinsa-global", "무신사 글로벌", "Musinsa Global")
+        company("yanolja", "yanolja", "yanolja", "야놀자", "Yanolja")
+        company("ridi", "ridi", "ridi", "리디", "RIDI")
+        company("channel", "channel", "channel", "채널코퍼레이션", "채널톡", "Channel Corporation", "Zoyi")
+        company("yeogi", "yeogi", "yeogi", "여기어때컴퍼니", "여기어때")
+        company("banksalad", "banksalad", "banksalad", "뱅크샐러드", "Banksalad")
+        company("zigbang", "zigbang", "zigbang", "직방", "Zigbang")
     }
     private val byId = definitions.associateBy { it.id }
     private val aliases = definitions.associate { it.id to it.companyNames.map(::normalize).toSet() }
@@ -154,6 +170,7 @@ class CompanyRegistry(sources: SourceRegistry) {
             "line" -> setOf("all", "web-backend", "web-frontend", "android", "ios", "fullstack", "data-engineer", "ml-engineer", "devops-sre")
             "woowa" -> setOf("all", "web-backend", "web-frontend", "android", "ios", "fullstack", "data-engineer", "ml-engineer", "devops-sre")
             "bucketplace" -> setOf("all", "web-backend", "web-frontend", "android", "ios", "fullstack", "data-engineer", "ml-engineer", "devops-sre", "planning", "product-management", "design", "marketing", "sales")
+            "socar", "kurly", "musinsa", "yanolja", "ridi", "channel", "yeogi", "banksalad", "zigbang" -> setOf("all", "web-backend", "web-frontend", "android", "ios", "fullstack", "data-engineer", "ml-engineer", "devops-sre")
             else -> setOf("all")
         }
     }
