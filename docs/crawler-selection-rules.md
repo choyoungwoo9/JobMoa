@@ -1,6 +1,6 @@
 # 채용공고 수집 및 개발 직군 판별 규칙
 
-기준일: 2026-11-14, 한국 시간.
+기준일: 2026-11-21, 한국 시간.
 
 이 문서는 현재 구현된 수집기의 동작을 설명한다. 향후 목표인 ‘전체 계열사 수집’과 현재 등록된 포털 범위를 구분한다. 수집기의 구현 여부와 실제 사이트에서 수집이 성공했는지도 별개다.
 
@@ -34,6 +34,15 @@
 | LINE | `Engineering` 직군이고 개발 세부 분야 또는 개발 제목에 해당 | QA·분석·PM·Engineering Manager·지원·보안 운영 등 | [LineDeveloperRule][line] |
 | 일본 LY 계열 | 개발 직무 태그 또는 일본어·영어 개발 제목 규칙 | 테스트·보안·분석·관리·지원 등 | [LY Corporation][ly], [LY Communications][ly-communications] |
 | 우아한형제들 | 형제들은 Tech 코드와 개발 제목, 청년들은 개발 제목 | QA·보안·DBA·분석·기획·디자인 등 | [WoowaDeveloperRule][woowa] |
+| 쏘카 | 공식 `개발/데이터` 직군 코드와 개발 제목 | 하드웨어·품질·분석·기획 등 | [쏘카 규칙][socar] |
+| 컬리 | 공식 테크 부문, 개발·인프라 직군, 구체적 개발 제목 | PM·디자인·보안·분석·비개발 등 | [컬리 규칙][kurly] |
+| 무신사 | 회사별 포털 필터와 공식 기술 직무명 | QA·보안·분석·기획·비개발 등 | [무신사 규칙][musinsa] |
+| 야놀자 | Workday 공개 목록에서 구체적 개발 직함 | Product Owner·PM·QA·분석·비개발 등 | [야놀자 규칙][yanolja] |
+| 리디 | RoundHR 진행 중 + 제품/개발 직군 + 기술 직함 | PD·MD·디자인·분석·운영 등 | [리디 규칙][ridi] |
+| 채널코퍼레이션 | 공개 목록의 명확한 소프트웨어·인프라·ML 직함 | 보안·영업·지원·분석·비개발 등 | [채널톡 규칙][channel] |
+| 여기어때 | 페이지 접근 가능 시 기술 직함 후보 | 현재 Cloudflare 403으로 실제 목록 확인 불가 | [여기어때 규칙][yeogi] |
+| 뱅크샐러드 | 공식 테크 목록 링크 + 개발 직함 | PM·분석·사이언티스트·비개발 등 | [뱅크샐러드 규칙][banksalad] |
+| 직방 | Greeting 공식 조직 필드 + 개발 직함 | 세일즈·분석·하드웨어·비개발 등 | [직방 규칙][zigbang] |
 
 ## 3. 네이버
 
@@ -234,6 +243,9 @@ QA, SDET, Security, Hardware, Mechanical, Scientist, Analyst, Manager, Director,
 - [당근 국내][daangn] / [당근서비스][daangn-service] / [Karrot 해외][karrot-global]
 - [LINE][line] / [LY Corporation][ly] / [LY Communications][ly-communications]
 - [우아한형제들·우아한청년들][woowa]
+- [쏘카][socar] / [컬리][kurly] / [무신사][musinsa]
+- [야놀자][yanolja] / [리디][ridi] / [채널코퍼레이션][channel]
+- [여기어때][yeogi] / [뱅크샐러드][banksalad] / [직방][zigbang]
 
 [registry]: ../backend/src/main/kotlin/com/youngwoo/jobmoa/crawler/application/SourceRegistry.kt
 [naver]: ../backend/src/main/kotlin/com/youngwoo/jobmoa/crawler/infrastructure/site/NaverRecruitmentSite.kt
@@ -248,3 +260,12 @@ QA, SDET, Security, Hardware, Mechanical, Scientist, Analyst, Manager, Director,
 [ly]: ../backend/src/main/kotlin/com/youngwoo/jobmoa/crawler/infrastructure/site/line/LyRecruitmentPortal.kt
 [ly-communications]: ../backend/src/main/kotlin/com/youngwoo/jobmoa/crawler/infrastructure/site/line/LyCommunicationsPortal.kt
 [woowa]: ../backend/src/main/kotlin/com/youngwoo/jobmoa/crawler/infrastructure/site/woowa/WoowaRecruitmentSite.kt
+[socar]: source-socar.md
+[kurly]: source-kurly.md
+[musinsa]: source-musinsa.md
+[yanolja]: source-yanolja.md
+[ridi]: source-ridi.md
+[channel]: source-channel.md
+[yeogi]: source-yeogi.md
+[banksalad]: source-banksalad.md
+[zigbang]: source-zigbang.md

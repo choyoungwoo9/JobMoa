@@ -16,7 +16,7 @@ export function BrandMark({
       className={`brand-mark brand-${sourceId}${small ? ' brand-small' : ''}`}
       aria-hidden="true"
     >
-      {failedLogo === source.logo ? source.mark : <img
+      {!source.logo || failedLogo === source.logo ? source.mark : <img
         src={source.logo}
         alt=""
         width={35}

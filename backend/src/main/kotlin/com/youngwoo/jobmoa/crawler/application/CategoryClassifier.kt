@@ -22,6 +22,7 @@ class CategoryClassifier(private val companies: CompanyRegistry, private val cla
                 "daangn" -> daangnPolicy(company.id)
                 "line" -> linePolicy(company.id)
                 "woowa" -> woowaPolicy(company.id)
+                "socar", "kurly", "musinsa", "yanolja", "ridi", "channel", "yeogi", "banksalad", "zigbang" -> generalBackendPolicy()
                 else -> error("웹 백엔드 회사 전략이 없습니다: ${company.id}")
             } else fieldPolicy(company.id, company.sourceId, categoryId)
             (company.id to categoryId) to policy
@@ -148,6 +149,7 @@ private fun fieldPolicy(companyId: String, sourceId: String, categoryId: String)
         "line" -> lineFieldTitles(companyId, categoryId)
         "woowa" -> woowaFieldTitles(categoryId)
         "bucketplace" -> bucketplaceFieldTitles(categoryId)
+        "socar", "kurly", "musinsa", "yanolja", "ridi", "channel", "yeogi", "banksalad", "zigbang" -> generalFieldTitles(categoryId)
         else -> error("회사별 분야 전략이 없습니다: $companyId / $categoryId")
     }
     val policy = when (categoryId) {
@@ -162,6 +164,23 @@ private fun fieldPolicy(companyId: String, sourceId: String, categoryId: String)
         else -> error("분야 규칙이 없습니다: $categoryId")
     }
     return policy
+}
+
+private fun generalBackendPolicy() = JobPolicy(
+    regex("back[ -]?end|backend engineer|server (?:developer|engineer)|서버\\s*(?:개발|엔지니어)|백엔드"),
+    regex("REST(?:ful)?|GraphQL|API|Spring|Django|Rails|Node\\.?js|서버\\s*(?:개발|설계)|백엔드|server[ -]?side|business\\s*logic|microservice"),
+    regex(NOT_BACKEND + "|database\\s*(?:engineer|administrator)|\\bdba\\b"),
+)
+
+private fun generalFieldTitles(category: String): String = when (category) {
+    "web-frontend" -> "front[ -]?end|frontend engineer|프론트엔드|웹\\s*프론트"
+    "android" -> "\\bandroid\\b|안드로이드"
+    "ios" -> "\\bios\\b|아이오에스"
+    "fullstack" -> FULLSTACK_ROLE
+    "data-engineer" -> "data[ -]?(?:engineer|engineering)|데이터\\s*엔지니어"
+    "ml-engineer" -> "machine[ -]?learning\\s*(?:engineer|engineering)|\\bML\\s*(?:engineer|engineering)|머신러닝\\s*엔지니어|AI\\s*engineer"
+    "devops-sre" -> "dev[ -]?ops|\\bSRE\\b|site\\s*reliability|데브옵스|사이트\\s*신뢰성"
+    else -> error("개발 사이트 미지원 분야: $category")
 }
 
 private const val NON_DEVELOPMENT = "인재\\s*(?:풀|pool)|talent\\s*pool|\\bqa\\b|\\bsdet\\b|quality\\s*(?:engineer|assurance)|test\\s*engineer|테스트\\s*엔지니어|품질\\s*엔지니어|product\\s*manager|project\\s*manager|기획자|디자이너|\\bdesigner\\b|recruiter|채용\\s*담당|hardware|하드웨어|mechanical|기계\\s*설계"

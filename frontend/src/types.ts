@@ -7,6 +7,15 @@ export type SourceId =
   | 'line'
   | 'woowa'
   | 'bucketplace'
+  | 'socar'
+  | 'kurly'
+  | 'musinsa'
+  | 'yanolja'
+  | 'ridi'
+  | 'channel'
+  | 'yeogi'
+  | 'banksalad'
+  | 'zigbang'
 export interface Category {
   id: string
   name: string
