@@ -73,11 +73,19 @@ class CrawlerRuntime(private val properties: CrawlerProperties, private val task
                             browserHeadless = headless
                         }
                         session.withPage { page ->
-                            page.navigate(task.url)
+                            page.navigatePosting(task.url)
+                            val candidate = DiscoveredPosting(task.url, task.company, task.title, task.location)
+                            adapter.closureReason(page, candidate)?.let { throw PostingClosed(it) }
+                            check(page.responseStatus()?.let { it in 200..399 } != false) { "공고의 마감을 확인할 수 없는 HTTP ${page.responseStatus()} 응답: ${task.url}" }
                             var checkpoint: CrawlTask = task
                             var posting = DiscoveredPosting(task.url, task.company, task.title, task.location)
                             if (task.stage == CrawlStage.BODY) {
-                                val extracted = adapter.extract(page, posting)
+                                val extracted = try { adapter.extract(page, posting) } catch (error: Exception) {
+                                    // 클라이언트 리다이렉트/네이티브 알림이 늦게 나타나는 사이트도 재확인한다.
+                                    if (error is PostingClosed || error is PostingExcluded || error is BrowserHttpFailure) throw error
+                                    adapter.closureReason(page, posting)?.let { throw PostingClosed(it) }
+                                    throw error
+                                }
                                 val scope = runs.findRun(task.runId)?.categoryIds.orEmpty().ifEmpty { setOf(task.categoryId) }
                                 if (!scope.any { classifier.accepts(it, task.companyId, extracted) }) {
                                     throw PostingExcluded("선택한 분야의 회사별 판별 기준에서 제외: ${task.categoryId} / ${extracted.title}")
@@ -96,6 +104,14 @@ class CrawlerRuntime(private val properties: CrawlerProperties, private val task
                     }
                     taskService.finish(task.id, token)
                 } catch (e: InterruptedException) { Thread.currentThread().interrupt() }
+                catch (e: PostingClosed) { task?.let { current ->
+                    try { taskService.closeExisting(current.id, current.leaseToken!!, e.reason) }
+                    catch (failure: Exception) {
+                        log.warn("마감 상태 저장 실패: {}", current.id, failure)
+                        try { taskService.fail(current.id, current.leaseToken!!, failure) } catch (_: LeaseLost) { }
+                        catch (saveFailure: Exception) { log.warn("마감 실패 기록 저장 실패; 임대 만료 후 복구합니다: {}", current.id, saveFailure) }
+                    }
+                } }
                 catch (e: PostingExcluded) { task?.let { current ->
                     try { taskService.exclude(current.id, current.leaseToken!!, e.message ?: "사이트 규칙에 따라 제외") }
                     catch (lost: Exception) { log.warn("제외 상태 저장 실패; 임대 만료 후 복구합니다: {}", current.id, lost) }

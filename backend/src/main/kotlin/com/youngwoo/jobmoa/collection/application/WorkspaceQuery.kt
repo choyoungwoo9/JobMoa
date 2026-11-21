@@ -96,6 +96,7 @@ class WorkspaceQuery(private val changes: CollectionChangeRepository, private va
                     else -> "success"
                 }, "added" to if (unknown) null else group.count { it.outcome == TaskOutcome.NEW },
                     "changed" to if (unknown) null else group.count { it.outcome == TaskOutcome.CHANGED },
+                    "closed" to if (unknown) null else group.count { it.status == TaskStatus.COMPLETED && it.outcome != TaskOutcome.EXCLUDED && it.closed },
                     "identical" to if (unknown) null else group.count { it.outcome == TaskOutcome.IDENTICAL },
                     "failed" to if (unknown) null else failures.size,
                     "succeeded" to succeeded, "excluded" to group.count { it.outcome == TaskOutcome.EXCLUDED }, "total" to group.size,

@@ -33,6 +33,27 @@ internal object KakaoAffiliatePortals {
         }
     }.getOrDefault(false)
 
+    fun closureReason(browser: BrowserPage, posting: DiscoveredPosting): String? {
+        val target = target(posting.url) ?: return null
+        if (!acceptsUrl(posting.url)) return null
+        if (target.id !in ninehireIds) return if (target.id != "kakaobank")
+            com.youngwoo.jobmoa.crawler.infrastructure.site.GreetingClosure.reason(browser, posting.url) else null
+        if (browser.currentUrl()?.let { URI(it).host } != URI(posting.url).host) return null
+        val key = URI(posting.url).path.substringAfterLast('/')
+        browser.waitFor("#__NEXT_DATA__")
+        val data = browser.evaluate("""key => {
+            const page = JSON.parse(document.querySelector('#__NEXT_DATA__').textContent);
+            const job = page.props?.pageProps?.recruitment;
+            const closedNotice = [...document.querySelectorAll('h1')].some(e => e.innerText.trim() === '지원서 접수가 마감되었습니다.');
+            if (page.page !== '/job_posting/[addressKey]/invalid' || page.query?.addressKey !== key ||
+                job?.addressKey !== key || !closedNotice || !location.pathname.endsWith('/' + key + '/invalid')) return null;
+            return {status: job.status, canSubmit: job.reception?.canSubmit, endAt: job.reception?.endAt || job.endAt};
+        }""", key) as? Map<*, *> ?: return null
+        if (data["canSubmit"] != false) return null
+        return if (data["status"] in setOf("closed", "finished", "ended", "disabled") || deadlinePassed(data["endAt"]?.toString()))
+            "Ninehire 동일 addressKey의 /invalid 화면 + 접수 마감 H1 + canSubmit=false (${data["status"]})" else null
+    }
+
     fun discover(browser: BrowserPage, target: SourceDefinition, emit: (DiscoveredPosting) -> Unit) {
         when (target.id) {
             "kakaobank" -> discoverBank(browser, emit)

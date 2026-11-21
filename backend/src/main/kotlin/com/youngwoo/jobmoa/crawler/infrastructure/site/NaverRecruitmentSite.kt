@@ -74,6 +74,10 @@ class NaverRecruitmentSite : RecruitmentSite {
         }
     }
 
+    override fun closureReason(browser: BrowserPage, posting: DiscoveredPosting): String? =
+        if (acceptsUrl(posting.url) && browser.dialogMessages().any { it.trim() == "접수기간이 아닙니다." })
+            "네이버 공고 상세의 '접수기간이 아닙니다.' 알림" else null
+
     override fun extract(browser: BrowserPage, posting: DiscoveredPosting): ExtractedPosting {
         if (NaverDeveloperRule.isTalentPool(posting.title)) throw PostingExcluded("네이버 인재풀 공고는 수집하지 않습니다.")
         browser.waitFor(".card_title")

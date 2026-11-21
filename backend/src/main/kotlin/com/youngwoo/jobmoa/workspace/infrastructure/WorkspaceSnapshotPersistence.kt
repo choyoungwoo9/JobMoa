@@ -40,7 +40,7 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
         SnapshotTable(columns.map { it.name }, rows)
     }
     override fun validate(snapshot: WorkspaceSnapshot) {
-        require(snapshot.format == "jobmoa" && snapshot.version == 1 && snapshot.schema == 10) { "이 버전에서 지원하는 JobMoa 백업 파일이 아닙니다." }
+        require(snapshot.format == "jobmoa" && snapshot.version in setOf(1, 2) && snapshot.schema == 10) { "이 버전에서 지원하는 JobMoa 백업 파일이 아닙니다." }
         require(snapshot.tables.keys == tables.toSet()) { "백업에 필요한 데이터가 없거나 알 수 없는 테이블이 포함되어 있습니다." }
         require(snapshot.tables.values.sumOf { it.rows.size.toLong() } <= 1_000_000) { "백업 데이터가 너무 큽니다." }
         tables.forEach { table ->
@@ -82,7 +82,7 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
         require(values("posting", "id").all { it.toString() in versionPostingIds }) { "본문 버전이 없는 공고가 있습니다." }
         require(values("posting_interest", "priority").all { it in setOf("HIGH", "NORMAL", "LOW", "NONE") } && values("posting_interest", "application_status").all { it in setOf("BEFORE_APPLY", "APPLIED") }) { "개인 관리 정보의 상태가 올바르지 않습니다." }
         require(values("collection_run", "status").all { it in setOf("COMPLETED", "PARTIAL_FAILED", "FAILED") } && values("collection_run_source", "status").all { it in setOf("COMPLETED", "FAILED") }) { "완료되지 않은 실행 또는 목록 작업이 있습니다." }
-        require(values("crawl_task", "stage").all { it in setOf("BODY", "CAPTURE", "SAVE") } && values("crawl_task", "outcome").all { it == null || it in setOf("NEW", "CHANGED", "IDENTICAL", "EXCLUDED") }) { "작업 단계가 올바르지 않습니다." }
+        require(values("crawl_task", "stage").all { it in setOf("BODY", "CAPTURE", "SAVE") } && values("crawl_task", "outcome").all { it == null || it in setOf("NEW", "CHANGED", "IDENTICAL", "CLOSED", "EXCLUDED") }) { "작업 단계가 올바르지 않습니다." }
         val references = (values("posting_version", "capture_path") + values("crawl_task", "capture_path")).filterNotNull().map { it.toString() }.toSet()
         require(references == snapshot.captures.toSet() && snapshot.captures.distinct().size == snapshot.captures.size) { "백업의 캡처 목록이 데이터와 일치하지 않습니다." }
     }

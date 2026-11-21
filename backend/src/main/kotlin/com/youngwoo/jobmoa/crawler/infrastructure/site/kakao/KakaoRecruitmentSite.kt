@@ -53,6 +53,8 @@ class KakaoRecruitmentSite : RecruitmentSite {
         }
     }
 
+    override fun closureReason(browser: BrowserPage, posting: DiscoveredPosting): String? = KakaoAffiliatePortals.closureReason(browser, posting)
+
     override fun extract(browser: BrowserPage, posting: DiscoveredPosting): ExtractedPosting {
         if (KakaoAffiliatePortals.acceptsUrl(posting.url)) return KakaoAffiliatePortals.extract(browser, posting)
         val id = URI(posting.url).path.substringAfterLast('/')

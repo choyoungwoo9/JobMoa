@@ -58,6 +58,17 @@ class DaangnRecruitmentSite : RecruitmentSite {
         }
     }
 
+    override fun closureReason(browser: BrowserPage, posting: DiscoveredPosting): String? {
+        val uri = URI(posting.url)
+        if (uri.host != "careers.daangn.com" || !Regex("/jobs/role/[0-9]+/?").matches(uri.path) || browser.responseStatus() != 404) return null
+        val current = browser.currentUrl()?.let(::URI) ?: return null
+        if (current.host != uri.host || current.path.trimEnd('/') != uri.path.trimEnd('/')) return null
+        val missing = browser.evaluate("""() => document.title === '당근 채용' &&
+            [...document.querySelectorAll('h1')].some(e => e.innerText.trim() === '페이지를 찾을 수 없습니다.') &&
+            [...document.querySelectorAll('a')].some(e => e.innerText.trim() === '채용공고 보러 가기')""") == true
+        return if (missing) "당근 공고 상세 HTTP 404 + 전용 페이지 없음 컴포넌트" else null
+    }
+
     override fun extract(browser: BrowserPage, posting: DiscoveredPosting): ExtractedPosting {
         if (DaangnServicePortal.acceptsUrl(posting.url)) return DaangnServicePortal.extract(browser, posting)
         if (KarrotGlobalPortals.acceptsUrl(posting.url)) return KarrotGlobalPortals.extract(browser, posting)

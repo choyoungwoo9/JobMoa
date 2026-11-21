@@ -30,6 +30,8 @@ class BucketplaceRecruitmentSite : RecruitmentSite {
             val row = value.asObject("오늘의집 목록 항목")["frontmatter"].asObject("오늘의집 공고 메타데이터")
             if (row["isPool"] == true) return@forEach
             val title = row.string("name").trim()
+            // 공식 Gatsby 데이터에 제목·지원 URL이 모두 비어 있는 작성 중 메타 항목이 있다.
+            if (title.isBlank() && row.string("recruitUrl").isBlank()) return@forEach
             check(title.isNotBlank()) { "오늘의집 목록 공고명이 없습니다." }
             if (!BucketplaceCandidateRule.accepts(title, row.string("teamName"))) return@forEach
             val original = row.string("recruitUrl")
@@ -39,6 +41,9 @@ class BucketplaceRecruitmentSite : RecruitmentSite {
             emit(DiscoveredPosting(url, "오늘의집", title, row.string("region").trim()))
         }
     }
+
+    override fun closureReason(browser: BrowserPage, posting: DiscoveredPosting): String? =
+        if (acceptsUrl(posting.url)) com.youngwoo.jobmoa.crawler.infrastructure.site.GreetingClosure.reason(browser, posting.url) else null
 
     override fun extract(browser: BrowserPage, posting: DiscoveredPosting): ExtractedPosting {
         val result = inspectDetail(browser, posting)

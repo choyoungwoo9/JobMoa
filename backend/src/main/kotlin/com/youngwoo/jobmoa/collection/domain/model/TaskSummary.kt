@@ -8,5 +8,5 @@ data class TaskSummary(
     val url: String, val urlHash: String, val status: TaskStatus, val stage: CrawlStage,
     val attempts: Int, val failedAt: Instant?, val error: String?, val outcome: TaskOutcome?,
     val resolvedAt: Instant?, val retryOfTaskId: String?,
-    val categoryId: String = "all", val companyId: String = "", val reusedVersionId: Long? = null,
+    val categoryId: String = "all", val companyId: String = "", val reusedVersionId: Long? = null, val closed: Boolean = false,
 )

@@ -134,7 +134,7 @@ Flyway V6은 기존 공고의 마지막 상태를 기준점으로 보존합니�
 | `POST /api/workspace/backups/{token}/restore` | `{confirmation: "복원"}`, 현재 전체 데이터 교체 |
 | `DELETE /api/workspace/backups/{token}` | 미리보기 취소 및 임시 파일 삭제 |
 
-백업 형식은 `jobmoa` v1 / DB 스키마 10, ZIP의 `workspace.json`과 `captures/{sha256}.png`로 구성된다. 현재 스키마가 다른 백업은 거부한다. ZIP 2 GiB·해제 4 GiB·개별 파일/JSON 128 MiB 제한이다. 임시 파일은 `${STORAGE_DIRECTORY}/workspace-tmp`에 저장하고 만료·재시작 잔여물을 정리한다. Spring multipart와 Docker 프론트 NGINX의 업로드 크기/타임아웃을 함께 조정했다. 백업 생성은 파일 스트리밍을 사용하지만 스냅샷 JSON·DB 행은 메모리에 보관하므로 한도까지의 대규모 복원 성능은 별도 검증이 필요하다.
+백업 형식은 `jobmoa` v2 / DB 스키마 10 (복원은 v1·v2 지원), ZIP의 `workspace.json`과 `captures/{sha256}.png`로 구성된다. 현재 스키마가 다른 백업은 거부한다. ZIP 2 GiB·해제 4 GiB·개별 파일/JSON 128 MiB 제한이다. 임시 파일은 `${STORAGE_DIRECTORY}/workspace-tmp`에 저장하고 만료·재시작 잔여물을 정리한다. Spring multipart와 Docker 프론트 NGINX의 업로드 크기/타임아웃을 함께 조정했다. 백업 생성은 파일 스트리밍을 사용하지만 스냅샷 JSON·DB 행은 메모리에 보관하므로 한도까지의 대규모 복원 성능은 별도 검증이 필요하다.
 
 `/api/state`의 `workspaceRevision`은 초기화·복원 때 바뀐다. 클라이언트는 리비전이 바뀌면 이전 버전 ID의 본문 캐시를 버린다. 유지보수는 수집 중 409로 차단하며, 사용자 확인 문구도 서버에서 검증한다.
 
@@ -159,3 +159,15 @@ Flyway V6은 기존 공고의 마지막 상태를 기준점으로 보존합니�
 ### 2026-11-17 실제 저장 데이터의 읽기 전용 검증
 
 Docker 반영 전후 공고 메타데이터·버전 목록·읽음 상태·개인 관리 정보가 동일하고 수집 실행 수가 유지되는 것을 확인했다. 확인 당시 437개 공고·437개 버전·436개 캡처를 NGINX의 `/api/workspace/backup`으로 내려받아 약 312 MB ZIP을 생성했다. 이 건수는 검증 시점의 스냅샷이며 현재 데이터 수를 안내하는 값이 아니다. ZIP을 별도 임시 서버의 미리보기에 업로드해 전체 데이터 구조·참조와 캡처 SHA-256을 검증한 뒤 폐기했다. 실제 사용자 DB에는 초기화·복원·재수집을 실행하지 않았다.
+
+## 본문이 사라진 공고의 사이트별 마감 판별 (2026-11-21)
+
+구현 기준과 실제 화면 확인 범위는 [사이트별 공고 마감 판별](../docs/closure-detection.md)을 참고한다. `RecruitmentSite.closureReason()`은 본문 추출 전에 사이트별 종료 증거를 확인하고, `PostingClosed`는 `TaskService.closeExisting()`으로 전달된다. 기존 공고의 상태·관측·관심 변화만 갱신하고 정상 버전·캡처·개인 관리 정보는 보존한다. 미저장 공고의 종료 화면은 저장하지 않는다.
+
+`BrowserPage.navigatePosting()`만 404/410의 렌더링된 안내를 확인할 수 있다. 일반 목록 탐색, 403/429/5xx의 실패 정책은 유지한다. HTTP 404 하나나 목록 누락은 마감 근거가 아니다. 브라우저 응답 상태·현재 URL·네이티브 알림과 사이트의 DOM/SSR을 함께 확인한다. 공식 JSON API의 실패는 상태·최종 URL·응답 일부를 가진 `BrowserHttpFailure`로 전달해 쿠팡 수집기가 정확한 `Job not found` 응답만 해석한다.
+
+작업 결과 `CLOSED`는 `COMPLETED`에 속한다. `GET /api/collections/{id}/tasks`의 `closed` 및 진단 메시지(`error`)로 판별 결과를 확인할 수 있다. 기업별 결과의 `closed`는 성공 처리된 마감 공고 수로, `succeeded`에 포함된다. 본문이 달라지지 않았음을 확인한 `IDENTICAL`과 구별한다. 수집 후 변화 요약의 새로 마감된 공고·관심 공고도 같은 트랜잭션에서 기록한다.
+
+추가 결과값을 포함한 백업은 v2로 내보내며 복원은 v1/v2를 지원한다(DB 스키마 10 유지). 오늘의집 목록은 제목과 지원 URL이 동시에 없는 작성 중 항목만 건너뛰도록 보완했다. 정상 공고의 필수 정보 누락 오류는 숨기지 않는다.
+
+대표 화면 확인 후 외부 접속을 차단한 HTML/SSR 재현, localhost 브라우저 응답, 임시 MySQL 저장 프로브로 검증했다. 실제 사용자 DB의 수집·재시도는 실행하지 않았고, 원래 실패 기록과 공고 상태를 유지했다. 실패 재시도의 실제 동작 확인은 사용자가 수행한다.

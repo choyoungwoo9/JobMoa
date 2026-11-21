@@ -70,7 +70,15 @@ class CoupangRecruitmentSite : RecruitmentSite {
         val id = Regex("(?:^|&)gh_jid=(\\d+)(?:&|$)").find(URI(posting.url).rawQuery.orEmpty())?.groupValues?.get(1)
             ?: error("쿠팡 상세 주소에 gh_jid가 없습니다.")
         // 원문에 렌더링된 내용과 공식 보드 본문을 대조한다. API만 성공해도 차단 화면을 캡처하지 않는다.
-        val job = browser.readJson("https://boards-api.greenhouse.io/v1/boards/coupang/jobs/$id") as? Map<*, *>
+        val apiUrl = "https://boards-api.greenhouse.io/v1/boards/coupang/jobs/$id"
+        val job = try { browser.readJson(apiUrl) } catch (failure: BrowserHttpFailure) {
+            val missing = failure.status == 404 && failure.url == apiUrl && runCatching {
+                browser.evaluate("""body => { const data = JSON.parse(body); return data.status === 404 && data.error === 'Job not found'; }""", failure.responseBody) == true
+            }.getOrDefault(false)
+            if (missing)
+                throw PostingClosed("쿠팡 공식 Greenhouse의 동일 공고 ID: HTTP 404, status=404, error=Job not found")
+            throw failure
+        } as? Map<*, *>
             ?: error("쿠팡 상세 API 구조 변경")
         val response = browser.evaluate("""job => {
             const decoded = new DOMParser().parseFromString(job.content || '', 'text/html').body.textContent || '';

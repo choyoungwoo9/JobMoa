@@ -44,6 +44,22 @@ class TossRecruitmentSite : RecruitmentSite {
         }
     }
 
+    override fun closureReason(browser: BrowserPage, posting: DiscoveredPosting): String? {
+        if (!acceptsUrl(posting.url) || browser.currentUrl()?.let { URI(it).host } != "toss.im") return null
+        val id = Regex("(?:^|&)(?:job_id|gh_jid)=(\\d+)(?:&|$)").find(URI(posting.url).rawQuery.orEmpty())?.groupValues?.get(1) ?: return null
+        browser.waitFor("#__NEXT_DATA__")
+        val unavailable = browser.evaluate("""id => {
+            const node = document.querySelector('#__NEXT_DATA__');
+            const page = node ? JSON.parse(node.textContent) : null;
+            const query = page?.props?.pageProps?.prefetchResult?.dehydratedState?.queries?.find(q =>
+                q.queryKey?.[1] === 'job-detail' && String(q.queryKey?.[2]) === id);
+            if (!query || query.state?.status !== 'success') return false;
+            const data = typeof query.state.data === 'string' ? JSON.parse(query.state.data) : query.state.data;
+            return data?.job === null && data?.errorStatus === 404;
+        }""", id) == true
+        return if (unavailable) "토스 상세 SSR의 동일 공고 ID: job=null, errorStatus=404" else null
+    }
+
     override fun extract(browser: BrowserPage, posting: DiscoveredPosting): ExtractedPosting {
         browser.waitFor("#__NEXT_DATA__")
         val result = browser.evaluate("""() => {

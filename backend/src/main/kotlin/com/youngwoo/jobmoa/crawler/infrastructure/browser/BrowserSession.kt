@@ -3,6 +3,7 @@ package com.youngwoo.jobmoa.crawler.infrastructure.browser
 import com.microsoft.playwright.*
 import com.microsoft.playwright.options.*
 import com.youngwoo.jobmoa.crawler.domain.model.PostingUrl
+import com.youngwoo.jobmoa.crawler.domain.model.BrowserHttpFailure
 import com.youngwoo.jobmoa.crawler.domain.port.BrowserPage
 import com.youngwoo.jobmoa.shared.CrawlerProperties
 
@@ -23,9 +24,18 @@ class BrowserSession(private val properties: CrawlerProperties, private val limi
             val page = context.newPage()
             page.setDefaultTimeout(properties.navigationTimeout.toMillis().toDouble())
             var navigationSite: String? = null
+            var status: Int? = null
+            val dialogs = mutableListOf<String>()
+            page.onDialog { dialog -> dialogs.add(dialog.message()); dialog.dismiss() }
             block(object : BrowserPage {
-                override fun navigate(url: String) {
+                override fun navigate(url: String) = navigateTo(url, false)
+                override fun navigatePosting(url: String) = navigateTo(url, true)
+                override fun responseStatus() = status
+                override fun currentUrl(): String { checkOwner(); return page.url() }
+                override fun dialogMessages(): List<String> { checkOwner(); return dialogs.toList() }
+                private fun navigateTo(url: String, posting: Boolean) {
                     checkOwner()
+                    status = null; dialogs.clear()
                     if (manageSitePermit) {
                         permit?.close(); permit = null
                         while (permit == null) { permit = limiter.tryAcquire(PostingUrl.siteKey(url)); if (permit == null) Thread.sleep(200) }
@@ -33,7 +43,9 @@ class BrowserSession(private val properties: CrawlerProperties, private val limi
                     limiter.beforeNavigation(PostingUrl.siteKey(url))
                     navigationSite = PostingUrl.siteKey(url)
                     val response = page.navigate(url, Page.NavigateOptions().setWaitUntil(WaitUntilState.DOMCONTENTLOADED))
-                    check(response != null && response.status() in 200..399) { "페이지 응답 오류: ${response?.status()} $url" }
+                    status = response?.status()
+                    if (response == null || (response.status() !in 200..399 && !(posting && response.status() in setOf(404, 410))))
+                        throw BrowserHttpFailure(response?.status() ?: 0, url)
                 }
                 override fun readJson(url: String): Any? {
                     checkOwner()
@@ -50,7 +62,7 @@ class BrowserSession(private val properties: CrawlerProperties, private val limi
                         limiter.beforeNavigation(site)
                         val response = context.request().get(url, RequestOptions.create().setTimeout(properties.navigationTimeout.toMillis().toDouble()))
                         try {
-                            check(response.ok()) { "JSON 응답 오류: ${response.status()} $url" }
+                            if (!response.ok()) throw BrowserHttpFailure(response.status(), response.url(), response.text().take(2000), "JSON")
                             return page.evaluate("body => JSON.parse(body)", response.text())
                         } finally { response.dispose() }
                     } finally { requestPermit?.close() }

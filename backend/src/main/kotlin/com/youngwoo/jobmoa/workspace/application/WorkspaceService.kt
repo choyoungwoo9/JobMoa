@@ -31,7 +31,7 @@ class WorkspaceService(private val repository: WorkspaceSnapshotRepository, priv
     fun overview(): Map<String, Any> = tx.execute {
         val counts = repository.counts()
         val files = Files.list(captures).use { stream -> stream.filter { safeFile(it) }.toList() }
-        counts + mapOf("captureFiles" to files.size, "captureBytes" to files.sumOf { Files.size(it) }, "backupVersion" to 1)
+        counts + mapOf("captureFiles" to files.size, "captureBytes" to files.sumOf { Files.size(it) }, "backupVersion" to 2)
     }
     private fun safeFile(path: Path) = fileName.matches(path.fileName.toString()) && Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)
     private fun checkedCapture(name: String): Path {

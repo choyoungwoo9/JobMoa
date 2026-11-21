@@ -77,6 +77,25 @@ class TaskService(private val tasks: CrawlTaskRepository, private val postings: 
         resolveParents(task, now)
     }
 
+    /** 마감 안내 화면을 본문·새 버전으로 저장하지 않고, 마지막 정상 본문과 개인 관리 정보를 보존한다. */
+    @Transactional
+    fun closeExisting(id: String, token: String, reason: String) {
+        val task = tasks.lock(id).also { it.requireOwnership(token, Instant.now()) }
+        require(reason.isNotBlank())
+        val now = Instant.now()
+        val old = postings.findByHashForUpdate(task.urlHash)
+        if (old != null) {
+            postings.save(old.copy(closed = true, lastSeen = now, lastChange = "closed"))
+            changes.append(CollectionChange(task.id, task.runId, old.id, TaskOutcome.CLOSED.name,
+                interests.find(old.id)?.starred ?: false, !old.closed, now))
+            observations.append(PostingObservation(postingId = old.id, taskId = task.id, observedAt = now, closed = true))
+        }
+        tasks.save(task.copy(status = TaskStatus.COMPLETED, outcome = if (old == null) TaskOutcome.EXCLUDED else TaskOutcome.CLOSED,
+            closed = true, error = "마감 확인: ${reason.take(1800)}" + if (old == null) " (기존 공고 없음, 신규 저장 제외)" else "",
+            bodyText = null, leaseToken = null, leaseExpiresAt = null))
+        resolveParents(task, now)
+    }
+
     @Transactional
     fun exclude(id: String, token: String, reason: String) {
         val task = tasks.lock(id).also { it.requireOwnership(token, Instant.now()) }
