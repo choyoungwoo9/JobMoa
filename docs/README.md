@@ -18,6 +18,7 @@
 | 통계의 정의·기간·한계 | [채용 통계](statistics.md) |
 | 관심 공고 관리 | [관심 공고 스펙](interest-postings-spec.md) |
 | 백업·복원·초기화·프리셋 등 개인 데이터 관리 | [개인 데이터 관리 스펙](workspace-tools-spec.md) |
+| 전체 공고 AI 질문·대화·스트리밍 계약 | [AI 질문과 Codex 워커](ai-chat.md) |
 | 저장된 공고의 사이트별 마감 판별 | [마감 판별 기준](closure-detection.md) |
 
 제품의 합의된 범위는 `docs/spec.md`가 상위 기준이다. 세부 문서는 해당 기능의 판정 조건과 예외를 설명하고, 실제 코드·API·화면의 현재 동작은 구현과 모듈 README에서 확인한다. 서로 다른 설명을 발견하면 한쪽을 임의로 기준 삼지 말고, 변경 작업에서 사용자 합의와 실제 동작을 확인해 함께 바로잡는다.
@@ -32,6 +33,7 @@
 | [statistics.md](statistics.md) | 통계 지표·필터·관측 기간의 정의와 한계 |
 | [interest-postings-spec.md](interest-postings-spec.md) | 관심 공고·메모·우선순위·지원 상태 상세 |
 | [workspace-tools-spec.md](workspace-tools-spec.md) | 개인 데이터 초기화·백업·복원·프리셋·변화 요약·비교 |
+| [ai-chat.md](ai-chat.md) | 전역 AI 대화·비동기 작업·SSE 재연결·Codex 워커 계약 |
 
 ### 수집기와 지원 범위
 

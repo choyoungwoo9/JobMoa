@@ -71,6 +71,8 @@ const paths: Record<string, ReactNode> = {
   spark: (
     <path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z" />
   ),
+  plus: <path d="M12 5v14m-7-7h14" />,
+  trash: (<><path d="M3 6h18M8 6V4h8v2m3 0-1 15H6L5 6m4 4v7m6-7v7" /></>),
   alert: (
     <>
       <path d="m10.3 3.9-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3.1l-8-14a2 2 0 0 0-3.4 0Z" />
