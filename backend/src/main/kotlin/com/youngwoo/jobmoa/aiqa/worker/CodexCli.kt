@@ -52,7 +52,7 @@ class CodexCli(
             val prompt = buildPrompt(workItem)
             val arguments = listOf(
                 executable, "exec", "--ephemeral", "--ignore-user-config", "--json", "--color", "never",
-                "--model", MODEL, "--search", "--disable", "shell_tool", "--sandbox", "read-only",
+                "--model", MODEL, "--config", "web_search=\"live\"", "--disable", "shell_tool", "--sandbox", "read-only",
                 "--ask-for-approval", "never", "--skip-git-repo-check", "--cd", directory.toString(),
                 "--output-schema", schema.toString(), "--output-last-message", output.toString(), "-",
             )
