@@ -23,7 +23,9 @@ class AiTaskEventHub(private val repository: AiChatRepository) {
         emitter.onError { remove() }
         synchronized(channel.lock) {
             channel.subscribers.add(emitter)
-            repository.taskEventsAfter(taskId, afterId).forEach { event -> send(emitter, event) }
+            repository.taskEventsAfter(taskId, afterId).forEach { event ->
+                if (!send(channel, emitter, event)) return@forEach
+            }
             if (terminal) {
                 channel.subscribers.remove(emitter)
                 emitter.complete()
@@ -36,7 +38,7 @@ class AiTaskEventHub(private val repository: AiChatRepository) {
     fun publish(event: AiTaskEvent) {
         val channel = channels[event.taskId] ?: return
         synchronized(channel.lock) {
-            channel.subscribers.toList().forEach { send(it, event) }
+            channel.subscribers.toList().forEach { send(channel, it, event) }
             if (event.type in setOf("complete", "failed")) {
                 channel.subscribers.toList().forEach { it.complete() }
                 channel.subscribers.clear()
@@ -53,7 +55,6 @@ class AiTaskEventHub(private val repository: AiChatRepository) {
                     try {
                         emitter.send(SseEmitter.event().comment("keepalive"))
                     } catch (_: IOException) {
-                        emitter.completeWithError(IOException("AI 작업 이벤트 연결이 끊겼습니다."))
                         channel.subscribers.remove(emitter)
                     }
                 }
@@ -61,11 +62,15 @@ class AiTaskEventHub(private val repository: AiChatRepository) {
         }
     }
 
-    private fun send(emitter: SseEmitter, event: AiTaskEvent) {
+    private fun send(channel: Channel, emitter: SseEmitter, event: AiTaskEvent): Boolean {
         try {
             emitter.send(SseEmitter.event().id(event.id.toString()).name(event.type).data(event.payloadJson))
+            return true
         } catch (_: IOException) {
-            emitter.completeWithError(IOException("AI 작업 이벤트 연결이 끊겼습니다."))
+            // SSE 구독자는 작업 진행과 독립적이다. 끊긴 연결만 제거하고
+            // 이미 DB에 커밋된 진행 이벤트 전파를 실패 처리하지 않는다.
+            channel.subscribers.remove(emitter)
+            return false
         }
     }
 }

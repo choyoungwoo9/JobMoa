@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.time.Duration
 import java.util.concurrent.Executors
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
@@ -46,53 +47,187 @@ class CodexCli(
     ): CodexResult {
         val directory = Files.createTempDirectory("jobmoa-codex-")
         try {
-            val schema = directory.resolve("result.schema.json")
-            val output = directory.resolve("result.json")
-            Files.writeString(schema, mapper.writeValueAsString(outputSchema()), StandardCharsets.UTF_8)
             val prompt = buildPrompt(workItem)
             val arguments = listOf(
-                executable, "exec", "--ephemeral", "--ignore-user-config", "--json", "--color", "never",
-                "--model", MODEL, "--config", "web_search=\"live\"", "--disable", "shell_tool", "--sandbox", "read-only",
-                "--skip-git-repo-check", "--cd", directory.toString(),
-                "--config", "approval_policy=\"never\"", "--output-schema", schema.toString(),
-                "--output-last-message", output.toString(), "-",
+                executable,
+                "--config", "web_search=\"live\"",
+                "--config", "approval_policy=\"never\"",
+                "--config", "mcp_servers={}",
+                "--config", "plugins={}",
+                "--disable", "shell_tool",
+                "app-server", "--listen", "stdio://",
             )
             val process = ProcessBuilder(arguments).directory(directory.toFile()).start()
             activeProcess.set(process)
             val io = Executors.newFixedThreadPool(2)
+            val stdoutLines = LinkedBlockingQueue<String>()
+            val stderrText = StringBuilder()
+            val answerStream = JsonAnswerDeltaExtractor()
+            val streamedResponse = StringBuilder()
+            var searchObserved = false
+            var threadId = ""
+            var completedTurn: JsonNode? = null
+            var finalMessageText = ""
+            val deadline = System.nanoTime() + TIMEOUT.toNanos()
             try {
-                val stdout = io.submit<Boolean> {
-                    process.inputStream.bufferedReader(StandardCharsets.UTF_8).use { reader ->
-                        parseEvents(reader.lineSequence(), emitSearch, emitDelta)
+                io.submit {
+                    try {
+                        process.inputStream.bufferedReader(StandardCharsets.UTF_8).use { reader ->
+                            while (true) stdoutLines.put(reader.readLine() ?: break)
+                        }
+                        stdoutLines.put(END_OF_STREAM)
+                    } catch (cause: Throwable) {
+                        stdoutLines.offer(STREAM_ERROR + safeError(cause.message.orEmpty()))
                     }
                 }
-                val stderr = io.submit<String> {
+                io.submit {
                     process.errorStream.bufferedReader(StandardCharsets.UTF_8).use { reader ->
-                        val captured = StringBuilder()
                         while (true) {
                             val line = reader.readLine() ?: break
-                            if (captured.length < 100_000) {
-                                captured.append(line.take(100_000 - captured.length)).append('\n')
+                            synchronized(stderrText) {
+                                if (stderrText.length < 100_000) {
+                                    stderrText.append(line.take(100_000 - stderrText.length)).append('\n')
+                                }
                             }
                         }
-                        captured.toString()
                     }
                 }
-                process.outputStream.bufferedWriter(StandardCharsets.UTF_8).use { it.write(prompt) }
-                if (!process.waitFor(TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)) {
-                    process.destroyForcibly()
-                    process.waitFor(5, TimeUnit.SECONDS)
-                    throw IllegalStateException("Codex 응답 시간이 초과됐습니다.")
+
+                val writer = process.outputStream.bufferedWriter(StandardCharsets.UTF_8)
+                fun send(payload: Map<String, Any?>) {
+                    writer.write(mapper.writeValueAsString(payload))
+                    writer.newLine()
+                    writer.flush()
                 }
-                val searchObserved = stdout.get(10, TimeUnit.SECONDS)
-                val error = stderr.get(10, TimeUnit.SECONDS)
-                if (process.exitValue() != 0 || !Files.exists(output)) {
-                    throw IllegalStateException(safeError(error).ifBlank { "Codex CLI가 답변을 만들지 못했습니다." })
+
+                fun sendRequest(id: Int, method: String, params: Map<String, Any?>) =
+                    send(mapOf("id" to id, "method" to method, "params" to params))
+
+                fun nextMessage(): JsonNode {
+                    while (true) {
+                        val remaining = deadline - System.nanoTime()
+                        if (remaining <= 0) throw IllegalStateException("Codex 응답 시간이 초과됐습니다.")
+                        val line = stdoutLines.poll(minOf(remaining, TimeUnit.SECONDS.toNanos(1)), TimeUnit.NANOSECONDS)
+                            ?: continue
+                        if (line == END_OF_STREAM) {
+                            val details = synchronized(stderrText) { stderrText.toString() }
+                            throw IllegalStateException(safeError(details).ifBlank { "Codex app-server 연결이 종료됐습니다." })
+                        }
+                        if (line.startsWith(STREAM_ERROR)) {
+                            throw IllegalStateException(line.removePrefix(STREAM_ERROR).ifBlank { "Codex app-server 출력 읽기에 실패했습니다." })
+                        }
+                        if (line.isBlank()) continue
+                        return mapper.readTree(line)
+                    }
                 }
-                val response = mapper.readTree(Files.readString(output, StandardCharsets.UTF_8))
+
+                fun handleNotification(message: JsonNode) {
+                    val method = message["method"]?.asString().orEmpty()
+                    if (method.isBlank()) return
+                    if (message.has("id")) {
+                        val id = message["id"]
+                        val response = when (method) {
+                            "item/commandExecution/requestApproval", "item/fileChange/requestApproval" ->
+                                mapOf("id" to id, "result" to mapOf("decision" to "decline"))
+                            else -> mapOf("id" to id, "error" to mapOf("code" to -32601, "message" to "지원하지 않는 Codex 요청입니다."))
+                        }
+                        send(response)
+                        return
+                    }
+
+                    val params = message["params"]
+                    when (method) {
+                        "item/started", "item/completed" -> {
+                            val itemType = params?.get("item")?.get("type")?.asString().orEmpty()
+                            val kind = itemType.lowercase().filter(Char::isLetterOrDigit)
+                            if (!searchObserved && kind.contains("websearch")) {
+                                searchObserved = true
+                                emitSearch("외부 웹 검색 중")
+                            }
+                            if (method == "item/completed" && kind == "agentmessage") {
+                                finalMessageText = params?.get("item")?.get("text")?.asString().orEmpty()
+                            }
+                        }
+                        "item/agentMessage/delta" -> {
+                            val delta = params?.get("delta")?.asString().orEmpty()
+                            if (delta.isNotEmpty()) {
+                                streamedResponse.append(delta)
+                                answerStream.append(delta).takeIf(String::isNotEmpty)?.let(emitDelta)
+                            }
+                        }
+                        "turn/completed" -> {
+                            val eventThreadId = params?.get("threadId")?.asString().orEmpty()
+                            if (threadId.isBlank() || eventThreadId == threadId) completedTurn = params?.get("turn")
+                        }
+                    }
+                }
+
+                fun awaitResponse(id: Int): JsonNode {
+                    while (true) {
+                        val message = nextMessage()
+                        if (message.has("method")) {
+                            handleNotification(message)
+                            continue
+                        }
+                        if (message["id"]?.asInt() != id) continue
+                        val error = message["error"]
+                        if (error != null && !error.isNull) {
+                            val code = error["code"]?.asInt()
+                            val details = error["message"]?.asString().orEmpty()
+                            throw IllegalStateException("Codex app-server 오류${code?.let { " ($it)" }.orEmpty()}: ${safeError(details)}")
+                        }
+                        return message["result"] ?: throw IllegalStateException("Codex app-server가 빈 응답을 반환했습니다.")
+                    }
+                }
+
+                sendRequest(1, "initialize", mapOf(
+                    "clientInfo" to mapOf("name" to "jobmoa-ai-worker", "title" to "JobMoa AI 워커", "version" to "0.1.0"),
+                    "capabilities" to mapOf("experimentalApi" to false),
+                ))
+                awaitResponse(1)
+                send(mapOf("method" to "initialized"))
+
+                sendRequest(2, "thread/start", mapOf(
+                    "model" to MODEL,
+                    "modelProvider" to "openai",
+                    "cwd" to directory.toAbsolutePath().toString(),
+                    "approvalPolicy" to "never",
+                    "sandbox" to "read-only",
+                    "ephemeral" to true,
+                ))
+                val thread = awaitResponse(2)["thread"]
+                threadId = thread?.get("id")?.asString().orEmpty()
+                require(threadId.isNotBlank()) { "Codex app-server가 대화 ID를 반환하지 않았습니다." }
+
+                sendRequest(3, "turn/start", mapOf(
+                    "threadId" to threadId,
+                    "input" to listOf(mapOf("type" to "text", "text" to prompt, "text_elements" to emptyList<Any>())),
+                    "model" to MODEL,
+                    "approvalPolicy" to "never",
+                    "outputSchema" to outputSchema(),
+                ))
+                awaitResponse(3)
+
+                while (completedTurn == null) handleNotification(nextMessage())
+                val turn = completedTurn ?: throw IllegalStateException("Codex app-server가 답변을 완료하지 않았습니다.")
+                val turnError = turn["error"]?.get("message")?.asString().orEmpty()
+                if (turnError.isNotBlank()) throw IllegalStateException(safeError(turnError))
+
+                val candidates = turn["items"]?.takeIf { it.isArray }?.values()?.toList().orEmpty()
+                    .asReversed().mapNotNull { item ->
+                        if (item["type"]?.asString() != "agentMessage") return@mapNotNull null
+                        item["text"]?.asString()?.takeIf(String::isNotBlank)?.let(::structuredResponse)
+                    }
+                val response = candidates.firstOrNull()
+                    ?: structuredResponse(finalMessageText)
+                    ?: structuredResponse(streamedResponse.toString())
+                    ?: throw IllegalStateException("Codex app-server가 지정한 JSON 형식의 답변을 반환하지 않았습니다.")
                 return parseResult(response, searchObserved)
             } finally {
                 activeProcess.compareAndSet(process, null)
+                runCatching { process.outputStream.close() }
+                process.destroy()
+                if (!process.waitFor(2, TimeUnit.SECONDS)) process.destroyForcibly()
                 io.shutdownNow()
             }
         } finally {
@@ -100,37 +235,12 @@ class CodexCli(
         }
     }
 
-    private fun parseEvents(events: Sequence<String>, emitSearch: (String) -> Unit, emitDelta: (String) -> Unit): Boolean {
-        var searchObserved = false
-        val answer = JsonAnswerDeltaExtractor()
-        events.filter(String::isNotBlank).forEach { line ->
-            val event = runCatching { mapper.readTree(line) }.getOrNull() ?: return@forEach
-            val type = event["type"]?.asString().orEmpty()
-            val itemType = event["item"]?.get("type")?.asString().orEmpty()
-            val eventKinds = listOf(type, itemType, event["item"]?.get("itemType")?.asString().orEmpty())
-                .map { it.lowercase().filter(Char::isLetterOrDigit) }
-            if (!searchObserved && eventKinds.any { it.contains("websearch") }) {
-                searchObserved = true
-                emitSearch("외부 웹 검색 중")
-            }
-            val delta = textDelta(event, type)
-            if (!delta.isNullOrEmpty()) answer.append(delta).takeIf(String::isNotEmpty)?.let(emitDelta)
-        }
-        return searchObserved
-    }
-
-    private fun textDelta(event: JsonNode, type: String): String? {
-        if (!type.contains("delta", ignoreCase = true)) return null
-        val candidates = listOfNotNull(event["delta"], event["item"]?.get("delta"), event["text_delta"], event["text"])
-        for (candidate in candidates) {
-            if (candidate.isString) return candidate.asString()
-            if (candidate.isObject) {
-                listOf("text", "delta", "content").forEach { key ->
-                    candidate[key]?.takeIf { it.isString }?.let { return it.asString() }
-                }
-            }
-        }
-        return null
+    private fun structuredResponse(text: String): JsonNode? {
+        if (text.isBlank()) return null
+        val direct = runCatching { mapper.readTree(text) }.getOrNull()?.takeIf { it.isObject && it.has("answer") }
+        if (direct != null) return direct
+        val fenced = Regex("(?s)```(?:json)?\\s*(\\{.*?})\\s*```").find(text)?.groupValues?.getOrNull(1) ?: return null
+        return runCatching { mapper.readTree(fenced) }.getOrNull()?.takeIf { it.isObject && it.has("answer") }
     }
 
     private fun parseResult(node: JsonNode, searchObserved: Boolean): CodexResult {
@@ -209,6 +319,8 @@ class CodexCli(
     companion object {
         const val MODEL = "gpt-6-luna"
         private val TIMEOUT = Duration.ofMinutes(8)
+        private const val END_OF_STREAM = "\u0000EOF"
+        private const val STREAM_ERROR = "\u0000ERROR:"
     }
 }
 
