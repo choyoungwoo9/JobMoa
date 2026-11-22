@@ -1,6 +1,7 @@
 package com.youngwoo.jobmoa.aiqa.worker
 
 import com.youngwoo.jobmoa.career.assistant.domain.model.CareerAssistantTaskType
+import com.youngwoo.jobmoa.application.domain.ApplicationAiTaskType
 import org.slf4j.LoggerFactory
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
@@ -83,6 +84,7 @@ private class AiWorker {
     private fun claim(queue: WorkerQueue) = request("POST", when (queue) {
         WorkerQueue.CAREER_MATERIAL -> "/api/career-materials/worker/tasks/claim"
         WorkerQueue.CAREER_ASSISTANT -> "/api/career-assistant/worker/tasks/claim"
+        WorkerQueue.APPLICATION -> "/api/applications/worker/tasks/claim"
         WorkerQueue.AI_CHAT -> "/api/ai/worker/tasks/claim"
     }, "{}")
 
@@ -127,6 +129,26 @@ private class AiWorker {
                     )))
                     log.info("경력 맞춤 작업 완료: {} ({})", taskId, taskType)
                 }
+                WorkerQueue.APPLICATION -> {
+                    val taskType = ApplicationAiTaskType.valueOf(task["taskType"].asString())
+                    val input = task["request"]
+                    val result: Any = when (taskType) {
+                        ApplicationAiTaskType.MATERIAL_DRAFT -> codex.buildApplicationMaterials(input)
+                        ApplicationAiTaskType.EXTRACT_QUESTIONS -> codex.extractApplicationQuestions(input)
+                        ApplicationAiTaskType.DRAFT_ANSWER -> codex.draftApplicationAnswer(input)
+                        ApplicationAiTaskType.INTERVIEW_RESEARCH -> codex.researchApplicationInterview(input) { message ->
+                            request("POST", "/api/applications/worker/tasks/$taskId/progress", mapper.writeValueAsString(mapOf(
+                                "leaseToken" to leaseToken, "message" to message,
+                            )))
+                        }
+                        ApplicationAiTaskType.INTERVIEW_FOLLOW_UP -> codex.createInterviewFollowUp(input)
+                    }
+                    request("POST", "/api/applications/worker/tasks/$taskId/complete", mapper.writeValueAsString(mapOf(
+                        "leaseToken" to leaseToken,
+                        "result" to mapper.readTree(mapper.writeValueAsString(result)),
+                    )))
+                    log.info("지원 준비 AI 작업 완료: {} ({})", taskId, taskType)
+                }
                 WorkerQueue.AI_CHAT -> {
                 val aiProgress = requireNotNull(progress)
                 aiProgress.status("공고 자료를 확인하고 있어요")
@@ -152,6 +174,7 @@ private class AiWorker {
                 val endpoint = when (queue) {
                     WorkerQueue.CAREER_MATERIAL -> "/api/career-materials/worker/tasks/$taskId/fail"
                     WorkerQueue.CAREER_ASSISTANT -> "/api/career-assistant/worker/tasks/$taskId/fail"
+                    WorkerQueue.APPLICATION -> "/api/applications/worker/tasks/$taskId/fail"
                     WorkerQueue.AI_CHAT -> "/api/ai/worker/tasks/$taskId/fail"
                 }
                 request("POST", endpoint, mapper.writeValueAsString(mapOf(
@@ -178,6 +201,7 @@ private class AiWorker {
         val endpoint = when (lease.queue) {
             WorkerQueue.CAREER_MATERIAL -> "/api/career-materials/worker/tasks/${lease.taskId}/renew"
             WorkerQueue.CAREER_ASSISTANT -> "/api/career-assistant/worker/tasks/${lease.taskId}/renew"
+            WorkerQueue.APPLICATION -> "/api/applications/worker/tasks/${lease.taskId}/renew"
             WorkerQueue.AI_CHAT -> "/api/ai/worker/tasks/${lease.taskId}/renew"
         }
         request("POST", endpoint, mapper.writeValueAsString(mapOf("leaseToken" to lease.token)))
@@ -251,7 +275,7 @@ private class AiWorker {
         }
     }
 
-    private enum class WorkerQueue { CAREER_MATERIAL, CAREER_ASSISTANT, AI_CHAT }
+    private enum class WorkerQueue { CAREER_MATERIAL, CAREER_ASSISTANT, APPLICATION, AI_CHAT }
     private data class Lease(val taskId: String, val token: String, val queue: WorkerQueue)
 
     companion object {

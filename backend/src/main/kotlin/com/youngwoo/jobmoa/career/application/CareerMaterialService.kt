@@ -98,6 +98,46 @@ class CareerMaterialService(
         }
     }
 
+    /** 사용자가 인터뷰 경험을 경력 자료로 승인하면 답변 원문을 로컬 텍스트 자료로 보존한다. */
+    @Transactional
+    fun saveInterviewFact(title: String, summary: String, sourceExcerpt: String): CareerFact {
+        access.writing()
+        val cleanTitle = title.trim()
+        val cleanSummary = summary.trim()
+        val quote = sourceExcerpt.trim()
+        require(cleanTitle.isNotBlank() && cleanTitle.length <= 500) { "경험 제목은 1~500자로 입력하세요." }
+        require(cleanSummary.isNotBlank() && cleanSummary.length <= 8000) { "경험 설명은 1~8,000자로 입력하세요." }
+        require(quote.isNotBlank() && quote.length <= 1000) { "원문 근거는 1~1,000자로 입력하세요." }
+        val id = UUID.randomUUID().toString()
+        val now = Instant.now()
+        val content = "경험 인터뷰에서 승인한 답변 근거\n\n$quote\n"
+        val directory = storageDirectory()
+        Files.createDirectories(directory)
+        val path = directory.resolve("$id.bin")
+        val temporary = Files.createTempFile(directory, "interview-", ".tmp")
+        try {
+            Files.writeString(temporary, content)
+            val size = Files.size(temporary)
+            val hash = sha256(temporary)
+            Files.move(temporary, path)
+            TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
+                override fun afterCompletion(status: Int) {
+                    if (status != TransactionSynchronization.STATUS_COMMITTED) runCatching { Files.deleteIfExists(path) }
+                }
+            })
+            repository.save(CareerMaterial(id, "경험 인터뷰.txt", "text/plain", size, hash, id, CareerMaterialStatus.ANALYZED,
+                createdAt = now, updatedAt = now))
+            val fragmentId = UUID.randomUUID().toString()
+            repository.saveFragments(listOf(CareerMaterialFragment(fragmentId, id, 0, "경험 인터뷰 답변", content)))
+            val fact = CareerFact(UUID.randomUUID().toString(), id, CareerFactKind.EXPERIENCE, cleanTitle, cleanSummary,
+                CareerFactStatus.UNVERIFIED, listOf(CareerFactEvidence(UUID.randomUUID().toString(), fragmentId, "경험 인터뷰 답변", quote)), now, now)
+            repository.replaceFacts(id, listOf(fact), now)
+            return fact
+        } finally {
+            Files.deleteIfExists(temporary)
+        }
+    }
+
     @Transactional(readOnly = true)
     fun list(): List<CareerMaterialSummary> = repository.list().map { summary(it, false) }
 

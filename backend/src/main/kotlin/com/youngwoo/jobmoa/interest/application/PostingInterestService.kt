@@ -6,7 +6,7 @@ import com.youngwoo.jobmoa.posting.domain.repository.PostingRepository
 import com.youngwoo.jobmoa.shared.ResourceNotFound
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.time.*
+import java.time.Instant
 
 @Service
 class PostingInterestService(private val postings: PostingRepository, private val interests: PostingInterestRepository, private val access: com.youngwoo.jobmoa.workspace.application.WorkspaceAccess) {
@@ -21,6 +21,6 @@ class PostingInterestService(private val postings: PostingRepository, private va
     fun star(id: Long, starred: Boolean): PostingInterest = interests.save(current(id).star(starred, Instant.now()))
 
     @Transactional
-    fun manage(id: Long, note: String, priority: InterestPriority, status: ApplicationStatus, appliedOn: LocalDate?): PostingInterest =
-        interests.save(current(id).manage(note, priority, status, appliedOn, LocalDate.now(ZoneId.of("Asia/Seoul")), Instant.now()))
+    fun manage(id: Long, note: String, priority: InterestPriority): PostingInterest =
+        interests.save(current(id).manage(note, priority, Instant.now()))
 }

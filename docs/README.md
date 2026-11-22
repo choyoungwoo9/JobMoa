@@ -31,7 +31,8 @@
 | --- | --- |
 | [spec.md](spec.md) | 현재 제품 동작과 합의된 범위 |
 | [statistics.md](statistics.md) | 통계 지표·필터·관측 기간의 정의와 한계 |
-| [interest-postings-spec.md](interest-postings-spec.md) | 관심 공고·메모·우선순위·지원 상태 상세 |
+| [interest-postings-spec.md](interest-postings-spec.md) | 관심 공고·메모·우선순위와 지원 상태 표시 경계 |
+| 지원 준비 | 공고별 지원 건·문항 답변·맞춤 자료·면접 조사와 경험 인터뷰는 [제품 스펙](spec.md#공고별-지원서-요구-정보)을 기준으로 한다. |
 | [workspace-tools-spec.md](workspace-tools-spec.md) | 개인 데이터 초기화·백업·복원·프리셋·변화 요약·비교 |
 | [ai-chat.md](ai-chat.md) | 전역 AI 대화·비동기 작업·SSE 재연결·Codex 워커 계약 |
 

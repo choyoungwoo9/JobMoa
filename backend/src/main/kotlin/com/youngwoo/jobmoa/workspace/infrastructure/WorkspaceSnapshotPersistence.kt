@@ -12,7 +12,8 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
     // 부모 → 자식 순서. 삭제는 역순으로 하며 FK를 끄거나 TRUNCATE하지 않는다.
     private val tables = listOf("collection_run", "collection_run_source", "crawl_task", "posting", "posting_version",
         "posting_category", "posting_observation", "posting_interest", "collection_preset", "collection_change",
-        "career_material", "career_material_fragment", "career_fact", "career_fact_evidence", "posting_application_requirement", "career_assistant_task")
+        "career_material", "career_material_fragment", "career_fact", "career_fact_evidence", "posting_application_requirement", "career_assistant_task",
+        "application_case", "application_ai_task", "application_question", "application_material_draft", "application_interview_session", "application_interview_turn")
     private data class Column(val name: String, val type: Int)
     private fun metadata(table: String): List<Column> = jdbc.execute(org.springframework.jdbc.core.ConnectionCallback { connection ->
         connection.prepareStatement("SELECT * FROM `$table` LIMIT 0").use { statement -> statement.executeQuery().use { rs ->
@@ -28,6 +29,9 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
         "careerMaterials" to count("career_material"), "careerFacts" to count("career_fact"),
         "careerTasks" to count("career_assistant_task"),
         "applicationRequirements" to count("posting_application_requirement"),
+        "applications" to count("application_case"), "applicationQuestions" to count("application_question"),
+        "applicationMaterials" to count("application_material_draft"), "interviewSessions" to count("application_interview_session"),
+        "applicationAiTasks" to count("application_ai_task"),
         "read" to (jdbc.queryForObject("SELECT COUNT(*) FROM posting WHERE is_read=1", Long::class.java) ?: 0))
     private fun count(table: String) = jdbc.queryForObject("SELECT COUNT(*) FROM `$table`", Long::class.java) ?: 0
     override fun captureNames(): Set<String> = jdbc.queryForList("SELECT capture_path FROM posting_version UNION SELECT capture_path FROM crawl_task WHERE capture_path IS NOT NULL", String::class.java).filterNotNull().toSet()
@@ -45,11 +49,13 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
         SnapshotTable(columns.map { it.name }, rows)
     }
     override fun validate(snapshot: WorkspaceSnapshot) {
-        require(snapshot.format == "jobmoa" && snapshot.version in setOf(1, 2) && snapshot.schema in setOf(10, 11, 12, 13, 14, 15, 16)) { "이 버전에서 지원하는 JobMoa 백업 파일이 아닙니다." }
+        require(snapshot.format == "jobmoa" && snapshot.version in setOf(1, 2) && snapshot.schema in 10..18) { "이 버전에서 지원하는 JobMoa 백업 파일이 아닙니다." }
+        val newApplicationTables = setOf("application_case", "application_ai_task", "application_question", "application_material_draft", "application_interview_session", "application_interview_turn")
         val expectedTables = when (snapshot.schema) {
-            10 -> tables.filterNot { it.startsWith("career_") || it == "posting_application_requirement" }.toSet()
-            11 -> tables.filterNot { it == "posting_application_requirement" || it == "career_assistant_task" }.toSet()
-            12 -> tables.filterNot { it == "career_assistant_task" }.toSet()
+            10 -> tables.filterNot { it.startsWith("career_") || it == "posting_application_requirement" || it in newApplicationTables }.toSet()
+            11 -> tables.filterNot { it == "posting_application_requirement" || it == "career_assistant_task" || it in newApplicationTables }.toSet()
+            12 -> tables.filterNot { it == "career_assistant_task" || it in newApplicationTables }.toSet()
+            in 13..17 -> tables.filterNot { it in newApplicationTables }.toSet()
             else -> tables.toSet()
         }
         require(snapshot.tables.keys == expectedTables) { "백업에 필요한 데이터가 없거나 알 수 없는 테이블이 포함되어 있습니다." }
@@ -79,6 +85,7 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
             "posting_category" -> listOf("posting_id", "category_id")
             "posting_interest" -> listOf("posting_id")
             "collection_change" -> listOf("task_id")
+            "application_material_draft" -> listOf("application_id")
             else -> listOf("id")
         }) }
         fun references(table: String, column: String, parent: String) {
@@ -151,6 +158,36 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
             require(values("career_assistant_task", "task_type").all { it in setOf("RECOMMENDATIONS", "POSTING_DRAFT") }) { "지원하지 않는 AI 경력 작업입니다." }
             require(values("career_assistant_task", "status").all { it in setOf("WAITING_AI", "COMPLETED", "FAILED") }) { "진행 중인 AI 경력 작업은 백업할 수 없습니다." }
         }
+        if (snapshot.schema >= 18) {
+            references("application_case", "posting_id", "posting")
+            references("application_ai_task", "application_id", "application_case")
+            references("application_ai_task", "posting_id", "posting")
+            references("application_question", "application_id", "application_case")
+            references("application_question", "source_requirement_id", "posting_application_requirement")
+            references("application_question", "answer_task_id", "application_ai_task")
+            references("application_material_draft", "application_id", "application_case")
+            references("application_material_draft", "source_task_id", "application_ai_task")
+            references("application_interview_session", "application_id", "application_case")
+            references("application_interview_turn", "session_id", "application_interview_session")
+            references("application_interview_turn", "promoted_material_id", "career_material")
+            require(values("application_case", "status").all { it in setOf("PREPARING", "APPLIED") }) { "지원 상태가 올바르지 않습니다." }
+            require(values("application_case", "posting_id").distinct().size == values("application_case", "posting_id").size) { "한 공고에 지원 건이 중복되었습니다." }
+            require(values("application_ai_task", "task_type").all { it in setOf("MATERIAL_DRAFT", "EXTRACT_QUESTIONS", "DRAFT_ANSWER", "INTERVIEW_RESEARCH", "INTERVIEW_FOLLOW_UP") }) { "지원하지 않는 지원 준비 AI 작업입니다." }
+            require(values("application_ai_task", "status").all { it in setOf("WAITING_AI", "COMPLETED", "FAILED") }) { "진행 중인 지원 준비 AI 작업은 백업할 수 없습니다." }
+            require(values("application_question", "character_limit").all { it == null || it.toString().toIntOrNull() in 1..12000 }) { "지원서 글자 수 제한이 올바르지 않습니다." }
+            require(values("application_interview_session", "status").all { it in setOf("ACTIVE", "COMPLETED") }) { "경험 인터뷰 상태가 올바르지 않습니다." }
+            require(values("application_interview_turn", "basis").all { it in setOf("POSTING", "RESUME", "PORTFOLIO", "APPLICATION_ANSWER", "COMPANY_TREND") }) { "경험 인터뷰 근거 유형이 올바르지 않습니다." }
+            val postingByCase = snapshot.tables.getValue("application_case").let { data ->
+                val idColumn = data.columns.indexOf("id")
+                val postingColumn = data.columns.indexOf("posting_id")
+                data.rows.associate { it[idColumn].toString() to it[postingColumn].toString() }
+            }
+            val mismatchedTasks = snapshot.tables.getValue("application_ai_task").rows.any { row ->
+                val data = snapshot.tables.getValue("application_ai_task")
+                postingByCase[row[data.columns.indexOf("application_id")].toString()] != row[data.columns.indexOf("posting_id")].toString()
+            }
+            require(!mismatchedTasks) { "지원 준비 AI 작업이 다른 공고를 참조합니다." }
+        }
     }
     override fun replace(snapshot: WorkspaceSnapshot) {
         validate(snapshot)
@@ -221,6 +258,14 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
                 lease_expires_at = NULL,
                 updated_at = CURRENT_TIMESTAMP(6)
         """.trimIndent())
+        if (snapshot.schema < 18) {
+            jdbc.update("""
+                INSERT INTO application_case (id, posting_id, status, started_at, applied_at, created_at, updated_at)
+                SELECT UUID(), posting_id, 'APPLIED', TIMESTAMP(applied_on, '00:00:00'), TIMESTAMP(applied_on, '00:00:00'), updated_at, updated_at
+                FROM posting_interest
+                WHERE application_status = 'APPLIED' AND applied_on IS NOT NULL
+            """.trimIndent())
+        }
         bumpRevision()
     }
     override fun reset(scope: String) {
@@ -228,7 +273,14 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
             "interests" -> jdbc.update("DELETE FROM posting_interest")
             "read" -> jdbc.update("UPDATE posting SET is_read=0")
             "presets" -> jdbc.update("DELETE FROM collection_preset")
-            "career" -> { jdbc.update("DELETE FROM career_assistant_task"); jdbc.update("DELETE FROM career_material") }
+            "career" -> {
+                jdbc.update("DELETE FROM application_interview_session")
+                jdbc.update("DELETE FROM application_material_draft")
+                jdbc.update("DELETE FROM application_ai_task")
+                jdbc.update("UPDATE application_question SET answer_draft='', answer_fact_ids_json='[]', answer_task_id=NULL, updated_at=CURRENT_TIMESTAMP(6)")
+                jdbc.update("DELETE FROM career_assistant_task")
+                jdbc.update("DELETE FROM career_material")
+            }
             "postings" -> { jdbc.update("DELETE FROM career_assistant_task"); tables.asReversed().filter { it != "collection_preset" && !it.startsWith("career_") }.forEach { jdbc.update("DELETE FROM `$it`") } }
             else -> throw IllegalArgumentException("지원하지 않는 초기화 범위입니다.")
         }

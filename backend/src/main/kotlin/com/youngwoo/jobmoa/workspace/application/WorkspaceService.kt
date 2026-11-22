@@ -35,7 +35,7 @@ class WorkspaceService(private val repository: WorkspaceSnapshotRepository, priv
         val files = Files.list(captures).use { stream -> stream.filter { safeFile(it) }.toList() }
         val materials = Files.list(careerMaterials).use { stream -> stream.filter { safeCareerFile(it) }.toList() }
         counts + mapOf("captureFiles" to files.size, "captureBytes" to files.sumOf { Files.size(it) },
-            "careerFiles" to materials.size, "careerBytes" to materials.sumOf { Files.size(it) }, "backupVersion" to 4)
+            "careerFiles" to materials.size, "careerBytes" to materials.sumOf { Files.size(it) }, "backupVersion" to 5)
     }
     private fun safeFile(path: Path) = fileName.matches(path.fileName.toString()) && Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)
     private fun safeCareerFile(path: Path) = careerFileName.matches(path.fileName.toString()) && Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)
@@ -118,9 +118,23 @@ class WorkspaceService(private val repository: WorkspaceSnapshotRepository, priv
                 values[taskExpiresIndex] = null
             }
         }
+        val applicationTasks = tables.getValue("application_ai_task")
+        val applicationTaskStatus = applicationTasks.columns.indexOf("status")
+        val applicationTaskToken = applicationTasks.columns.indexOf("lease_token")
+        val applicationTaskExpires = applicationTasks.columns.indexOf("lease_expires_at")
+        val applicationTaskProgress = applicationTasks.columns.indexOf("progress_message")
+        val normalizedApplicationTasks = applicationTasks.rows.map { row ->
+            if (row[applicationTaskStatus] != "ANALYZING") row else row.toMutableList().also { values ->
+                values[applicationTaskStatus] = "WAITING_AI"
+                values[applicationTaskToken] = null
+                values[applicationTaskExpires] = null
+                values[applicationTaskProgress] = "백업에서 복원되어 다시 처리 대기 중"
+            }
+        }
         return tables + ("career_material" to table.copy(rows = rows)) +
             ("posting_application_requirement" to requirementTable.copy(rows = requirementRows)) +
-            ("career_assistant_task" to assistant.copy(rows = normalizedTasks))
+            ("career_assistant_task" to assistant.copy(rows = normalizedTasks)) +
+            ("application_ai_task" to applicationTasks.copy(rows = normalizedApplicationTasks))
     }
     private fun hash(path: Path): String {
         val digest = MessageDigest.getInstance("SHA-256")
@@ -223,7 +237,8 @@ class WorkspaceService(private val repository: WorkspaceSnapshotRepository, priv
                 "careerBytes" to snapshot.careerFiles.sumOf { Files.size(directory.resolve("career-materials/$it")) },
                 "careerMaterialsIncluded" to (snapshot.schema >= 11),
                 "applicationRequirementsIncluded" to (snapshot.schema >= 12),
-                "careerAssistantIncluded" to (snapshot.schema >= 13))
+                "careerAssistantIncluded" to (snapshot.schema >= 13),
+                "applicationWorkspaceIncluded" to (snapshot.schema >= 18))
         } catch (e: Exception) {
             removeDirectory(directory)
             if (e is IllegalArgumentException) throw e
@@ -264,7 +279,12 @@ class WorkspaceService(private val repository: WorkspaceSnapshotRepository, priv
         "careerFacts" to (s.tables["career_fact"]?.rows?.size ?: 0),
         "careerTasks" to (s.tables["career_assistant_task"]?.rows?.size ?: 0),
         "careerFiles" to s.careerFiles.size,
-        "applicationRequirements" to (s.tables["posting_application_requirement"]?.rows?.size ?: 0))
+        "applicationRequirements" to (s.tables["posting_application_requirement"]?.rows?.size ?: 0),
+        "applications" to (s.tables["application_case"]?.rows?.size ?: 0),
+        "applicationQuestions" to (s.tables["application_question"]?.rows?.size ?: 0),
+        "applicationMaterials" to (s.tables["application_material_draft"]?.rows?.size ?: 0),
+        "interviewSessions" to (s.tables["application_interview_session"]?.rows?.size ?: 0),
+        "applicationAiTasks" to (s.tables["application_ai_task"]?.rows?.size ?: 0))
     @Synchronized fun discard(token: String) { previews.remove(token)?.let { removeDirectory(it.directory) } }
     @Synchronized fun restore(token: String, confirmation: String): Map<String, Any> {
         require(confirmation == "복원") { "확인 문구 '복원'을 입력하세요." }

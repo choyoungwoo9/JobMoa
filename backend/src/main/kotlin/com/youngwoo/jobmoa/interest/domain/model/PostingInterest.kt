@@ -18,11 +18,8 @@ data class PostingInterest(
 ) {
     fun star(value: Boolean, now: Instant) = copy(starred = value, updatedAt = now)
 
-    fun manage(note: String, priority: InterestPriority, status: ApplicationStatus, appliedOn: LocalDate?, today: LocalDate, now: Instant): PostingInterest {
+    fun manage(note: String, priority: InterestPriority, now: Instant): PostingInterest {
         require(note.length <= 5000) { "메모는 5,000자까지 저장할 수 있습니다." }
-        require(status == ApplicationStatus.APPLIED || appliedOn == null) { "지원 전 공고에는 지원일을 지정할 수 없습니다." }
-        val date = if (status == ApplicationStatus.APPLIED) appliedOn ?: this.appliedOn ?: today else null
-        require(date == null || !date.isAfter(today)) { "지원일은 오늘 이후로 지정할 수 없습니다." }
-        return copy(note = note, priority = priority, applicationStatus = status, appliedOn = date, updatedAt = now)
+        return copy(note = note, priority = priority, updatedAt = now)
     }
 }
