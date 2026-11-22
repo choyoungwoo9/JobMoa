@@ -237,6 +237,9 @@ export function ApplicationWorkspace({ jobs, demo = false, initialApplicationId,
   const researchPatterns = research?.reviewPatterns ?? []
   const researchQuestions = research?.questions ?? []
   const activeTurn = detail?.interviewSession?.turns.find(turn => !turn.answer || (turn.followUpQuestion && !turn.followUpAnswer))
+  const previousDocumentVersions = (detail?.materials?.previousVersions ?? []).filter((entry: any) =>
+    entry.draft?.resumeSections?.some((item: any) => item.included !== false && item.content?.trim()) ||
+    entry.draft?.portfolioProjects?.some((item: any) => item.included !== false && item.title?.trim() && item.summary?.trim()))
 
   return <section className="application-workspace" aria-label="지원 준비 공간">
     <aside className="application-case-list">
@@ -266,7 +269,7 @@ export function ApplicationWorkspace({ jobs, demo = false, initialApplicationId,
           {!detail.materials && <div className="application-empty-inline"><strong>제출용 문서를 만들어보세요</strong><p>등록된 경력 자료에서 직무 경험과 프로젝트를 찾아 이력서와 포트폴리오를 구성합니다. 이름·연락처처럼 자료에서 확인되지 않는 정보는 임의로 만들지 않아요.</p><button className="text-button" onClick={onOpenCareer}>경력 자료 열기</button></div>}
           {detail.materials && <>
             <p className="application-document-help">근거와 확인 메모는 검토 화면에만 표시되고 PDF에는 포함되지 않습니다. 문서를 다시 구성하면 현재 저장본은 이전 버전으로 보관돼요.</p>
-            {!!detail.materials.previousVersions?.length && <details className="application-previous-versions"><summary>이전 생성본 {detail.materials.previousVersions.length}개 보기</summary>{detail.materials.previousVersions.map((entry: any) => <div key={entry.version}><span>초안 v{entry.version}</span><button className="text-button" onClick={() => previewDocument('resume', entry.draft, entry.version)}>이력서 보기</button><button className="text-button" disabled={!entry.draft?.portfolioProjects?.length} onClick={() => previewDocument('portfolio', entry.draft, entry.version)}>포트폴리오 보기</button></div>)}</details>}
+            {!!previousDocumentVersions.length && <details className="application-previous-versions"><summary>이전 생성본 {previousDocumentVersions.length}개 보기</summary>{previousDocumentVersions.map((entry: any) => <div key={entry.version}><span>초안 v{entry.version}</span><button className="text-button" onClick={() => previewDocument('resume', entry.draft, entry.version)}>이력서 보기</button><button className="text-button" disabled={!entry.draft?.portfolioProjects?.some((item: any) => item.included !== false && item.title?.trim() && item.summary?.trim())} onClick={() => previewDocument('portfolio', entry.draft, entry.version)}>포트폴리오 보기</button></div>)}</details>}
             <div className="application-material-card"><div className="application-material-card-heading"><h4>이력서</h4><span>초안 v{detail.materialsVersion}</span></div>
               <div className="application-document-profile"><strong>문서 기본 정보</strong><small>자료에서 찾지 못한 정보는 직접 입력할 수 있어요. 비워둔 항목은 PDF에 표시하지 않아요.</small><div className="application-document-profile-grid">
                 <label>이름<input maxLength={100} value={draft.candidateName} onChange={e => setDraft(value => ({ ...value, candidateName: e.target.value }))} /></label>

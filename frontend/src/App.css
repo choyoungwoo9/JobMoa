@@ -3848,6 +3848,13 @@ dialog::backdrop {
   .application-document-overlay { position: static !important; inset: auto !important; display: block !important; width: 100% !important; height: auto !important; overflow: visible !important; background: #fff !important; }
   .application-document-toolbar { display: none !important; }
   .application-document-page { width: 210mm !important; min-height: 297mm !important; margin: 0 !important; padding: 19mm 19mm 20mm !important; border: 0 !important; box-shadow: none !important; break-after: page; page-break-after: always; }
+  .application-resume-document { padding: 13mm 16mm 15mm !important; font-size: 9.25pt !important; line-height: 1.45 !important; }
+  .application-resume-document h1 { margin: 6px 0 4px; font-size: 21pt; }
+  .application-resume-document h2 { margin-bottom: 4px; padding-bottom: 3px; font-size: 10.5pt; }
+  .application-resume-document .application-document-heading { margin-bottom: 9px; padding-bottom: 8px; }
+  .application-resume-document .application-document-summary { margin: 10px 0; padding: 9px 11px; }
+  .application-resume-document .application-document-section { margin: 9px 0; }
+  .application-resume-document .application-document-text li,.application-resume-document .application-document-section > ul li { margin: 1px 0; }
   .application-document-page:last-child { break-after: auto; page-break-after: auto; }
   .application-document-page-footer { right: 19mm !important; left: 19mm !important; }
   .application-document-section, .application-document-tech { break-inside: avoid; page-break-inside: avoid; }
