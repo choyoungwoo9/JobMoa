@@ -118,7 +118,7 @@ class CareerMaterialService(
         val cleanSummary = summary.trim()
         require(cleanTitle.isNotBlank() && cleanTitle.length <= 500) { "제목은 1~500자로 입력하세요." }
         require(cleanSummary.isNotBlank() && cleanSummary.length <= 8000) { "설명은 1~8,000자로 입력하세요." }
-        require(current.evidence.isNotEmpty()) { "원문 근거가 있는 후보만 확정할 수 있습니다." }
+        require(current.evidence.isNotEmpty()) { "원문 근거가 있는 경력 정보만 저장할 수 있습니다." }
         val updated = current.copy(title = cleanTitle, summary = cleanSummary, status = status, updatedAt = Instant.now())
         repository.saveFact(updated)
         return repository.facts(materialId).first { it.id == factId }

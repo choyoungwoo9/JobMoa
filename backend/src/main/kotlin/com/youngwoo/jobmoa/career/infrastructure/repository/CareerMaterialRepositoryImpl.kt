@@ -35,8 +35,10 @@ class CareerMaterialRepositoryImpl(
         }
     }
 
-    override fun verifiedFacts(): List<CareerFact> {
-        val rows = facts.findAllByVerificationStatusOrderByCreatedAtAscIdAsc(CareerFactStatus.VERIFIED.name)
+    override fun recommendationFacts(): List<CareerFact> {
+        val rows = facts.findAllByVerificationStatusInOrderByCreatedAtAscIdAsc(
+            listOf(CareerFactStatus.UNVERIFIED.name, CareerFactStatus.VERIFIED.name),
+        )
         if (rows.isEmpty()) return emptyList()
         val materialIds = rows.map { it.materialId }.distinct()
         val sourceById = fragments.findAllByMaterialIdIn(materialIds).associateBy { it.id }

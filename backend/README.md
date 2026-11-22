@@ -160,20 +160,20 @@ Codex 작업자는 `/api/application-requirements/worker/tasks/**`, `/api/career
 
 ## 경력 자료와 Codex 분석
 
-V12가 원본 문서·추출 구간·AI 사실 후보·근거 인용 테이블을 만든다. 원본은 `${STORAGE_DIRECTORY}/career-materials/{uuid}.bin`에 두고, 문서 내용은 Apache Tika 표준 파서로 감지·추출한다. 페이지 구분과 제목/문단 구간을 저장하며, OCR은 Tesseract 한국어·영어 사전을 사용한다. 파서가 처리하지 못하거나 본문이 비어 있어도 원본과 실패 이유는 남긴다. 업로드는 파일당 50 MiB, 한 번에 20개·총 200 MiB까지 받는다. 추출 본문 저장은 파일당 400만 자, Codex 전달은 파일당 16만 자까지 제한한다. 확장자 검증은 하지 않고 SHA-256 내용 해시로 동일 파일 중복을 막는다. V14는 확정된 경력 사실을 바탕으로 추천·공고별 맞춤 이력서·포트폴리오 초안을 `career_assistant_task`에 저장한다.
+V12가 원본 문서·추출 구간·AI 경력 정보·근거 인용 테이블을 만든다. 원본은 `${STORAGE_DIRECTORY}/career-materials/{uuid}.bin`에 두고, 문서 내용은 Apache Tika 표준 파서로 감지·추출한다. 페이지 구분과 제목/문단 구간을 저장하며, OCR은 Tesseract 한국어·영어 사전을 사용한다. 파서가 처리하지 못하거나 본문이 비어 있어도 원본과 실패 이유는 남긴다. 업로드는 파일당 50 MiB, 한 번에 20개·총 200 MiB까지 받는다. 추출 본문 저장은 파일당 400만 자, Codex 전달은 파일당 16만 자까지 제한한다. 확장자 검증은 하지 않고 SHA-256 내용 해시로 동일 파일 중복을 막는다. V14는 사용자가 제외하지 않은 경력 정보를 바탕으로 추천·공고별 맞춤 이력서·포트폴리오 초안을 `career_assistant_task`에 저장한다.
 
 | API | 용도 |
 | --- | --- |
 | `GET /api/career-materials` | 등록 파일·형식·크기·처리 상태 목록 |
 | `POST /api/career-materials` | multipart `files` 여러 개 등록·본문 추출·비동기 분석 큐 등록 |
 | `GET /api/career-materials/{id}` | 본문 구간과 AI 사실 후보·근거 인용 조회 |
-| `PATCH /api/career-materials/{id}/facts/{factId}` | 제목·설명 수정, `UNVERIFIED`·`VERIFIED`·`REJECTED` 상태 저장 |
+| `PATCH /api/career-materials/{id}/facts/{factId}` | 제목·설명과 상태 수정. `UNVERIFIED`·기존 `VERIFIED`는 추천에 포함하고, `REJECTED`는 제외 |
 | `GET /api/career-materials/{id}/original` | 원본 파일 다운로드 |
 | `DELETE /api/career-materials/{id}` | 원본·추출 본문·후보를 함께 삭제 |
 | `POST /api/career-materials/{id}/retry` | AI 분석 실패 파일을 다시 대기열에 등록 |
 | `GET /api/career-materials/worker/status` | 선택 Codex 워커 상태 |
 | `/api/career-materials/worker/tasks/**` | 작업 claim·lease 갱신·완료·실패 보고 |
-| `GET /api/career-assistant/readiness` | 확정된 경력 사실·열린 공고 건수 |
+| `GET /api/career-assistant/readiness` | 추천에 포함되는 경력 정보·열린 공고 건수 |
 | `POST /api/career-assistant/recommendations` | `{count, preferenceText, categoryIds, companyIds, locationKeywords}`로 추천 작업을 등록하고 `202`와 작업 ID 반환. `preferenceText`는 최대 1,200자, 지역은 최대 200자이며 나머지 조건은 선택 사항 |
 | `GET /api/career-assistant/recommendations` | 최근 추천 작업 및 저장된 결과 |
 | `POST /api/career-assistant/recommendations/{id}/drafts` | 추천 결과에서 선택한 공고의 맞춤 초안 작업 등록 |
@@ -181,9 +181,9 @@ V12가 원본 문서·추출 구간·AI 사실 후보·근거 인용 테이블�
 | `GET /api/career-assistant/tasks/{id}` · `POST .../{id}/retry` | 개별 작업 상태·실패 재시도 |
 | `/api/career-assistant/worker/tasks/**` | 추천·초안 작업 claim·lease 갱신·완료·실패 보고 |
 
-워커는 AI 질문·경력 자료·지원서 요구 정보·경력 추천 및 맞춤 초안 네 큐를 순환 조회해 한 종류가 계속 앞서지 않게 한다. 질문 답변만 웹 검색을 허용하고, 경력 자료·지원서 정보·추천·초안 prompt는 외부 검색 없이 입력으로 받은 자료만 사용한다. `gpt-6-luna`에서 생성한 경력 후보의 각 인용은 API가 추출 구간에 실제 포함되는지 재검증한다. 사용자가 `VERIFIED`한 사실만 추천·초안에 보내며, 추천 공고 ID와 사실 ID는 요청 후보와 대조한다. 추천의 직군·회사는 각각 ID 선택 조건으로, 지역은 쉼표 구분 검색어로 서버에서 후보에 적용한다. 각 항목 안에서는 선택값 중 하나라도 일치하면 포함하고, 여러 항목은 모두 만족해야 한다. 선택 조건은 모두 비워둘 수 있다. 자연어 `preferenceText`는 하드 필터가 아니라 후보 순위와 Codex 판단에 쓰는 희망 조건이며, 명시적인 제외 요청만 추천에서 제외한다. 서버는 조건 적용 후 열린 공고의 최신 본문과 확정 사실·희망 조건의 키워드 연관도로 최대 36개를 골라 Codex에 전달하고, 요청한 최대 20개까지만 추천한다. 맞춤 초안은 선택한 공고 본문 최대 18,000자와 확정 사실 최대 80개를 전달하고 각 항목에 근거 사실 ID가 없는 경우 결과에서 제외한다. 워커가 꺼져 있어도 추천·초안 작업은 DB에 저장되어 대기한다. 파일명·추출 텍스트, 지원서 원문, 확정 경력 정보와 선택 공고 본문은 각 요청 때 Codex 서비스로 전송된다.
+워커는 AI 질문·경력 자료·지원서 요구 정보·경력 추천 및 맞춤 초안 네 큐를 순환 조회해 한 종류가 계속 앞서지 않게 한다. 질문 답변만 웹 검색을 허용하고, 경력 자료·지원서 정보·추천·초안 prompt는 외부 검색 없이 입력으로 받은 자료만 사용한다. `gpt-6-luna`에서 생성한 경력 후보의 각 인용은 API가 추출 구간에 실제 포함되는지 재검증한다. 추천·초안은 `REJECTED`가 아닌 모든 경력 정보를 사용하며 `UNVERIFIED` 상태는 사용자의 확정을 기다리지 않는다. `VERIFIED`는 기존 흐름에서 확인된 항목을 보존하는 상태이고, 추천 포함 여부와는 무관하다. AI 추출 요약은 원문 인용과 대조하고 근거 밖의 수치·역할·성과를 만들지 않도록 prompt에 명시한다. 추천 공고 ID와 사실 ID는 요청 후보와 대조한다. 추천의 직군·회사는 각각 ID 선택 조건으로, 지역은 쉼표 구분 검색어로 서버에서 후보에 적용한다. 각 항목 안에서는 선택값 중 하나라도 일치하면 포함하고, 여러 항목은 모두 만족해야 한다. 선택 조건은 모두 비워둘 수 있다. 자연어 `preferenceText`는 하드 필터가 아니라 후보 순위와 Codex 판단에 쓰는 희망 조건이며, 명시적인 제외 요청만 추천에서 제외한다. 서버는 조건 적용 후 열린 공고의 최신 본문과 경력 정보·희망 조건의 키워드 연관도로 최대 36개를 골라 Codex에 전달하고, 요청한 최대 20개까지만 추천한다. 맞춤 초안은 선택한 공고 본문 최대 18,000자와 제외되지 않은 경력 정보 최대 80개를 전달하고 각 항목에 근거 사실 ID가 없는 경우 결과에서 제외한다. 워커가 꺼져 있어도 추천·초안 작업은 DB에 저장되어 대기한다. 파일명·추출 텍스트, 지원서 원문, 추천에 포함된 경력 정보와 선택 공고 본문은 각 요청 때 Codex 서비스로 전송된다.
 
-백업·복원은 경력 원본·추출 자료·후보 상태·추천·맞춤 초안 작업을 함께 포함한다. `career` 초기화는 이 항목을 모두 지우고, `postings` 초기화는 공고별 지원서 정보와 추천·초안도 지우되 경력 자료와 확정 사실은 유지한다. 지원서 문항에 대한 답변 생성은 아직 구현하지 않았다.
+백업·복원은 경력 원본·추출 자료·추천 제외 상태·추천·맞춤 초안 작업을 함께 포함한다. `career` 초기화는 이 항목을 모두 지우고, `postings` 초기화는 공고별 지원서 정보와 추천·초안도 지우되 경력 자료와 추천에 포함된 경력 정보는 유지한다. 지원서 문항에 대한 답변 생성은 아직 구현하지 않았다.
 
 2026-11-22 추천 조건 적용 검증: `./gradlew compileKotlin`과 메인 `./start.sh`의 백엔드·프론트 Docker 빌드가 통과했고 MySQL·백엔드·프론트 컨테이너가 모두 healthy, 백엔드 readiness가 `UP`이었다. `./gradlew test`는 `NO-SOURCE`로 끝나 백엔드 자동 테스트 소스가 없는 상태다. 재시작 후 DB·캡처 볼륨이 유지됐다. 추천 POST·Codex 분석·개인 파일 업로드는 실행하지 않았으며, 브라우저 입력 확인 범위는 [프론트 검증 기록](../frontend/README.md#경력-자료)에 적었다.
 

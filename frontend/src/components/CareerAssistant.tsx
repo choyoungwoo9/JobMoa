@@ -52,12 +52,12 @@ interface TaskView {
   createdAt: string
   updatedAt: string
   result: RecommendationResult | PostingDraft | null
-  verifiedFactCount: number
+  availableFactCount: number
   factsTruncated: boolean
   candidateCount: number
   candidatesTruncated: boolean
 }
-interface Readiness { verifiedFactCount: number; openPostingCount: number }
+interface Readiness { availableFactCount: number; openPostingCount: number }
 interface Preferences { count: number; preferenceText: string; categoryIds: string[]; companyIds: string[]; locationKeywords: string }
 
 const STORAGE_KEY = 'jobmoa.career-assistant.preferences.v1'
@@ -229,13 +229,13 @@ export function CareerAssistant({
   return <section className="career-assistant" aria-label="추천 공고와 맞춤 이력서·포트폴리오">
     {error && <div className="career-alert" role="alert">{error}</div>}
     {notice && <div className="career-notice" role="status">{notice}</div>}
-    {readiness?.verifiedFactCount === 0 ? <div className="career-plan-prerequisite">
+    {readiness?.availableFactCount === 0 ? <div className="career-plan-prerequisite">
       <span className="career-plan-icon">01</span>
-      <div><strong>먼저 경력 후보를 확인해 주세요</strong><p>AI가 읽은 후보를 수정하고 ‘확정’한 정보만 추천과 맞춤 초안에 사용해요. 확인 전 후보는 추천에 전달하지 않습니다.</p></div>
+      <div><strong>추천에 사용할 경력 정보가 아직 없어요</strong><p>AI가 원문 근거와 함께 추출한 경력·프로젝트·성과는 자동으로 추천에 반영돼요. 잘못된 내용은 경력 자료에서 수정하거나 제외할 수 있습니다.</p></div>
       <button className="button secondary" onClick={onBackToMaterials}>경력 자료에서 확인</button>
     </div> : <>
       <section className="career-plan-settings">
-        <div className="career-plan-heading"><div><span className="career-plan-eyebrow">추천 기준</span><h2>다음에 지원할 곳을 찾아볼까요?</h2><p>{readiness?.verifiedFactCount ?? '—'}개의 확정 경력 정보와 현재 {readiness?.openPostingCount ?? '—'}개의 열린 공고를 바탕으로 추천해요.</p></div>
+        <div className="career-plan-heading"><div><span className="career-plan-eyebrow">추천 기준</span><h2>다음에 지원할 곳을 찾아볼까요?</h2><p>{readiness?.availableFactCount ?? '—'}개의 경력 정보와 현재 {readiness?.openPostingCount ?? '—'}개의 열린 공고를 바탕으로 추천해요.</p></div>
           <label className="career-count">추천 개수<select value={preferences.count} onChange={event => changePreferences({ count: Number(event.target.value) })}>{[5, 10, 15, 20].map(count => <option key={count} value={count}>{count}개</option>)}</select></label>
         </div>
         <label className="career-preference-field" htmlFor="career-preference-text">
@@ -243,7 +243,7 @@ export function CareerAssistant({
           <textarea id="career-preference-text" value={preferences.preferenceText} maxLength={1200} rows={3}
             placeholder="예: 서울이나 수도권의 핀테크·커머스 백엔드 직무를 우선 보고 싶어. 재택근무가 가능하면 더 좋아."
             onChange={event => changePreferences({ preferenceText: event.target.value })} />
-          <small className="career-preference-help">비워두면 확정한 경력 정보로 열린 공고 전체를 살펴봐요. 선호 조건은 편하게 문장으로 적어주세요.</small>
+          <small className="career-preference-help">비워두면 제외하지 않은 경력 정보로 열린 공고 전체를 살펴봐요. 선호 조건은 편하게 문장으로 적어주세요.</small>
         </label>
         <details className="career-advanced-settings">
           <summary><span>상세 조건</span><small>{selectedCategoryNames.length + selectedCompanyNames.length + (preferences.locationKeywords.trim() ? 1 : 0) > 0
@@ -258,7 +258,7 @@ export function CareerAssistant({
           </div>
         </details>
         <div className="career-plan-actions"><p>마감 공고는 제외해요. 추천은 ‘잘 맞음 / 검토해볼 만함 / 자료가 부족함’으로 보여주고, 이유와 경력 근거를 함께 붙입니다.</p>
-          <button className="button primary" disabled={busy || !readiness || readiness.verifiedFactCount === 0 || readiness.openPostingCount === 0} onClick={() => void requestRecommendations()}>{busy ? '작업 등록 중…' : '추천 공고 찾기'}</button>
+          <button className="button primary" disabled={busy || !readiness || readiness.availableFactCount === 0 || readiness.openPostingCount === 0} onClick={() => void requestRecommendations()}>{busy ? '작업 등록 중…' : '추천 공고 찾기'}</button>
         </div>
         {!workerConnected && <div className="career-plan-worker"><strong>Codex 워커가 연결되지 않았어요.</strong><span>요청은 대기열에 저장되며 워커를 켜면 자동으로 처리됩니다.</span></div>}
       </section>
@@ -268,7 +268,7 @@ export function CareerAssistant({
           {recommendations.length > 1 && <label>결과<select value={selectedId ?? ''} onChange={event => setSelectedId(event.target.value)}>{recommendations.map(task => <option key={task.id} value={task.id}>{new Date(task.createdAt).toLocaleString('ko-KR')} · {TASK_LABEL[task.status]}</option>)}</select></label>}
         </header>
         {selected && selected.status !== 'COMPLETED' && <TaskStatusCard task={selected} workerConnected={workerConnected} busy={busy} onRetry={() => void retry(selected.id)} />}
-        {selected?.factsTruncated && <p className="career-context-note">확정된 경력 정보 {selected.verifiedFactCount}개 중 최근 80개를 추천에 사용했어요.</p>}
+        {selected?.factsTruncated && <p className="career-context-note">경력 정보 {selected.availableFactCount}개 중 최근 80개를 추천에 사용했어요.</p>}
         {selected?.candidatesTruncated && <p className="career-context-note">본문이 저장된 열린 공고 {selected.candidateCount}개 중 경력과 입력 조건의 연관도가 높은 최대 36개를 비교했어요.</p>}
         {result && <div className="career-preference-interpretation">
           <div><strong>적용한 조건</strong><span>{[
@@ -276,7 +276,7 @@ export function CareerAssistant({
             result.criteria?.categoryNames?.length ? `직군: ${result.criteria.categoryNames.join(', ')}` : '',
             result.criteria?.companyNames?.length ? `회사: ${result.criteria.companyNames.join(', ')}` : '',
             result.criteria?.locationKeywords ? `지역: ${result.criteria.locationKeywords}` : '',
-          ].filter(Boolean).join(' · ') || '별도 조건 없이 확정 경력과 열린 공고를 비교했어요.'}</span></div>
+          ].filter(Boolean).join(' · ') || '별도 조건 없이 경력 정보와 열린 공고를 비교했어요.'}</span></div>
           {result.preferenceSummary && <div><strong>AI가 이해한 방향</strong><span>{result.preferenceSummary}</span></div>}
         </div>}
         {result && (result.recommendations.length ? <div className="career-recommendation-list">{result.recommendations.map(item => <RecommendationCard key={item.posting.id} item={item} recommendationId={selected?.id ?? ''} draft={drafts.find(task => task.postingId === item.posting.id) ?? null} busy={busy} copiedId={copiedId} workerConnected={workerConnected} onOpenPosting={onOpenPosting} onCreateDraft={createDraft} onRetry={retry} onCopy={copyDraft} />)}</div> : <div className="career-plan-empty"><strong>근거를 들어 추천할 공고가 없어요.</strong><span>희망하는 방향이나 상세 조건을 바꿔 다시 찾아보세요.</span></div>)}
@@ -376,22 +376,22 @@ function RecommendationCard({ item, recommendationId, draft, busy, copiedId, wor
     <p className="career-recommendation-explanation">{item.explanation}</p>
     <div className="career-recommendation-columns">
       <section><h4>맞는 지점</h4>{item.matchingPoints.length ? <ul>{item.matchingPoints.map((point, index) => <li key={index}>{point}</li>)}</ul> : <p>뚜렷한 공통 항목이 없어요.</p>}</section>
-      <section><h4>더 확인할 점</h4>{item.gaps.length ? <ul>{item.gaps.map((gap, index) => <li key={index}>{gap}</li>)}</ul> : <p>확정 경력 정보에서 눈에 띄는 공백은 없어요.</p>}</section>
+      <section><h4>더 확인할 점</h4>{item.gaps.length ? <ul>{item.gaps.map((gap, index) => <li key={index}>{gap}</li>)}</ul> : <p>경력 자료에서 눈에 띄는 공백은 없어요.</p>}</section>
     </div>
     {!!item.evidence.length && <div className="career-recommendation-evidence"><h4>연결된 경력 근거</h4>{item.evidence.map(fact => <div key={fact.id}><strong>{fact.title}</strong>{fact.evidence.slice(0, 2).map((source, index) => <blockquote key={index}><span>{source.locationLabel}</span>{source.excerpt}</blockquote>)}</div>)}</div>}
-    <div className="career-draft-launch"><div><strong>이 공고에 맞춘 이력서·포트폴리오 구성</strong><span>새 내용을 지어내지 않고 확정된 경력 정보만 재배치·표현해요.</span></div>
+    <div className="career-draft-launch"><div><strong>이 공고에 맞춘 이력서·포트폴리오 구성</strong><span>새 내용을 지어내지 않고 경력 정보와 원문 근거를 바탕으로 재배치·표현해요.</span></div>
       {!draft && <button className="button primary small" disabled={busy} onClick={() => void onCreateDraft(recommendationId, item.posting.id)}>맞춤 초안 만들기</button>}
       {draft && <span className={`career-status status-${draft.status.toLowerCase()}`}>{TASK_LABEL[draft.status]}</span>}
     </div>
     {draft && draft.status !== 'COMPLETED' && <TaskStatusCard task={draft} workerConnected={workerConnected} busy={busy} onRetry={() => void onRetry(draft.id)} />}
     {draft && readyDraft && <div className="career-draft-result">
       <div className="career-draft-result-heading"><h4>공고별 초안</h4><button className="button secondary small" onClick={() => void onCopy(draft.id, readyDraft)}>{copiedId === draft.id ? '복사했어요' : '초안 복사'}</button></div>
-      {draft.factsTruncated && <p className="career-context-note">확정된 경력 정보 {draft.verifiedFactCount}개 중 최근 80개를 사용했어요.</p>}
+      {draft.factsTruncated && <p className="career-context-note">경력 정보 {draft.availableFactCount}개 중 최근 80개를 사용했어요.</p>}
       {readyDraft.resumeHeadline && <section><h5>이력서 한 줄 소개</h5><p>{readyDraft.resumeHeadline}</p><Evidence facts={readyDraft.resumeHeadlineEvidence} /></section>}
       {readyDraft.resumeSummary && <section><h5>이력서 요약</h5><p>{readyDraft.resumeSummary}</p><Evidence facts={readyDraft.resumeSummaryEvidence} /></section>}
       {!!readyDraft.resumeSections.length && <section><h5>이력서 구성</h5>{readyDraft.resumeSections.map((part, index) => <div className="career-draft-section" key={index}><strong>{part.heading}</strong><p>{part.content}</p><Evidence facts={part.evidence} /></div>)}</section>}
       {!!readyDraft.portfolioProjects.length && <section><h5>포트폴리오 프로젝트 순서</h5>{readyDraft.portfolioProjects.map((project, index) => <div className="career-portfolio-project" key={index}><span>{index + 1}</span><div><strong>{project.title}</strong><p>{project.selectionReason}</p><p>{project.summary}</p><Evidence facts={project.evidence} /></div></div>)}</section>}
-      {!readyDraft.resumeSections.length && !readyDraft.portfolioProjects.length && !readyDraft.resumeSummary && <p className="career-context-note">확정 자료로 뒷받침할 초안을 구성하지 못했어요. 아래 추가 확인 항목을 살펴보세요.</p>}
+      {!readyDraft.resumeSections.length && !readyDraft.portfolioProjects.length && !readyDraft.resumeSummary && <p className="career-context-note">경력 자료의 원문 근거로 뒷받침할 초안을 구성하지 못했어요. 아래 추가 확인 항목을 살펴보세요.</p>}
       {!!readyDraft.informationGaps.length && <section className="career-draft-gaps"><h5>초안에 넣기 전 확인할 정보</h5><ul>{readyDraft.informationGaps.map((gap, index) => <li key={index}>{gap}</li>)}</ul></section>}
       <p className="career-draft-disclaimer">AI 초안입니다. 제출 전 원문 근거와 표현을 직접 확인해 주세요. 이력서 파일이나 포트폴리오 문서는 자동으로 덮어쓰지 않습니다.</p>
     </div>}

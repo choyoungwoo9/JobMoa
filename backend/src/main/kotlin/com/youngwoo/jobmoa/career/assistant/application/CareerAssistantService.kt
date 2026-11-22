@@ -3,7 +3,6 @@ package com.youngwoo.jobmoa.career.assistant.application
 import com.youngwoo.jobmoa.career.assistant.domain.model.*
 import com.youngwoo.jobmoa.career.assistant.domain.repository.CareerAssistantTaskRepository
 import com.youngwoo.jobmoa.career.domain.model.CareerFact
-import com.youngwoo.jobmoa.career.domain.model.CareerFactStatus
 import com.youngwoo.jobmoa.career.domain.repository.CareerMaterialRepository
 import com.youngwoo.jobmoa.crawler.application.CompanyRegistry
 import com.youngwoo.jobmoa.posting.domain.model.Posting
@@ -39,9 +38,9 @@ class CareerAssistantService(
         val knownCompanies = companies.list().associateBy { it.id }
         require(request.companyIds.all { it in knownCompanies }) { "지원하지 않는 회사 필터가 포함되어 있습니다." }
 
-        val allFacts = materials.verifiedFacts().filter { it.status == CareerFactStatus.VERIFIED }
-        require(allFacts.isNotEmpty()) { "경력 자료에서 사실 후보를 먼저 확인·확정하세요." }
-        val factContexts = allFacts.take(MAX_FACTS).map(::factPrompt)
+        val availableFacts = materials.recommendationFacts()
+        require(availableFacts.isNotEmpty()) { "추천에 사용할 경력 정보가 없습니다. 경력 자료를 분석하거나 제외한 항목을 다시 포함하세요." }
+        val factContexts = availableFacts.take(MAX_FACTS).map(::factPrompt)
         val categoryLabels = companies.categories.associate { it.id to it.name }
         val selectedCompanyNames = request.companyIds.mapNotNull { knownCompanies[it]?.name }.sorted()
         val selectedCategoryNames = request.categoryIds.mapNotNull(categoryLabels::get).sorted()
@@ -55,7 +54,7 @@ class CareerAssistantService(
         require(eligible.isNotEmpty()) { "선택한 직군·회사·지역에 맞는 열린 공고가 없습니다." }
 
         val versions = postings.latestVersions(eligible.map { it.id }.distinct()).associateBy { it.postingId }
-        val profileTokens = allFacts.flatMap { tokens("${it.title} ${it.summary}") }.toSet()
+        val profileTokens = availableFacts.flatMap { tokens("${it.title} ${it.summary}") }.toSet()
         val preferenceTokens = rankingPreferenceTokens(request.preferenceText)
         val ranked = eligible.mapNotNull { posting ->
             val version = versions[posting.id] ?: return@mapNotNull null
@@ -91,8 +90,8 @@ class CareerAssistantService(
                 "companyNames" to selectedCompanyNames,
                 "locationKeywords" to request.locationKeywords.trim(),
             ),
-            "verifiedFactCount" to allFacts.size,
-            "factsTruncated" to (allFacts.size > MAX_FACTS),
+            "availableFactCount" to availableFacts.size,
+            "factsTruncated" to (availableFacts.size > MAX_FACTS),
             "candidateCount" to ranked.size,
             "candidatesTruncated" to (ranked.size > MAX_CANDIDATES),
             "facts" to factContexts,
@@ -107,7 +106,7 @@ class CareerAssistantService(
 
     @Transactional(readOnly = true)
     fun readiness() = CareerAssistantReadiness(
-        verifiedFactCount = materials.verifiedFacts().size,
+        availableFactCount = materials.recommendationFacts().size,
         openPostingCount = postings.list().count { !it.closed },
     )
 
@@ -136,9 +135,9 @@ class CareerAssistantService(
         val posting = postings.find(postingId) ?: throw ResourceNotFound("공고를 찾을 수 없습니다.")
         require(!posting.closed) { "마감된 공고의 맞춤 자료는 만들 수 없습니다." }
         val version = postings.latestVersion(postingId) ?: throw ResourceNotFound("공고 본문을 찾을 수 없습니다.")
-        val allFacts = materials.verifiedFacts().filter { it.status == CareerFactStatus.VERIFIED }
-        require(allFacts.isNotEmpty()) { "확정된 경력 정보가 없어 맞춤 자료를 만들 수 없습니다." }
-        val factContexts = allFacts.take(MAX_FACTS).map(::factPrompt)
+        val availableFacts = materials.recommendationFacts()
+        require(availableFacts.isNotEmpty()) { "추천에 사용할 경력 정보가 없어 맞춤 자료를 만들 수 없습니다." }
+        val factContexts = availableFacts.take(MAX_FACTS).map(::factPrompt)
         val input = mapOf(
             "taskType" to CareerAssistantTaskType.POSTING_DRAFT.name,
             "recommendation" to selected,
@@ -151,8 +150,8 @@ class CareerAssistantService(
                 "categories" to posting.categories.toList().sorted(),
                 "body" to version.bodyText.take(MAX_DRAFT_BODY_CHARS),
             ),
-            "verifiedFactCount" to allFacts.size,
-            "factsTruncated" to (allFacts.size > MAX_FACTS),
+            "availableFactCount" to availableFacts.size,
+            "factsTruncated" to (availableFacts.size > MAX_FACTS),
             "facts" to factContexts,
         )
         val now = Instant.now()
@@ -265,8 +264,8 @@ class CareerAssistantService(
             )
         }.take(limit)
         val preferenceSummary = draft.preferenceSummary.trim().take(400).ifBlank {
-            if (criteria.preferenceText.isBlank()) "추가 희망 조건 없이 확정 경력과 선택한 상세 조건을 기준으로 비교했어요."
-            else "입력한 희망 조건과 확정 경력 정보를 함께 고려했어요."
+            if (criteria.preferenceText.isBlank()) "추가 희망 조건 없이 경력 정보와 선택한 상세 조건을 기준으로 비교했어요."
+            else "입력한 희망 조건과 경력 정보를 함께 고려했어요."
         }
         return CareerRecommendationResult(criteria, preferenceSummary, items)
     }
@@ -348,7 +347,8 @@ class CareerAssistantService(
             createdAt = task.createdAt,
             updatedAt = task.updatedAt,
             result = task.resultJson?.let { runCatching { mapper.readTree(it) }.getOrNull() },
-            verifiedFactCount = request?.get("verifiedFactCount")?.asInt() ?: 0,
+            availableFactCount = request?.get("availableFactCount")?.asInt()
+                ?: request?.get("verifiedFactCount")?.asInt() ?: 0,
             factsTruncated = request?.get("factsTruncated")?.asBoolean() ?: false,
             candidateCount = request?.get("candidateCount")?.asInt() ?: 1,
             candidatesTruncated = request?.get("candidatesTruncated")?.asBoolean() ?: false,
@@ -370,6 +370,7 @@ class CareerAssistantService(
     private fun factPrompt(fact: CareerFact) = mapOf(
         "id" to fact.id,
         "kind" to fact.kind.name,
+        "reviewStatus" to fact.status.name,
         "title" to fact.title.take(500),
         "summary" to fact.summary.take(1600),
         "evidence" to fact.evidence.take(3).map { mapOf("locationLabel" to it.locationLabel, "excerpt" to it.excerpt.take(600)) },
@@ -427,7 +428,7 @@ data class CareerRecommendationRequest(
     val locationKeywords: String = "",
 )
 
-data class CareerAssistantReadiness(val verifiedFactCount: Int, val openPostingCount: Int)
+data class CareerAssistantReadiness(val availableFactCount: Int, val openPostingCount: Int)
 
 data class CareerAssistantTaskView(
     val id: String,
@@ -440,7 +441,7 @@ data class CareerAssistantTaskView(
     val createdAt: Instant,
     val updatedAt: Instant,
     val result: JsonNode?,
-    val verifiedFactCount: Int,
+    val availableFactCount: Int,
     val factsTruncated: Boolean,
     val candidateCount: Int,
     val candidatesTruncated: Boolean,

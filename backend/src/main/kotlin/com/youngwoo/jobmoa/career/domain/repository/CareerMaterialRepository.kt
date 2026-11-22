@@ -13,7 +13,7 @@ interface CareerMaterialRepository {
     fun fragments(materialId: String): List<CareerMaterialFragment>
     fun saveFragments(rows: List<CareerMaterialFragment>)
     fun facts(materialId: String): List<CareerFact>
-    fun verifiedFacts(): List<CareerFact>
+    fun recommendationFacts(): List<CareerFact>
     fun saveFact(fact: CareerFact)
     fun replaceFacts(materialId: String, rows: List<CareerFact>, now: Instant)
     fun claimNext(now: Instant, lease: Duration): CareerMaterialLease?
