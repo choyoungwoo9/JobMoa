@@ -83,7 +83,6 @@ private class AiWorker {
     private fun claim(queue: WorkerQueue) = request("POST", when (queue) {
         WorkerQueue.CAREER_MATERIAL -> "/api/career-materials/worker/tasks/claim"
         WorkerQueue.CAREER_ASSISTANT -> "/api/career-assistant/worker/tasks/claim"
-        WorkerQueue.APPLICATION_REQUIREMENTS -> "/api/application-requirements/worker/tasks/claim"
         WorkerQueue.AI_CHAT -> "/api/ai/worker/tasks/claim"
     }, "{}")
 
@@ -128,14 +127,6 @@ private class AiWorker {
                     )))
                     log.info("경력 맞춤 작업 완료: {} ({})", taskId, taskType)
                 }
-                WorkerQueue.APPLICATION_REQUIREMENTS -> {
-                    val result = codex.analyzeApplicationRequirements(task)
-                    request("POST", "/api/application-requirements/worker/tasks/$taskId/complete", mapper.writeValueAsString(mapOf(
-                        "leaseToken" to leaseToken,
-                        "result" to result,
-                    )))
-                    log.info("지원서 요구 정보 분석 완료: {}", taskId)
-                }
                 WorkerQueue.AI_CHAT -> {
                 val aiProgress = requireNotNull(progress)
                 aiProgress.status("공고 자료를 확인하고 있어요")
@@ -161,7 +152,6 @@ private class AiWorker {
                 val endpoint = when (queue) {
                     WorkerQueue.CAREER_MATERIAL -> "/api/career-materials/worker/tasks/$taskId/fail"
                     WorkerQueue.CAREER_ASSISTANT -> "/api/career-assistant/worker/tasks/$taskId/fail"
-                    WorkerQueue.APPLICATION_REQUIREMENTS -> "/api/application-requirements/worker/tasks/$taskId/fail"
                     WorkerQueue.AI_CHAT -> "/api/ai/worker/tasks/$taskId/fail"
                 }
                 request("POST", endpoint, mapper.writeValueAsString(mapOf(
@@ -188,7 +178,6 @@ private class AiWorker {
         val endpoint = when (lease.queue) {
             WorkerQueue.CAREER_MATERIAL -> "/api/career-materials/worker/tasks/${lease.taskId}/renew"
             WorkerQueue.CAREER_ASSISTANT -> "/api/career-assistant/worker/tasks/${lease.taskId}/renew"
-            WorkerQueue.APPLICATION_REQUIREMENTS -> "/api/application-requirements/worker/tasks/${lease.taskId}/renew"
             WorkerQueue.AI_CHAT -> "/api/ai/worker/tasks/${lease.taskId}/renew"
         }
         request("POST", endpoint, mapper.writeValueAsString(mapOf("leaseToken" to lease.token)))
@@ -262,7 +251,7 @@ private class AiWorker {
         }
     }
 
-    private enum class WorkerQueue { CAREER_MATERIAL, CAREER_ASSISTANT, APPLICATION_REQUIREMENTS, AI_CHAT }
+    private enum class WorkerQueue { CAREER_MATERIAL, CAREER_ASSISTANT, AI_CHAT }
     private data class Lease(val taskId: String, val token: String, val queue: WorkerQueue)
 
     companion object {

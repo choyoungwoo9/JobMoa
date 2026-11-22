@@ -45,7 +45,7 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
         SnapshotTable(columns.map { it.name }, rows)
     }
     override fun validate(snapshot: WorkspaceSnapshot) {
-        require(snapshot.format == "jobmoa" && snapshot.version in setOf(1, 2) && snapshot.schema in setOf(10, 11, 12, 13, 14)) { "이 버전에서 지원하는 JobMoa 백업 파일이 아닙니다." }
+        require(snapshot.format == "jobmoa" && snapshot.version in setOf(1, 2) && snapshot.schema in setOf(10, 11, 12, 13, 14, 15)) { "이 버전에서 지원하는 JobMoa 백업 파일이 아닙니다." }
         val expectedTables = when (snapshot.schema) {
             10 -> tables.filterNot { it.startsWith("career_") || it == "posting_application_requirement" }.toSet()
             11 -> tables.filterNot { it == "posting_application_requirement" || it == "career_assistant_task" }.toSet()
@@ -117,7 +117,7 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
         if (snapshot.schema >= 12) {
             references("posting_application_requirement", "posting_id", "posting")
             require(values("posting_application_requirement", "source").all { it in setOf("POSTING_BODY", "USER_PASTED", "PUBLIC_PAGE") }) { "지원서 정보 출처가 올바르지 않습니다." }
-            require(values("posting_application_requirement", "status").all { it in setOf("WAITING_PUBLIC", "FETCHING_PUBLIC", "WAITING_AI", "ANALYZING", "REVIEW", "CONFIRMED", "FAILED") }) { "지원서 정보 상태가 올바르지 않습니다." }
+            require(values("posting_application_requirement", "status").all { it in setOf("WAITING_PUBLIC", "FETCHING_PUBLIC", "SAVED", "WAITING_AI", "ANALYZING", "REVIEW", "CONFIRMED", "FAILED") }) { "지원서 정보 상태가 올바르지 않습니다." }
         }
         if (snapshot.schema >= 14) references("posting_application_requirement", "collection_run_id", "collection_run")
         if (snapshot.schema >= 14) {
@@ -161,12 +161,26 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
         }
         jdbc.update("""
             UPDATE posting_application_requirement
-            SET status = 'FAILED',
-                error_message = '과거 공고 본문 분석은 지원서 항목으로 사용하지 않습니다. 실제 지원 페이지를 다시 확인하거나 문항을 직접 붙여넣어 주세요.',
+            SET status = CASE
+                    WHEN source = 'POSTING_BODY' THEN 'FAILED'
+                    WHEN status IN ('WAITING_PUBLIC', 'FETCHING_PUBLIC') THEN 'WAITING_PUBLIC'
+                    WHEN status = 'FAILED' AND source = 'PUBLIC_PAGE' AND public_page_fetched = 0 THEN 'FAILED'
+                    WHEN CHAR_LENGTH(TRIM(raw_text)) > 0 THEN 'SAVED'
+                    ELSE 'FAILED'
+                END,
+                raw_text = CASE WHEN source = 'POSTING_BODY' THEN '' ELSE raw_text END,
+                result_json = NULL,
+                confirmed_at = NULL,
+                error_message = CASE
+                    WHEN source = 'POSTING_BODY' THEN '이전 버전에서 공고 본문을 지원서 원문으로 저장한 기록입니다. 실제 지원 페이지 원문만 사용하세요.'
+                    WHEN status IN ('WAITING_PUBLIC', 'FETCHING_PUBLIC') THEN NULL
+                    WHEN status = 'FAILED' AND source = 'PUBLIC_PAGE' AND public_page_fetched = 0 THEN error_message
+                    WHEN CHAR_LENGTH(TRIM(raw_text)) > 0 THEN NULL
+                    ELSE COALESCE(error_message, '저장된 지원서 원문이 없습니다.')
+                END,
                 lease_token = NULL,
                 lease_expires_at = NULL,
                 updated_at = CURRENT_TIMESTAMP(6)
-            WHERE source = 'POSTING_BODY' AND status IN ('WAITING_AI', 'ANALYZING')
         """.trimIndent())
         bumpRevision()
     }

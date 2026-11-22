@@ -3,7 +3,7 @@ package com.youngwoo.jobmoa.applicationrequirements.domain
 import java.time.Instant
 
 enum class RequirementSource { POSTING_BODY, USER_PASTED, PUBLIC_PAGE }
-enum class RequirementStatus { WAITING_PUBLIC, FETCHING_PUBLIC, WAITING_AI, ANALYZING, REVIEW, CONFIRMED, FAILED }
+enum class RequirementStatus { WAITING_PUBLIC, FETCHING_PUBLIC, SAVED, FAILED }
 
 data class ApplicationRequirement(
     val id: String,
@@ -11,7 +11,6 @@ data class ApplicationRequirement(
     val source: RequirementSource,
     val sourceUrl: String?,
     val rawText: String,
-    val resultJson: String?,
     val status: RequirementStatus,
     val attempts: Int,
     val errorMessage: String?,
@@ -19,12 +18,9 @@ data class ApplicationRequirement(
     val leaseExpiresAt: Instant?,
     val createdAt: Instant,
     val updatedAt: Instant,
-    val confirmedAt: Instant?,
     val collectionRunId: String? = null,
     val publicPageFetched: Boolean = false,
 )
-
-data class ApplicationRequirementAnalysis(val resultJson: String)
 
 data class PublicPageFetchLease(
     val id: String,

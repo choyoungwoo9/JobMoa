@@ -124,8 +124,8 @@ export interface CollectionRun {
   retryOf?: string
   retriedFailures?: string[]
   progress?: { discoveryFinished: boolean; total: number; pending: number; processing: number; completed: number; failed: number; percent: number | null }
-  applicationProgress?: { total: number; pending: number; processing: number; fetched: number; failed: number; analysisPending: number; analysisFailed: number; review: number }
-  applicationResults?: { companyId: string; company: string; status: 'running' | 'success' | 'partial' | 'login-required' | 'failed' | 'waiting'; total: number; fetched: number; failed: number; loginRequired: number; pending: number; processing: number; analysisPending: number; analysisFailed: number }[]
+  applicationProgress?: { total: number; pending: number; processing: number; fetched: number; failed: number }
+  applicationResults?: { companyId: string; company: string; status: 'running' | 'success' | 'partial' | 'login-required' | 'failed' | 'waiting'; total: number; fetched: number; failed: number; loginRequired: number; pending: number; processing: number }[]
 }
 export interface DemoState {
   workspaceRevision?: string

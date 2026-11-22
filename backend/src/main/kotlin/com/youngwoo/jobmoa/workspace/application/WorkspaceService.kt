@@ -67,11 +67,35 @@ class WorkspaceService(private val repository: WorkspaceSnapshotRepository, priv
         val requirementStatus = requirementTable.columns.indexOf("status")
         val requirementToken = requirementTable.columns.indexOf("lease_token")
         val requirementExpires = requirementTable.columns.indexOf("lease_expires_at")
+        val requirementSource = requirementTable.columns.indexOf("source")
+        val requirementRaw = requirementTable.columns.indexOf("raw_text")
+        val requirementResult = requirementTable.columns.indexOf("result_json")
+        val requirementConfirmed = requirementTable.columns.indexOf("confirmed_at")
+        val requirementError = requirementTable.columns.indexOf("error_message")
+        val requirementFetched = requirementTable.columns.indexOf("public_page_fetched")
         val requirementRows = requirementTable.rows.map { row ->
-            if (row[requirementStatus] !in setOf("ANALYZING", "FETCHING_PUBLIC")) row else row.toMutableList().also { values ->
-                values[requirementStatus] = if (row[requirementStatus] == "FETCHING_PUBLIC") "WAITING_PUBLIC" else "WAITING_AI"
+            val source = row[requirementSource]?.toString()
+            val text = row[requirementRaw]?.toString().orEmpty()
+            val oldStatus = row[requirementStatus]?.toString()
+            row.toMutableList().also { values ->
+                values[requirementStatus] = when {
+                    source == "POSTING_BODY" -> "FAILED"
+                    oldStatus == "FETCHING_PUBLIC" || oldStatus == "WAITING_PUBLIC" -> "WAITING_PUBLIC"
+                    oldStatus == "FAILED" && source == "PUBLIC_PAGE" && row[requirementFetched] != true -> "FAILED"
+                    text.isNotBlank() -> "SAVED"
+                    else -> "FAILED"
+                }
+                if (source == "POSTING_BODY") values[requirementRaw] = ""
+                values[requirementResult] = null
+                values[requirementConfirmed] = null
                 values[requirementToken] = null
                 values[requirementExpires] = null
+                values[requirementError] = when {
+                    source == "POSTING_BODY" -> "이전 버전에서 공고 본문을 지원서 원문으로 저장한 기록입니다. 실제 지원 페이지 원문만 사용하세요."
+                    values[requirementStatus] == "WAITING_PUBLIC" -> null
+                    values[requirementStatus] == "SAVED" -> null
+                    else -> row[requirementError]
+                }
             }
         }
         val assistant = tables.getValue("career_assistant_task")

@@ -38,8 +38,6 @@ class WorkspaceQuery(private val changes: CollectionChangeRepository, private va
             val unknown = rows.count { !it.publicPageFetched && it.status !in setOf(
                 com.youngwoo.jobmoa.applicationrequirements.domain.RequirementStatus.WAITING_PUBLIC,
                 com.youngwoo.jobmoa.applicationrequirements.domain.RequirementStatus.FETCHING_PUBLIC,
-                com.youngwoo.jobmoa.applicationrequirements.domain.RequirementStatus.WAITING_AI,
-                com.youngwoo.jobmoa.applicationrequirements.domain.RequirementStatus.ANALYZING,
                 com.youngwoo.jobmoa.applicationrequirements.domain.RequirementStatus.FAILED) }
             val status = when {
                 pending > 0 -> "checking"
@@ -177,11 +175,7 @@ class WorkspaceQuery(private val changes: CollectionChangeRepository, private va
             }
             mapOf("companyId" to company.first, "company" to company.second, "status" to status,
                 "total" to rows.size, "fetched" to fetched, "failed" to failedRows.size,
-                "loginRequired" to loginRequired, "pending" to pending, "processing" to processing,
-                "analysisPending" to rows.count { it.publicPageFetched && it.status in setOf(
-                    com.youngwoo.jobmoa.applicationrequirements.domain.RequirementStatus.WAITING_AI,
-                    com.youngwoo.jobmoa.applicationrequirements.domain.RequirementStatus.ANALYZING) },
-                "analysisFailed" to rows.count { it.publicPageFetched && it.status == com.youngwoo.jobmoa.applicationrequirements.domain.RequirementStatus.FAILED })
+                "loginRequired" to loginRequired, "pending" to pending, "processing" to processing)
         }
         .sortedBy { it["company"].toString() }
 }

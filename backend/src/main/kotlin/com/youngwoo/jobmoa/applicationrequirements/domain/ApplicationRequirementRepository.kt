@@ -12,8 +12,6 @@ interface ApplicationRequirementRepository {
     fun latestPublicSummary(): List<ApplicationRequirementRunSummary>
     fun lock(id: String): ApplicationRequirement?
     fun save(requirement: ApplicationRequirement)
-    fun claim(now: Instant, lease: Duration): ApplicationRequirement?
     fun claimPublicPage(now: Instant, lease: Duration): ApplicationRequirement?
-    fun renew(id: String, token: String, now: Instant, lease: Duration): Boolean
     fun renewPublicPage(id: String, token: String, now: Instant, lease: Duration): Boolean
 }
