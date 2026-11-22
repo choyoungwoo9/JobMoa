@@ -185,6 +185,8 @@ V12가 원본 문서·추출 구간·AI 경력 정보·근거 인용 테이블�
 
 백업·복원은 경력 원본·추출 자료·추천 제외 상태·추천·맞춤 초안 작업을 함께 포함한다. `career` 초기화는 이 항목을 모두 지우고, `postings` 초기화는 공고별 지원서 정보와 추천·초안도 지우되 경력 자료와 추천에 포함된 경력 정보는 유지한다. 지원서 문항에 대한 답변 생성은 아직 구현하지 않았다.
 
+2026-11-22 경력 정보 자동 반영 검증: `./gradlew compileKotlin`과 메인 `./start.sh`의 백엔드·프론트 이미지 빌드가 통과했고 세 Docker 컨테이너가 healthy로 올라왔다. `GET /api/career-assistant/readiness` 응답의 `availableFactCount`는 `UNVERIFIED`와 기존 `VERIFIED`를 포함하고, `REJECTED`는 제외하는 조회 결과로 확인했다. 화면에서도 준비도와 추천 버튼이 표시됐다. 추천·초안 POST는 실행하지 않았다. Codex 워커는 이전 프로세스와 추적 파일을 정리하고 새 PID 및 실행별 `workerId` heartbeat로 재시작을 확인했다. 다만 시작 직후 기존 대기 AI 작업은 Codex 사용량 한도 오류를 기록해 AI 응답 생성까지는 검증하지 않았다.
+
 2026-11-22 추천 조건 적용 검증: `./gradlew compileKotlin`과 메인 `./start.sh`의 백엔드·프론트 Docker 빌드가 통과했고 MySQL·백엔드·프론트 컨테이너가 모두 healthy, 백엔드 readiness가 `UP`이었다. `./gradlew test`는 `NO-SOURCE`로 끝나 백엔드 자동 테스트 소스가 없는 상태다. 재시작 후 DB·캡처 볼륨이 유지됐다. 추천 POST·Codex 분석·개인 파일 업로드는 실행하지 않았으며, 브라우저 입력 확인 범위는 [프론트 검증 기록](../frontend/README.md#경력-자료)에 적었다.
 
 백업 형식은 `jobmoa` v2 / DB 스냅샷 스키마 13이며, 복원은 스키마 10·11·12·13과 형식 v1·v2를 지원한다. ZIP은 `workspace.json`, `captures/{sha256}.png`, `career-materials/{uuid}.bin`으로 구성된다. 스키마 10 백업에는 경력 자료·지원서 요구 정보·추천 초안이 없고, 스키마 11에는 지원서 요구 정보·추천 초안이 없으며, 스키마 12에는 추천 초안이 없다. 복원 미리보기는 백업에서 빠져 전체 교체로 삭제될 현재 데이터를 알린다. 백업 생성 시 진행 중인 AI 작업은 다시 대기하도록 정리한다. ZIP 2 GiB·해제 4 GiB·개별 경력 원본 50 MiB·캡처/JSON 128 MiB 제한이다. 임시 파일은 `${STORAGE_DIRECTORY}/workspace-tmp`에 저장하고 만료·재시작 잔여물을 정리한다. Spring multipart와 Docker 프론트 NGINX의 업로드 크기/타임아웃을 함께 조정했다. 백업 생성은 파일 스트리밍을 사용하지만 스냅샷 JSON·DB 행은 메모리에 보관하므로 한도까지의 대규모 복원 성능은 별도 검증이 필요하다.
