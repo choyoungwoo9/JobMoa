@@ -20,6 +20,8 @@ data class ApplicationRequirement(
     val createdAt: Instant,
     val updatedAt: Instant,
     val confirmedAt: Instant?,
+    val collectionRunId: String? = null,
+    val publicPageFetched: Boolean = false,
 )
 
 data class ApplicationRequirementAnalysis(val resultJson: String)
@@ -29,4 +31,16 @@ data class PublicPageFetchLease(
     val postingId: Long,
     val leaseToken: String,
     val postingUrl: String,
+)
+
+data class ApplicationRequirementStatusCount(val status: RequirementStatus, val publicPageFetched: Boolean, val total: Int)
+
+data class ApplicationRequirementRunSummary(
+    val postingId: Long,
+    val sourceId: String,
+    val company: String,
+    val url: String,
+    val status: RequirementStatus,
+    val publicPageFetched: Boolean,
+    val errorMessage: String?,
 )

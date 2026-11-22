@@ -7,19 +7,65 @@ import com.youngwoo.jobmoa.crawler.application.CompanyRegistry
 import com.youngwoo.jobmoa.posting.domain.model.Posting
 import com.youngwoo.jobmoa.posting.domain.repository.PostingRepository
 import com.youngwoo.jobmoa.shared.ResourceNotFound
+import com.youngwoo.jobmoa.applicationrequirements.application.ApplicationRequirementService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
 @Transactional(readOnly = true)
 class WorkspaceQuery(private val changes: CollectionChangeRepository, private val maintenance: com.youngwoo.jobmoa.workspace.application.WorkspaceRevision, private val runs: CollectionRepository, private val tasks: CrawlTaskRepository,
-    private val postings: PostingRepository, private val sites: SourceRegistry, private val companies: CompanyRegistry, private val interests: com.youngwoo.jobmoa.interest.domain.repository.PostingInterestRepository) {
+    private val postings: PostingRepository, private val sites: SourceRegistry, private val companies: CompanyRegistry, private val interests: com.youngwoo.jobmoa.interest.domain.repository.PostingInterestRepository,
+    private val applicationRequirements: ApplicationRequirementService) {
     fun sources() = sites.definitions.map { definition -> mapOf(
         "id" to definition.id, "name" to definition.name, "url" to definition.listingUrl,
         "available" to sites.supported(definition.id),
         "portals" to if (sites.supported(definition.id)) sites.adapter(definition.id).discoveryTargets else emptyList<Any>(),
     ) }
-    fun state() = mapOf("version" to 1, "workspaceRevision" to maintenance.current(), "jobs" to jobs(), "runs" to collections(), "sources" to sources(), "categories" to companies.categories, "companies" to companies.list())
+    fun state() = mapOf("version" to 1, "workspaceRevision" to maintenance.current(), "jobs" to jobs(), "runs" to collections(), "sources" to sources(), "categories" to companies.categories, "companies" to companyCatalog())
+
+    private fun companyCatalog(): List<Map<String, Any?>> {
+        val evidence = applicationRequirements.latestPublicSummary().flatMap { row ->
+            companies.resolve(row.sourceId, row.company, row.url).map { it.id to row }
+        }.groupBy({ it.first }, { it.second })
+        return companies.list().map { company ->
+            val rows = evidence[company.id].orEmpty()
+            val fetched = rows.count { it.publicPageFetched }
+            val failed = rows.count { it.status == com.youngwoo.jobmoa.applicationrequirements.domain.RequirementStatus.FAILED && !it.publicPageFetched }
+            val pending = rows.count { it.status in setOf(
+                com.youngwoo.jobmoa.applicationrequirements.domain.RequirementStatus.WAITING_PUBLIC,
+                com.youngwoo.jobmoa.applicationrequirements.domain.RequirementStatus.FETCHING_PUBLIC) }
+            val loginRequired = rows.count { it.status == com.youngwoo.jobmoa.applicationrequirements.domain.RequirementStatus.FAILED && !it.publicPageFetched && it.errorMessage.orEmpty().contains("로그인") }
+            val unknown = rows.count { !it.publicPageFetched && it.status !in setOf(
+                com.youngwoo.jobmoa.applicationrequirements.domain.RequirementStatus.WAITING_PUBLIC,
+                com.youngwoo.jobmoa.applicationrequirements.domain.RequirementStatus.FETCHING_PUBLIC,
+                com.youngwoo.jobmoa.applicationrequirements.domain.RequirementStatus.WAITING_AI,
+                com.youngwoo.jobmoa.applicationrequirements.domain.RequirementStatus.ANALYZING,
+                com.youngwoo.jobmoa.applicationrequirements.domain.RequirementStatus.FAILED) }
+            val status = when {
+                pending > 0 -> "checking"
+                fetched > 0 && failed + unknown > 0 -> "mixed"
+                fetched > 0 -> "public"
+                failed > 0 && loginRequired == failed -> "login-required"
+                failed > 0 -> "failed"
+                rows.isNotEmpty() -> "review"
+                else -> "unchecked"
+            }
+            val note = when (status) {
+                "checking" -> "최근 공고의 공개 지원 페이지 확인이 진행 중입니다."
+                "public" -> "최근 확인한 공고에서 공개 지원 페이지 원문을 가져왔습니다. 공고마다 결과는 달라질 수 있습니다."
+                "mixed" -> "공개 페이지를 확인한 공고와 로그인·접근 제한이 있는 공고가 함께 있습니다. 공고별 상태를 확인해 주세요."
+                "login-required" -> "최근 확인한 공고는 지원 페이지에서 로그인이 필요했습니다. 로그인 정보를 사용하지 않으며 화면에서 직접 복사할 수 있습니다."
+                "failed" -> "최근 확인한 공고에서 공개 지원 경로를 찾지 못했거나 접근할 수 없었습니다. 지원 페이지 미지원으로 단정하지 않습니다."
+                "review" -> "이전 확인 기록만 있어 공개 지원 페이지 여부를 다시 확인해야 합니다."
+                else -> "아직 확인 이력이 없습니다. 수집하면 선택한 회사의 열린 공고를 확인합니다."
+            }
+            mapOf("id" to company.id, "sourceId" to company.sourceId, "name" to company.name,
+                "supportedCategoryIds" to company.supportedCategoryIds, "applicationPageStatus" to status,
+                "applicationPageNote" to note, "applicationPageChecked" to rows.size,
+                "applicationPageFetched" to fetched, "applicationPageLoginRequired" to loginRequired,
+                "applicationPageFailed" to failed)
+        }
+    }
     fun jobs(): List<Map<String, Any?>> {
         val all = postings.list()
         val management = interests.findAll(all.map { it.id })
@@ -71,6 +117,8 @@ class WorkspaceQuery(private val changes: CollectionChangeRepository, private va
                 "pending" to all.count { it.status == TaskStatus.PENDING }, "processing" to all.count { it.status == TaskStatus.PROCESSING },
                 "completed" to all.count { it.status == TaskStatus.COMPLETED }, "failed" to all.count { it.status == TaskStatus.FAILED },
                 "percent" to if (!discoveryFinished) null else if (all.isEmpty()) 100 else terminal * 100 / all.size),
+            "applicationProgress" to applicationRequirements.collectionProgress(run.id),
+            "applicationResults" to applicationResults(run.id),
             "results" to portals.groupBy { it.sourceId }.map { (sourceId, sourcePortals) ->
                 val group = all.filter { it.sourceId == sourceId }
                 val failedPortals = sourcePortals.filter { it.status == DiscoveryStatus.FAILED }
@@ -107,4 +155,33 @@ class WorkspaceQuery(private val changes: CollectionChangeRepository, private va
             },
         )
     }
+
+    private fun applicationResults(runId: String): List<Map<String, Any?>> = applicationRequirements.collectionSummary(runId)
+        .groupBy { row ->
+            companies.resolve(row.sourceId, row.company, row.url).firstOrNull()?.let { it.id to it.name }
+                ?: ("${row.sourceId}:${row.company}" to row.company)
+        }
+        .map { (company, rows) ->
+            val pending = rows.count { it.status == com.youngwoo.jobmoa.applicationrequirements.domain.RequirementStatus.WAITING_PUBLIC }
+            val processing = rows.count { it.status == com.youngwoo.jobmoa.applicationrequirements.domain.RequirementStatus.FETCHING_PUBLIC }
+            val failedRows = rows.filter { it.status == com.youngwoo.jobmoa.applicationrequirements.domain.RequirementStatus.FAILED && !it.publicPageFetched }
+            val fetched = rows.count { it.publicPageFetched }
+            val loginRequired = failedRows.count { it.errorMessage.orEmpty().contains("로그인") }
+            val status = when {
+                pending + processing > 0 -> "running"
+                loginRequired > 0 && loginRequired == failedRows.size -> "login-required"
+                failedRows.isNotEmpty() && fetched > 0 -> "partial"
+                failedRows.isNotEmpty() -> "failed"
+                fetched == rows.size -> "success"
+                else -> "waiting"
+            }
+            mapOf("companyId" to company.first, "company" to company.second, "status" to status,
+                "total" to rows.size, "fetched" to fetched, "failed" to failedRows.size,
+                "loginRequired" to loginRequired, "pending" to pending, "processing" to processing,
+                "analysisPending" to rows.count { it.publicPageFetched && it.status in setOf(
+                    com.youngwoo.jobmoa.applicationrequirements.domain.RequirementStatus.WAITING_AI,
+                    com.youngwoo.jobmoa.applicationrequirements.domain.RequirementStatus.ANALYZING) },
+                "analysisFailed" to rows.count { it.publicPageFetched && it.status == com.youngwoo.jobmoa.applicationrequirements.domain.RequirementStatus.FAILED })
+        }
+        .sortedBy { it["company"].toString() }
 }

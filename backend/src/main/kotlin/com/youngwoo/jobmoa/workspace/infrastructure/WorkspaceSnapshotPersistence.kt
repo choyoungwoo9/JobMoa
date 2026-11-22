@@ -45,7 +45,7 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
         SnapshotTable(columns.map { it.name }, rows)
     }
     override fun validate(snapshot: WorkspaceSnapshot) {
-        require(snapshot.format == "jobmoa" && snapshot.version in setOf(1, 2) && snapshot.schema in setOf(10, 11, 12, 13)) { "이 버전에서 지원하는 JobMoa 백업 파일이 아닙니다." }
+        require(snapshot.format == "jobmoa" && snapshot.version in setOf(1, 2) && snapshot.schema in setOf(10, 11, 12, 13, 14)) { "이 버전에서 지원하는 JobMoa 백업 파일이 아닙니다." }
         val expectedTables = when (snapshot.schema) {
             10 -> tables.filterNot { it.startsWith("career_") || it == "posting_application_requirement" }.toSet()
             11 -> tables.filterNot { it == "posting_application_requirement" || it == "career_assistant_task" }.toSet()
@@ -56,7 +56,11 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
         require(snapshot.tables.values.sumOf { it.rows.size.toLong() } <= 1_000_000) { "백업 데이터가 너무 큽니다." }
         snapshot.tables.keys.forEach { table ->
             val data = snapshot.tables.getValue(table)
-            require(data.columns == metadata(table).map { it.name }) { "$table 백업 스키마가 일치하지 않습니다." }
+            val currentColumns = metadata(table).map { it.name }
+            val legacyApplicationColumns = currentColumns - setOf("collection_run_id", "public_page_fetched")
+            val schemaMatches = data.columns == currentColumns ||
+                (snapshot.schema == 13 && table == "posting_application_requirement" && data.columns == legacyApplicationColumns)
+            require(schemaMatches) { "$table 백업 스키마가 일치하지 않습니다." }
             require(data.rows.all { row -> row.size == data.columns.size && row.all { it == null || it is String || it is Number || it is Boolean } }) { "$table 데이터 형식이 잘못되었습니다." }
         }
         fun values(table: String, column: String) = snapshot.tables.getValue(table).let { t -> t.rows.map { it[t.columns.indexOf(column)] } }
@@ -115,6 +119,16 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
             require(values("posting_application_requirement", "source").all { it in setOf("POSTING_BODY", "USER_PASTED", "PUBLIC_PAGE") }) { "지원서 정보 출처가 올바르지 않습니다." }
             require(values("posting_application_requirement", "status").all { it in setOf("WAITING_PUBLIC", "FETCHING_PUBLIC", "WAITING_AI", "ANALYZING", "REVIEW", "CONFIRMED", "FAILED") }) { "지원서 정보 상태가 올바르지 않습니다." }
         }
+        if (snapshot.schema >= 14) references("posting_application_requirement", "collection_run_id", "collection_run")
+        if (snapshot.schema >= 14) {
+            val appRequirements = snapshot.tables.getValue("posting_application_requirement")
+            val runPosition = appRequirements.columns.indexOf("collection_run_id")
+            val postingPosition = appRequirements.columns.indexOf("posting_id")
+            val runPostingPairs = appRequirements.rows.mapNotNull { row ->
+                row[runPosition]?.toString()?.let { runId -> runId to row[postingPosition].toString() }
+            }
+            require(runPostingPairs.size == runPostingPairs.toSet().size) { "한 수집 실행에 같은 공고 지원 페이지 이력이 중복되었습니다." }
+        }
         if (snapshot.schema >= 13) {
             references("career_assistant_task", "parent_task_id", "career_assistant_task")
             references("career_assistant_task", "posting_id", "posting")
@@ -129,9 +143,13 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
             val data = snapshot.tables.getValue(table)
             val columns = metadata(table)
             val sql = "INSERT INTO `$table` (${columns.joinToString(",") { "`${it.name}`" }}) VALUES (${columns.joinToString(",") { "?" }})"
+            val incomingColumns = data.columns.withIndex().associate { it.value to it.index }
             data.rows.chunked(200).forEach { batch -> jdbc.batchUpdate(sql, batch, 200) { ps, row ->
                 columns.forEachIndexed { index, column ->
-                    val value = row[index]
+                    val inputIndex = incomingColumns[column.name]
+                    val value = if (inputIndex != null) row[inputIndex]
+                        else if (snapshot.schema == 13 && table == "posting_application_requirement" && column.name == "public_page_fetched") false
+                        else null
                     when {
                         value == null -> ps.setNull(index + 1, column.type)
                         column.type in setOf(Types.TIMESTAMP, Types.TIMESTAMP_WITH_TIMEZONE) -> ps.setTimestamp(index + 1, java.sql.Timestamp.from(Instant.parse(value.toString())))
@@ -141,6 +159,15 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
                 }
             } }
         }
+        jdbc.update("""
+            UPDATE posting_application_requirement
+            SET status = 'FAILED',
+                error_message = '과거 공고 본문 분석은 지원서 항목으로 사용하지 않습니다. 실제 지원 페이지를 다시 확인하거나 문항을 직접 붙여넣어 주세요.',
+                lease_token = NULL,
+                lease_expires_at = NULL,
+                updated_at = CURRENT_TIMESTAMP(6)
+            WHERE source = 'POSTING_BODY' AND status IN ('WAITING_AI', 'ANALYZING')
+        """.trimIndent())
         bumpRevision()
     }
     override fun reset(scope: String) {

@@ -6,6 +6,10 @@ import java.time.Instant
 interface ApplicationRequirementRepository {
     fun find(id: String): ApplicationRequirement?
     fun findByPosting(postingId: Long): List<ApplicationRequirement>
+    fun findByCollectionRunAndPosting(runId: String, postingId: Long): ApplicationRequirement?
+    fun countByCollectionRun(runId: String): List<ApplicationRequirementStatusCount>
+    fun summarizeCollectionRun(runId: String): List<ApplicationRequirementRunSummary>
+    fun latestPublicSummary(): List<ApplicationRequirementRunSummary>
     fun lock(id: String): ApplicationRequirement?
     fun save(requirement: ApplicationRequirement)
     fun claim(now: Instant, lease: Duration): ApplicationRequirement?
