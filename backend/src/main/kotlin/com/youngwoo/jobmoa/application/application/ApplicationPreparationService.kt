@@ -163,15 +163,18 @@ class ApplicationPreparationService(
         }?.let { return taskView(it)!! }
         val posting = postings.find(app.postingId) ?: throw ResourceNotFound("공고를 찾을 수 없습니다.")
         val body = postings.latestVersion(app.postingId)?.bodyText.orEmpty()
-        val facts = careerFacts.recommendationFacts().take(MAX_FACTS).map(::factPrompt)
-        require(facts.isNotEmpty()) { "답변 근거로 사용할 경력 자료가 없습니다. 경력 자료를 먼저 등록해 주세요." }
+        val allFacts = careerFacts.recommendationFacts()
+        val factContext = selectFactContext(allFacts, posting, body, "${question.prompt} ${question.sourceQuote.orEmpty()}")
+        require(factContext.facts.isNotEmpty()) { "답변에 사용할 경력 자료가 없습니다. 경력 자료를 먼저 등록해 주세요." }
         val input = mapOf(
             "applicationId" to applicationId,
             "questionId" to questionId,
             "question" to question.prompt,
             "characterLimit" to question.characterLimit,
             "posting" to postingContext(posting, body),
-            "facts" to facts,
+            "availableFactCount" to factContext.availableCount,
+            "factsTruncated" to factContext.truncated,
+            "facts" to factContext.facts,
         )
         return taskView(createTask(app, ApplicationAiTaskType.DRAFT_ANSWER, input))!!
     }
@@ -183,9 +186,16 @@ class ApplicationPreparationService(
         activeTask(applicationId, ApplicationAiTaskType.MATERIAL_DRAFT)?.let { return taskView(it)!! }
         val posting = postings.find(app.postingId) ?: throw ResourceNotFound("공고를 찾을 수 없습니다.")
         val body = postings.latestVersion(app.postingId)?.bodyText.orEmpty()
-        val facts = careerFacts.recommendationFacts().take(MAX_FACTS).map(::factPrompt)
-        require(facts.isNotEmpty()) { "맞춤 자료에 사용할 경력 정보가 없습니다. 경력 자료를 먼저 등록해 주세요." }
-        val input = mapOf("applicationId" to applicationId, "posting" to postingContext(posting, body), "facts" to facts)
+        val allFacts = careerFacts.recommendationFacts()
+        require(allFacts.isNotEmpty()) { "맞춤 자료에 사용할 경력 정보가 없습니다. 경력 자료를 먼저 등록해 주세요." }
+        val factContext = selectFactContext(allFacts, posting, body)
+        val input = mapOf(
+            "applicationId" to applicationId,
+            "posting" to postingContext(posting, body),
+            "availableFactCount" to factContext.availableCount,
+            "factsTruncated" to factContext.truncated,
+            "facts" to factContext.facts,
+        )
         return taskView(createTask(app, ApplicationAiTaskType.MATERIAL_DRAFT, input))!!
     }
 
@@ -233,14 +243,18 @@ class ApplicationPreparationService(
         activeTask(applicationId, ApplicationAiTaskType.INTERVIEW_RESEARCH)?.let { return taskView(it)!! }
         val posting = postings.find(app.postingId) ?: throw ResourceNotFound("공고를 찾을 수 없습니다.")
         val body = postings.latestVersion(app.postingId)?.bodyText.orEmpty()
-        val facts = careerFacts.recommendationFacts().take(MAX_FACTS).map(::factPrompt)
         val answers = repository.questions(applicationId).filter { it.answerDraft.isNotBlank() }.take(20).map {
             mapOf("question" to it.prompt, "answer" to it.answerDraft.take(2000))
         }
+        val allFacts = careerFacts.recommendationFacts()
+        val answerContext = answers.joinToString(" ") { "${it["question"]} ${it["answer"]}" }
+        val factContext = selectFactContext(allFacts, posting, body, answerContext)
         val input = mapOf(
             "applicationId" to applicationId,
             "posting" to postingContext(posting, body),
-            "facts" to facts,
+            "availableFactCount" to factContext.availableCount,
+            "factsTruncated" to factContext.truncated,
+            "facts" to factContext.facts,
             "materials" to repository.draft(applicationId)?.draftJson?.let(mapper::readTree),
             "applicationAnswers" to answers,
         )
@@ -295,10 +309,12 @@ class ApplicationPreparationService(
             runCatching { mapper.readTree(it.requestJson)["turnId"]?.asString() == turnId }.getOrDefault(false)
         }?.let { return taskView(it)!! }
         val posting = postings.find(app.postingId) ?: throw ResourceNotFound("공고를 찾을 수 없습니다.")
-        val facts = careerFacts.recommendationFacts().take(MAX_FACTS).map(::factPrompt)
+        val body = postings.latestVersion(app.postingId)?.bodyText.orEmpty()
+        val factContext = selectFactContext(careerFacts.recommendationFacts(), posting, body, "${turn.question} ${updated.answer}")
         val input = mapOf("applicationId" to applicationId, "sessionId" to sessionId, "turnId" to turnId,
             "basis" to turn.basis, "question" to turn.question, "answer" to updated.answer,
-            "posting" to postingContext(posting, postings.latestVersion(app.postingId)?.bodyText.orEmpty()), "facts" to facts)
+            "posting" to postingContext(posting, body),
+            "availableFactCount" to factContext.availableCount, "factsTruncated" to factContext.truncated, "facts" to factContext.facts)
         return taskView(createTask(app, ApplicationAiTaskType.INTERVIEW_FOLLOW_UP, input))!!
     }
 
@@ -422,15 +438,15 @@ class ApplicationPreparationService(
         val result = mapper.createObjectNode()
         result.put("sourceTaskId", task.id)
         result.set("posting", request["posting"])
-        result.put("resumeHeadline", proposal.resumeHeadline.trim().take(500).takeIf { headingFactIds.isNotEmpty() }.orEmpty())
-        result.put("resumeSummary", proposal.resumeSummary.trim().take(3000).takeIf { summaryFactIds.isNotEmpty() }.orEmpty())
+        result.put("resumeHeadline", proposal.resumeHeadline.trim().take(500))
+        result.put("resumeSummary", proposal.resumeSummary.trim().take(3000))
         result.set("resumeHeadlineFactIds", mapper.valueToTree(headingFactIds))
         result.set("resumeSummaryFactIds", mapper.valueToTree(summaryFactIds))
         result.set("resumeHeadlineEvidence", mapper.valueToTree(evidence(headingFactIds)))
         result.set("resumeSummaryEvidence", mapper.valueToTree(evidence(summaryFactIds)))
         val sections = proposal.resumeSections.take(10).mapIndexedNotNull { index, item ->
             val ids = item.verifiedFactIds.distinct().filter { it in factMap }
-            if (ids.isEmpty() || item.heading.isBlank() || item.content.isBlank()) return@mapIndexedNotNull null
+            if (item.heading.isBlank() || item.content.isBlank()) return@mapIndexedNotNull null
             mapper.createObjectNode().apply {
                 put("id", "section-${index + 1}"); put("heading", item.heading.trim().take(100)); put("content", item.content.trim().take(4000))
                 put("included", true); put("order", index); set("factIds", mapper.valueToTree(ids)); set("evidence", mapper.valueToTree(evidence(ids)))
@@ -438,16 +454,22 @@ class ApplicationPreparationService(
         }
         val projects = proposal.portfolioProjects.take(8).mapIndexedNotNull { index, item ->
             val ids = item.verifiedFactIds.distinct().filter { it in factMap }
-            if (ids.isEmpty() || item.title.isBlank() || item.summary.isBlank()) return@mapIndexedNotNull null
+            if (item.title.isBlank() || item.summary.isBlank()) return@mapIndexedNotNull null
             mapper.createObjectNode().apply {
                 put("id", "project-${index + 1}"); put("title", item.title.trim().take(200)); put("selectionReason", item.selectionReason.trim().take(1000))
                 put("summary", item.summary.trim().take(3000)); put("included", true); put("order", index)
                 set("factIds", mapper.valueToTree(ids)); set("evidence", mapper.valueToTree(evidence(ids)))
             }
         }
-        require(result["resumeHeadline"].asString().isNotBlank() || result["resumeSummary"].asString().isNotBlank() || sections.isNotEmpty()) { "근거가 연결된 이력서 초안을 만들지 못했습니다." }
+        require(result["resumeHeadline"].asString().isNotBlank() || result["resumeSummary"].asString().isNotBlank() || sections.isNotEmpty()) { "AI가 이력서 내용을 작성하지 못했습니다. 다시 시도해 주세요." }
         result.set("resumeSections", mapper.valueToTree(sections)); result.set("portfolioProjects", mapper.valueToTree(projects))
-        result.set("informationGaps", mapper.valueToTree(cleanLines(raw["informationGaps"], 12, 500)))
+        val hasUnlinkedContent = (result["resumeHeadline"].asString().isNotBlank() && headingFactIds.isEmpty()) ||
+            (result["resumeSummary"].asString().isNotBlank() && summaryFactIds.isEmpty()) ||
+            sections.any { it["factIds"].size() == 0 } || projects.any { it["factIds"].size() == 0 }
+        val gaps = cleanLines(raw["informationGaps"], 12, 500).toMutableList()
+        if (hasUnlinkedContent) gaps.add("일부 초안에 원문 근거가 자동 연결되지 않았습니다. 경력 자료와 대조해 사실·수치를 확인해 주세요.")
+        result.put("hasUnlinkedContent", hasUnlinkedContent)
+        result.set("informationGaps", mapper.valueToTree(gaps.distinct().take(12)))
         val now = Instant.now()
         repository.saveDraft(ApplicationMaterialsDraft(task.applicationId, task.id, mapper.writeValueAsString(result), 1, now, now))
         return result
@@ -486,10 +508,9 @@ class ApplicationPreparationService(
         val safeAnswer = answer
         val facts = factContextMap(request["facts"])
         val factIds = raw["factIds"]?.takeIf { it.isArray }?.values()?.map { it.asString() }?.distinct()?.filter { it in facts }.orEmpty()
-        require(factIds.isNotEmpty()) { "경력 근거가 연결되지 않은 답변 초안은 저장할 수 없습니다." }
         val saved = repository.saveQuestion(question.copy(answerDraft = safeAnswer, answerFactIdsJson = mapper.writeValueAsString(factIds), answerTaskId = task.id, updatedAt = Instant.now()))
         return mapper.createObjectNode().apply {
-            put("questionId", saved.id); put("answer", safeAnswer); set("factIds", mapper.valueToTree(factIds))
+            put("questionId", saved.id); put("answer", safeAnswer); put("hasUnlinkedContent", factIds.isEmpty()); set("factIds", mapper.valueToTree(factIds))
             set("evidence", mapper.valueToTree(factIds.mapNotNull(facts::get)))
         }
     }
@@ -576,6 +597,46 @@ class ApplicationPreparationService(
 
     private fun urlValid(value: String): Boolean = runCatching { PublicUrlGuard.validate(value); true }.getOrDefault(false)
     private fun confidence(value: String?) = value?.uppercase()?.takeIf { it in setOf("HIGH", "MEDIUM", "LOW") } ?: "LOW"
+    private fun selectFactContext(facts: List<CareerFact>, posting: Posting, body: String, additionalContext: String = ""): FactContext {
+        val context = searchTokens("${posting.company} ${posting.title} ${posting.location} ${posting.categories.joinToString(" ")} $body $additionalContext")
+        if (facts.size <= MAX_FACTS || context.isEmpty()) return FactContext(facts.size, facts.size > MAX_FACTS, facts.take(MAX_FACTS).map(::factPrompt))
+
+        val termsByFact = facts.associate { fact ->
+            fact.id to searchTokens("${fact.title} ${fact.summary} ${fact.evidence.joinToString(" ") { it.excerpt }}")
+        }
+        val documentFrequency = mutableMapOf<String, Int>()
+        termsByFact.values.forEach { tokens -> tokens.intersect(context).forEach { term -> documentFrequency.merge(term, 1, Int::plus) } }
+        fun score(tokens: Set<String>, multiplier: Double): Double = tokens.asSequence().filter { it in context }.sumOf { term ->
+            (1.0 + kotlin.math.ln((facts.size + 1.0) / (documentFrequency.getValue(term) + 1.0))) * multiplier
+        }
+        val selected = facts.sortedWith(
+            compareByDescending<CareerFact> { fact ->
+                val title = searchTokens(fact.title)
+                val summary = searchTokens(fact.summary)
+                val evidence = searchTokens(fact.evidence.joinToString(" ") { it.excerpt })
+                score(title, 5.0) + score(summary, 2.5) + score(evidence, 1.0)
+            }.thenByDescending { it.updatedAt }.thenBy { it.id },
+        ).take(MAX_FACTS)
+        return FactContext(facts.size, facts.size > selected.size, selected.map(::factPrompt))
+    }
+
+    private fun searchTokens(value: String): Set<String> {
+        val stopWords = setOf("경험", "업무", "담당", "개발", "기반", "서비스", "기술", "프로젝트", "관련", "통해", "위한", "그리고", "성과", "역할", "진행", "수행", "the", "and", "with", "for", "from", "your", "you")
+        val raw = Regex("[A-Za-z][A-Za-z0-9+#.\\-]{1,}|[가-힣]{2,}")
+            .findAll(value.lowercase())
+            .map { it.value.trimEnd('.') }
+            .filter { it.length >= 2 && it !in stopWords }
+            .toSet()
+        val aliases = mapOf(
+            "backend" to setOf("백엔드", "서버"), "백엔드" to setOf("backend", "서버"), "server" to setOf("서버", "backend", "백엔드"), "서버" to setOf("server", "backend", "백엔드"),
+            "frontend" to setOf("프론트엔드", "웹"), "프론트엔드" to setOf("frontend", "프론트", "웹"), "android" to setOf("안드로이드", "모바일"), "안드로이드" to setOf("android", "모바일"),
+            "ios" to setOf("아이오에스", "모바일"), "데이터" to setOf("data", "데이터엔지니어"), "data" to setOf("데이터", "데이터엔지니어"),
+            "ml" to setOf("머신러닝", "machine", "learning"), "머신러닝" to setOf("ml", "machine", "learning"), "sre" to setOf("인프라", "운영", "devops"), "devops" to setOf("sre", "인프라", "운영"),
+            "pm" to setOf("프로덕트매니저", "기획"), "기획" to setOf("pm", "프로덕트매니저"), "디자인" to setOf("design", "designer"), "마케팅" to setOf("marketing"), "영업" to setOf("sales"),
+        )
+        return raw + raw.flatMap { aliases[it].orEmpty() }
+    }
+
     private fun factContextMap(node: JsonNode?): Map<String, JsonNode> = node?.takeIf { it.isArray }?.values()?.mapNotNull { item ->
         item["id"]?.asString()?.takeIf(String::isNotBlank)?.let { it to item }
     }?.toMap().orEmpty()
@@ -633,6 +694,8 @@ class ApplicationPreparationService(
         private val TASK_LEASE = Duration.ofMinutes(10)
     }
 }
+
+private data class FactContext(val availableCount: Int, val truncated: Boolean, val facts: List<Map<String, Any>>)
 
 data class ApplicationCaseSummary(
     val id: String, val postingId: Long, val sourceId: String, val company: String, val title: String, val location: String, val url: String,

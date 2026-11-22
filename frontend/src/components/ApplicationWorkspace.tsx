@@ -25,12 +25,12 @@ type Detail = {
 type MaterialSection = { id: string; heading: string; content: string; included: boolean; order: number; factIds: string[]; evidence: Evidence[] }
 type MaterialProject = { id: string; title: string; selectionReason: string; summary: string; included: boolean; order: number; factIds: string[]; evidence: Evidence[] }
 type Evidence = { id?: string; title?: string; summary?: string; locationLabel?: string; excerpt?: string }
-type MaterialDraft = { resumeHeadline: string; resumeSummary: string; resumeSections: MaterialSection[]; portfolioProjects: MaterialProject[]; informationGaps: string[] }
+type MaterialDraft = { resumeHeadline: string; resumeSummary: string; resumeHeadlineEvidence: Evidence[]; resumeSummaryEvidence: Evidence[]; resumeSections: MaterialSection[]; portfolioProjects: MaterialProject[]; informationGaps: string[]; hasUnlinkedContent: boolean }
 type Pane = 'materials' | 'questions' | 'interview' | 'source'
 const paneLabels: Record<Pane, string> = { materials: '맞춤 이력서·포트폴리오', questions: '지원서 문항', interview: '면접 준비', source: '지원서 원문' }
 const basisLabels: Record<string, string> = { POSTING: '공고 기반', RESUME: '이력서 기반', PORTFOLIO: '포트폴리오 기반', APPLICATION_ANSWER: '지원서 답변 기반', COMPANY_TREND: '회사·직무 경향' }
 const taskLabels: Record<TaskType, string> = { MATERIAL_DRAFT: '맞춤 자료 구성', EXTRACT_QUESTIONS: '문항 추출', DRAFT_ANSWER: '답변 초안 작성', INTERVIEW_RESEARCH: '면접 경향 조사', INTERVIEW_FOLLOW_UP: '꼬리 질문 작성' }
-const emptyDraft: MaterialDraft = { resumeHeadline: '', resumeSummary: '', resumeSections: [], portfolioProjects: [], informationGaps: [] }
+const emptyDraft: MaterialDraft = { resumeHeadline: '', resumeSummary: '', resumeHeadlineEvidence: [], resumeSummaryEvidence: [], resumeSections: [], portfolioProjects: [], informationGaps: [], hasUnlinkedContent: false }
 
 function taskState(task: Task | null | undefined) {
   if (!task) return null
@@ -43,9 +43,12 @@ function initialDraft(value: any): MaterialDraft {
   if (!value || typeof value !== 'object') return emptyDraft
   return {
     resumeHeadline: value.resumeHeadline ?? '', resumeSummary: value.resumeSummary ?? '',
+    resumeHeadlineEvidence: Array.isArray(value.resumeHeadlineEvidence) ? value.resumeHeadlineEvidence : [],
+    resumeSummaryEvidence: Array.isArray(value.resumeSummaryEvidence) ? value.resumeSummaryEvidence : [],
     resumeSections: Array.isArray(value.resumeSections) ? value.resumeSections.map((item: any, index: number) => ({ ...item, order: item.order ?? index, included: item.included !== false, factIds: item.factIds ?? [], evidence: item.evidence ?? [] })) : [],
     portfolioProjects: Array.isArray(value.portfolioProjects) ? value.portfolioProjects.map((item: any, index: number) => ({ ...item, order: item.order ?? index, included: item.included !== false, factIds: item.factIds ?? [], evidence: item.evidence ?? [] })) : [],
     informationGaps: Array.isArray(value.informationGaps) ? value.informationGaps : [],
+    hasUnlinkedContent: value.hasUnlinkedContent === true,
   }
 }
 function json(body: unknown): RequestInit { return { body: JSON.stringify(body) } }
@@ -164,6 +167,22 @@ export function ApplicationWorkspace({ jobs, demo = false, initialApplicationId,
     await api(`/api/applications/${detail.application.id}/questions/${q.id}`, { method: 'PUT', ...json({ prompt: value.prompt, characterLimit: value.characterLimit ? Number(value.characterLimit) : null, answer: value.answer }) })
     await refreshDetail(detail.application.id)
   }
+  async function draftAllAnswers() {
+    if (!detail) return
+    const unanswered = detail.questions.filter(question => !(questionEdits[question.id]?.answer ?? question.answerDraft).trim())
+    if (!unanswered.length) { setNotice('아직 답변 초안을 만들지 않은 문항이 없어요.'); return }
+    let queued = 0
+    const failures: string[] = []
+    for (const question of unanswered) {
+      try {
+        await api<Task>(`/api/applications/${detail.application.id}/questions/${question.id}/answer-draft`, { method: 'POST' })
+        queued += 1
+      } catch (cause) { failures.push(cause instanceof Error ? cause.message : question.prompt) }
+    }
+    await refreshDetail(detail.application.id)
+    if (queued) setNotice(`${queued}개 문항의 답변 초안을 순서대로 만들도록 AI 대기열에 넣었어요.`)
+    if (failures.length) setError(`${failures.length}개 문항은 대기열에 넣지 못했어요: ${failures[0]}`)
+  }
   async function saveMaterials() {
     if (!detail) return
     const body = { resumeHeadline: draft.resumeHeadline, resumeSummary: draft.resumeSummary,
@@ -231,12 +250,12 @@ export function ApplicationWorkspace({ jobs, demo = false, initialApplicationId,
         {currentTask && <div className="application-ai-progress" role="status"><span className="application-ai-spinner" /><div><strong>{taskLabels[currentTask.type]} · {taskState(currentTask)}</strong><small>브라우저를 닫아도 작업은 취소되지 않아요. 이 화면을 다시 열면 저장된 상태를 이어서 확인합니다.</small></div><button className="text-button" onClick={() => void refreshDetail(detail.application.id)}>새로고침</button></div>}
         {activeTask?.status === 'FAILED' && <div className="application-task-error"><div><strong>{taskLabels[activeTask.type]} 실패</strong><p>{activeTask.errorMessage}</p></div><button className="button secondary small" disabled={busy} onClick={() => void run(() => retry(activeTask))}>실패한 작업 재시도</button></div>}
         {pane === 'materials' && <div className="application-pane-content">
-          <div className="application-pane-heading"><div><h3>공고 맞춤 자료</h3><p>원본 경력 자료는 유지하고, 이 지원 건에서 쓸 순서와 표현을 편집해요. 각 제안에는 경력 근거가 연결됩니다.</p></div>{!detail.materials && <button className="button primary" disabled={busy || !!currentTask} onClick={() => void run(() => queueTask(`/api/applications/${detail.application.id}/materials/generate`))}>맞춤 이력서·포트폴리오 만들기</button>}</div>
-          {!detail.materials && <div className="application-empty-inline"><strong>맞춤 자료 초안이 없어요</strong><p>이력서·포트폴리오 초안은 등록된 경력 자료를 근거로 구성해요. 근거 자료가 부족하면 경력 자료에서 먼저 파일을 올려 주세요.</p><button className="text-button" onClick={onOpenCareer}>경력 자료 열기</button></div>}
+          <div className="application-pane-heading"><div><h3>공고 맞춤 자료</h3><p>여러 경력 자료에서 관련 경험을 찾아 초안을 만들어요. 원문 근거 링크는 가능한 문장에 연결하고, 연결이 빠진 곳은 확인 표시를 남겨요.</p></div>{!detail.materials && <button className="button primary" disabled={busy || !!currentTask} onClick={() => void run(() => queueTask(`/api/applications/${detail.application.id}/materials/generate`))}>맞춤 이력서·포트폴리오 만들기</button>}</div>
+          {!detail.materials && <div className="application-empty-inline"><strong>맞춤 자료 초안이 없어요</strong><p>등록된 경력 자료에서 공고와 관련된 경험을 찾아 이력서와 포트폴리오를 구성해요. 자료와 대조가 필요한 부분은 초안에 표시합니다.</p><button className="text-button" onClick={onOpenCareer}>경력 자료 열기</button></div>}
           {detail.materials && <>
             <div className="application-material-card"><div className="application-material-card-heading"><h4>이력서</h4><span>초안 v{detail.materialsVersion}</span></div>
-              <label>이력서 제목<input maxLength={500} value={draft.resumeHeadline} onChange={e => setDraft(value => ({ ...value, resumeHeadline: e.target.value }))} /></label>
-              <label>요약<textarea rows={4} maxLength={3000} value={draft.resumeSummary} onChange={e => setDraft(value => ({ ...value, resumeSummary: e.target.value }))} /></label>
+              <label>이력서 제목<input maxLength={500} value={draft.resumeHeadline} onChange={e => setDraft(value => ({ ...value, resumeHeadline: e.target.value }))} /></label><EvidenceList evidence={draft.resumeHeadlineEvidence} />
+              <label>요약<textarea rows={4} maxLength={3000} value={draft.resumeSummary} onChange={e => setDraft(value => ({ ...value, resumeSummary: e.target.value }))} /></label><EvidenceList evidence={draft.resumeSummaryEvidence} />
               {draft.resumeSections.map((section, index) => <article className={`application-edit-item ${section.included ? '' : 'excluded'}`} key={section.id}><div className="application-edit-item-heading"><label><input type="checkbox" checked={section.included} onChange={e => setDraft(value => ({ ...value, resumeSections: value.resumeSections.map(item => item.id === section.id ? { ...item, included: e.target.checked } : item) }))} /> 이력서에 포함</label><div><button aria-label="이력서 항목 위로" disabled={index === 0} onClick={() => setDraft(value => ({ ...value, resumeSections: moveItem(value.resumeSections, index, -1) }))}>↑</button><button aria-label="이력서 항목 아래로" disabled={index === draft.resumeSections.length - 1} onClick={() => setDraft(value => ({ ...value, resumeSections: moveItem(value.resumeSections, index, 1) }))}>↓</button></div></div><input aria-label="이력서 항목 제목" value={section.heading} onChange={e => setDraft(value => ({ ...value, resumeSections: value.resumeSections.map(item => item.id === section.id ? { ...item, heading: e.target.value } : item) }))} /><textarea aria-label="이력서 항목 내용" rows={4} value={section.content} onChange={e => setDraft(value => ({ ...value, resumeSections: value.resumeSections.map(item => item.id === section.id ? { ...item, content: e.target.value } : item) }))} /><EvidenceList evidence={section.evidence} /></article>)}
             </div>
             <div className="application-material-card"><div className="application-material-card-heading"><h4>포트폴리오</h4><span>{draft.portfolioProjects.length}개 프로젝트</span></div>
@@ -248,12 +267,12 @@ export function ApplicationWorkspace({ jobs, demo = false, initialApplicationId,
           </>}
         </div>}
         {pane === 'questions' && <div className="application-pane-content">
-          <div className="application-pane-heading"><div><h3>지원서 문항별 답변</h3><p>공개 지원 페이지 원문을 바탕으로 문항을 뽑고, 각 답변은 따로 작성·수정합니다.</p></div><button className="button primary" disabled={busy || !!currentTask || !detail.requirement} onClick={() => void run(() => queueTask(`/api/applications/${detail.application.id}/questions/extract`))}>원문에서 문항 추출</button></div>
+          <div className="application-pane-heading"><div><h3>지원서 문항별 답변</h3><p>원문에서 문항을 뽑은 뒤, 미작성 답변을 한 번에 초안으로 만들 수 있어요.</p></div><div className="application-pane-actions"><button className="button secondary" disabled={busy || !!currentTask || !detail.questions.some(question => !(questionEdits[question.id]?.answer ?? question.answerDraft).trim())} onClick={() => void run(draftAllAnswers)}>미작성 답변 전체 초안</button><button className="button primary" disabled={busy || !!currentTask || !detail.requirement} onClick={() => void run(() => queueTask(`/api/applications/${detail.application.id}/questions/extract`))}>원문에서 문항 추출</button></div></div>
           {!detail.requirement && <div className="application-empty-inline"><strong>저장된 지원서 원문이 필요해요</strong><p>‘지원서 원문’ 탭에서 공개 지원 페이지 원문을 확인하거나 직접 붙여넣어 저장하세요.</p><button className="text-button" onClick={() => setPane('source')}>지원서 원문 열기</button></div>}
           {detail.questionExtractionTask && <TaskNotice task={detail.questionExtractionTask} retry={() => void run(() => retry(detail.questionExtractionTask!))} />}
           <div className="application-add-question"><h4>문항 직접 추가</h4><textarea rows={3} maxLength={8000} placeholder="지원서 질문을 입력하세요" value={newPrompt} onChange={e => setNewPrompt(e.target.value)} /><div><label>글자 수 제한<input type="number" min={1} max={12000} placeholder="선택" value={newLimit} onChange={e => setNewLimit(e.target.value)} /></label><button className="button secondary small" disabled={busy || !newPrompt.trim()} onClick={() => void run(addQuestion, '문항을 추가했어요.')}>문항 추가</button></div></div>
           {!detail.questions.length && <p className="application-no-evidence">아직 지원서 문항이 없어요. 원문에서 추출하거나 직접 추가할 수 있어요.</p>}
-          {detail.questions.map((question, index) => { const value = questionEdits[question.id] ?? { prompt: question.prompt, characterLimit: question.characterLimit?.toString() ?? '', answer: question.answerDraft }; return <article className="application-question-card" key={question.id}><header><span>문항 {index + 1}</span><button className="text-button danger-text" disabled={busy} onClick={() => void run(async () => { await api(`/api/applications/${detail.application.id}/questions/${question.id}`, { method: 'DELETE' }); await refreshDetail(detail.application.id) })}>삭제</button></header><label>질문<textarea rows={3} maxLength={8000} value={value.prompt} onChange={e => changeQuestion(question.id, { prompt: e.target.value })} /></label><label className="application-limit-field">글자 수 제한<input type="number" min={1} max={12000} value={value.characterLimit} onChange={e => changeQuestion(question.id, { characterLimit: e.target.value })} placeholder="제한 없음" /></label>{question.sourceQuote && <blockquote><small>원문 근거</small>{question.sourceQuote}</blockquote>}<label>답변 초안<textarea rows={8} maxLength={question.characterLimit ?? 12000} value={value.answer} onChange={e => changeQuestion(question.id, { answer: e.target.value })} placeholder="경력 자료를 근거로 답변을 작성하거나 AI 초안을 받아 편집하세요." /></label><div className="application-answer-footer"><span>{value.answer.length.toLocaleString()}{question.characterLimit ? ` / ${question.characterLimit}` : ''}자 · 근거 {question.factIds.length ? `${question.factIds.length}개 연결` : '미연결'}</span><div><button className="button secondary small" disabled={busy || !value.prompt.trim()} onClick={() => void run(() => queueTask(`/api/applications/${detail.application.id}/questions/${question.id}/answer-draft`))}>AI 초안</button><button className="button primary small" disabled={busy} onClick={() => void run(() => saveQuestion(question), '문항과 답변을 저장했어요.')}>저장</button></div></div>{question.factIds.length > 0 && <p className="application-fact-note">사용한 경력 근거 ID: {question.factIds.join(', ')} · 답변 초안은 저장된 자료에서 수정할 수 있어요.</p>}</article> })}
+          {detail.questions.map((question, index) => { const value = questionEdits[question.id] ?? { prompt: question.prompt, characterLimit: question.characterLimit?.toString() ?? '', answer: question.answerDraft }; return <article className="application-question-card" key={question.id}><header><span>문항 {index + 1}</span><button className="text-button danger-text" disabled={busy} onClick={() => void run(async () => { await api(`/api/applications/${detail.application.id}/questions/${question.id}`, { method: 'DELETE' }); await refreshDetail(detail.application.id) })}>삭제</button></header><label>질문<textarea rows={3} maxLength={8000} value={value.prompt} onChange={e => changeQuestion(question.id, { prompt: e.target.value })} /></label><label className="application-limit-field">글자 수 제한<input type="number" min={1} max={12000} value={value.characterLimit} onChange={e => changeQuestion(question.id, { characterLimit: e.target.value })} placeholder="제한 없음" /></label>{question.sourceQuote && <blockquote><small>원문 근거</small>{question.sourceQuote}</blockquote>}<label>답변 초안<textarea rows={8} maxLength={question.characterLimit ?? 12000} value={value.answer} onChange={e => changeQuestion(question.id, { answer: e.target.value })} placeholder="경력 자료에서 관련 경험을 찾아 답변 초안을 만들어요." /></label><div className="application-answer-footer"><span>{value.answer.length.toLocaleString()}{question.characterLimit ? ` / ${question.characterLimit}` : ''}자 · 근거 {question.factIds.length ? `${question.factIds.length}개 연결` : '미연결'}</span><div><button className="button secondary small" disabled={busy || !value.prompt.trim()} onClick={() => void run(() => queueTask(`/api/applications/${detail.application.id}/questions/${question.id}/answer-draft`))}>AI 초안</button><button className="button primary small" disabled={busy} onClick={() => void run(() => saveQuestion(question), '문항과 답변을 저장했어요.')}>저장</button></div></div>{question.factIds.length > 0 ? <p className="application-fact-note">사용한 경력 근거 ID: {question.factIds.join(', ')} · 답변 초안은 저장된 자료에서 수정할 수 있어요.</p> : question.answerDraft.trim() && <p className="application-fact-warning">근거가 자동 연결되지 않았어요. 경력 자료의 내용과 수치를 확인한 뒤 사용하세요.</p>}</article> })}
         </div>}
         {pane === 'interview' && <div className="application-pane-content">
           <div className="application-pane-heading"><div><h3>공개 정보 기반 면접 준비</h3><p>공식 사실, 공개 후기, 공고에서 추론한 주제를 분리해 조사합니다. 실제 질문을 보장하지 않으며 검색한 출처와 확인 시점을 보여줘요.</p></div><button className="button primary" disabled={busy || !!currentTask} onClick={() => void run(() => queueTask(`/api/applications/${detail.application.id}/interview/research`))}>{research ? '다시 조사' : '면접 경향 조사'}</button></div>
@@ -277,7 +296,7 @@ export function ApplicationWorkspace({ jobs, demo = false, initialApplicationId,
 }
 
 function EvidenceList({ evidence }: { evidence: Evidence[] }) {
-  if (!evidence.length) return <p className="application-no-evidence">연결된 경력 근거가 없습니다.</p>
+  if (!evidence.length) return <p className="application-no-evidence">이 항목에는 원문 근거가 연결되지 않았어요. 경력 자료와 대조해 확인하세요.</p>
   return <details className="application-evidence"><summary>경력 근거 {evidence.length}개 보기</summary>{evidence.map((item, index) => <blockquote key={item.id ?? index}><strong>{item.title ?? item.locationLabel ?? `근거 ${index + 1}`}</strong>{item.excerpt ?? item.summary ?? ''}</blockquote>)}</details>
 }
 function TaskNotice({ task, retry }: { task: Task; retry: () => void }) {
