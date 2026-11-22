@@ -73,15 +73,20 @@ class WorkspaceService(private val repository: WorkspaceSnapshotRepository, priv
         val requirementConfirmed = requirementTable.columns.indexOf("confirmed_at")
         val requirementError = requirementTable.columns.indexOf("error_message")
         val requirementFetched = requirementTable.columns.indexOf("public_page_fetched")
+        val requirementVersionSaved = requirementTable.columns.indexOf("version_saved")
+        val requirementContentVersion = requirementTable.columns.indexOf("content_version_id")
         val requirementRows = requirementTable.rows.map { row ->
             val source = row[requirementSource]?.toString()
             val text = row[requirementRaw]?.toString().orEmpty()
             val oldStatus = row[requirementStatus]?.toString()
+            val isDuplicateCheck = source == "PUBLIC_PAGE" && row[requirementFetched] == true &&
+                row[requirementVersionSaved] == false && row[requirementContentVersion] != null
             row.toMutableList().also { values ->
                 values[requirementStatus] = when {
                     source == "POSTING_BODY" -> "FAILED"
                     oldStatus == "FETCHING_PUBLIC" || oldStatus == "WAITING_PUBLIC" -> "WAITING_PUBLIC"
                     oldStatus == "FAILED" && source == "PUBLIC_PAGE" && row[requirementFetched] != true -> "FAILED"
+                    isDuplicateCheck -> "SAVED"
                     text.isNotBlank() -> "SAVED"
                     else -> "FAILED"
                 }
@@ -95,6 +100,10 @@ class WorkspaceService(private val repository: WorkspaceSnapshotRepository, priv
                     values[requirementStatus] == "WAITING_PUBLIC" -> null
                     values[requirementStatus] == "SAVED" -> null
                     else -> row[requirementError]
+                }
+                if (source == "POSTING_BODY") {
+                    values[requirementVersionSaved] = false
+                    values[requirementContentVersion] = null
                 }
             }
         }

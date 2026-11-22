@@ -32,6 +32,8 @@ class ApplicationRequirementService(
         require(source == RequirementSource.USER_PASTED) { "자동 확인된 지원 페이지 원문은 이 화면에서 직접 입력할 수 없습니다." }
         val text = rawText.trim()
         require(text.isNotEmpty() && text.length <= MAX_TEXT_CHARS) { "지원서 원문은 1자 이상 ${MAX_TEXT_CHARS}자 이하여야 합니다." }
+        if (!requirements.lockPosting(postingId)) throw ResourceNotFound("공고를 찾을 수 없습니다.")
+        latestSavedVersion(postingId)?.takeIf { it.rawText == text }?.let { return view(it) }
         val safeUrl = sourceUrl?.trim()?.takeIf(String::isNotBlank)?.also {
             require(it.length <= 2048) { "출처 URL이 너무 깁니다." }
             PostingUrl.normalize(it)
@@ -41,10 +43,11 @@ class ApplicationRequirementService(
             id = UUID.randomUUID().toString(), postingId = postingId, source = source,
             sourceUrl = safeUrl, rawText = text, status = RequirementStatus.SAVED,
             attempts = 0, errorMessage = null, leaseToken = null, leaseExpiresAt = null,
-            createdAt = now, updatedAt = now,
+            createdAt = now, updatedAt = now, versionSaved = true,
         )
-        requirements.save(requirement)
-        return view(requirement)
+        val version = requirement.copy(contentVersionId = requirement.id)
+        requirements.save(version)
+        return view(version)
     }
 
     private fun queuePublicPage(posting: com.youngwoo.jobmoa.posting.domain.model.Posting, collectionRunId: String): ApplicationRequirementView {
@@ -106,9 +109,14 @@ class ApplicationRequirementService(
         requirePublicLease(current, token)
         val body = text.trim().take(MAX_TEXT_CHARS)
         require(body.length >= MIN_PUBLIC_TEXT_CHARS) { "공개 지원 페이지에서 읽을 수 있는 문항 텍스트가 충분하지 않습니다." }
+        if (!requirements.lockPosting(current.postingId)) throw ResourceNotFound("공고를 찾을 수 없습니다.")
         val safeResolvedUrl = PostingUrl.normalize(resolvedUrl)
-        requirements.save(current.copy(sourceUrl = safeResolvedUrl, rawText = body, status = RequirementStatus.SAVED,
-            errorMessage = null, leaseToken = null, leaseExpiresAt = null, publicPageFetched = true, updatedAt = Instant.now()))
+        val previousVersion = latestSavedVersion(current.postingId)
+        val sameAsLatest = previousVersion?.rawText == body
+        requirements.save(current.copy(sourceUrl = safeResolvedUrl, rawText = if (sameAsLatest) "" else body,
+            status = RequirementStatus.SAVED, errorMessage = null, leaseToken = null, leaseExpiresAt = null,
+            publicPageFetched = true, updatedAt = Instant.now(), versionSaved = !sameAsLatest,
+            contentVersionId = if (sameAsLatest) previousVersion.id else current.id))
     }
 
     @Transactional
@@ -124,9 +132,13 @@ class ApplicationRequirementService(
         if (row.status != RequirementStatus.FETCHING_PUBLIC || row.leaseToken != token || row.leaseExpiresAt?.isAfter(Instant.now()) != true) throw LeaseLost()
     }
 
+    private fun latestSavedVersion(postingId: Long): ApplicationRequirement? =
+        requirements.latestSavedVersionForUpdate(postingId)
+
     private fun view(row: ApplicationRequirement) = ApplicationRequirementView(
         row.id, row.postingId, row.source, row.sourceUrl, row.rawText, row.status, row.attempts,
         row.errorMessage, row.createdAt, row.updatedAt, row.collectionRunId, row.publicPageFetched,
+        row.versionSaved, row.contentVersionId,
     )
 
     private fun safeError(value: String) = value
@@ -153,4 +165,6 @@ data class ApplicationRequirementView(
     val updatedAt: Instant,
     val collectionRunId: String?,
     val publicPageFetched: Boolean,
+    val versionSaved: Boolean,
+    val contentVersionId: String?,
 )

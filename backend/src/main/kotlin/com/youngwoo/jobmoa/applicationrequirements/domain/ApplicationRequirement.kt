@@ -20,6 +20,8 @@ data class ApplicationRequirement(
     val updatedAt: Instant,
     val collectionRunId: String? = null,
     val publicPageFetched: Boolean = false,
+    val versionSaved: Boolean = false,
+    val contentVersionId: String? = null,
 )
 
 data class PublicPageFetchLease(

@@ -14,7 +14,10 @@ interface Requirement {
   attempts: number
   errorMessage: string | null
   createdAt: string
+  updatedAt: string
   publicPageFetched: boolean
+  versionSaved: boolean
+  contentVersionId: string | null
 }
 
 const sourceLabel: Record<RequirementSource, string> = {
@@ -38,13 +41,16 @@ export function ApplicationRequirementsPanel({ job }: { job: Job }) {
     try {
       const next = await api<Requirement[]>(`/api/postings/${job.id}/application-requirements`)
       const history = next.filter(item => item.source !== 'POSTING_BODY')
+      const versions = history.filter(item => item.versionSaved)
       setItems(next)
-      const selected = history.find(item => item.id === selectedIdRef.current)
+      const selected = versions.find(item => item.id === selectedIdRef.current)
       if (!selected) {
         const latest = history[0]
-        selectedIdRef.current = latest?.id ?? ''
-        setSelectedId(latest?.id ?? '')
-        setRawText(latest?.rawText ?? '')
+        const latestVersionId = latest?.contentVersionId ?? (latest?.versionSaved ? latest.id : '')
+        const latestVersion = versions.find(item => item.id === latestVersionId)
+        selectedIdRef.current = latestVersion?.id ?? ''
+        setSelectedId(latestVersion?.id ?? '')
+        setRawText(latestVersion?.rawText ?? '')
         dirtyRef.current = false
         setDirty(false)
       } else if (!dirtyRef.current) {
@@ -67,11 +73,14 @@ export function ApplicationRequirementsPanel({ job }: { job: Job }) {
   }, [pending, refresh])
 
   const history = items.filter(item => item.source !== 'POSTING_BODY')
-  const selected = history.find(item => item.id === selectedId) ?? history[0]
+  const versions = history.filter(item => item.versionSaved)
+  const latestActivity = history[0]
+  const selected = versions.find(item => item.id === selectedId)
+  const showVersionSelector = versions.length > 1 || (versions.length > 0 && latestActivity?.versionSaved !== true && !latestActivity?.contentVersionId)
   const changed = rawText.trim() !== (selected?.rawText ?? '')
 
   function selectVersion(id: string) {
-    const item = history.find(row => row.id === id)
+    const item = versions.find(row => row.id === id)
     if (!item) return
     selectedIdRef.current = item.id
     setSelectedId(item.id)
@@ -113,41 +122,44 @@ export function ApplicationRequirementsPanel({ job }: { job: Job }) {
     }
   }
 
-  const statusLabel = selected ? ({
+  const statusLabel = latestActivity ? ({
     WAITING_PUBLIC: '지원 페이지 확인 대기',
     FETCHING_PUBLIC: '지원 페이지 확인 중',
     SAVED: '원문 저장됨',
     FAILED: '원문을 찾지 못함',
-  } satisfies Record<RequirementStatus, string>)[selected.status] : '원문 없음'
+  } satisfies Record<RequirementStatus, string>)[latestActivity.status] : '원문 없음'
 
-  const statusDetail = selected?.status === 'FAILED'
-    ? selected.errorMessage || '공개 지원 페이지에서 원문을 가져오지 못했어요.'
-    : selected?.status === 'WAITING_PUBLIC'
+  const statusDetail = latestActivity?.status === 'FAILED'
+    ? latestActivity.errorMessage || '공개 지원 페이지에서 원문을 가져오지 못했어요.'
+    : latestActivity?.status === 'WAITING_PUBLIC'
       ? '공고 수집과 함께 지원 페이지를 확인하고 있어요.'
-      : selected?.status === 'FETCHING_PUBLIC'
+      : latestActivity?.status === 'FETCHING_PUBLIC'
         ? '공개 지원 페이지를 여는 중이에요.'
-        : selected?.status === 'SAVED' && selected.source === 'PUBLIC_PAGE'
-          ? '이 버전은 공고 수집 실행에서 자동으로 가져왔어요.'
-          : selected?.status === 'SAVED'
-            ? '수정한 원문을 새 버전으로 저장했어요.'
+        : latestActivity?.status === 'SAVED' && !latestActivity.versionSaved && latestActivity.contentVersionId
+          ? '기존 원문과 같아 새 버전을 저장하지 않았어요.'
+          : latestActivity?.status === 'SAVED' && latestActivity.source === 'PUBLIC_PAGE'
+            ? '공고 수집에서 새 원문 버전을 저장했어요.'
+            : latestActivity?.status === 'SAVED'
+              ? '직접 저장한 원문 버전이에요.'
             : '공고를 수집하면 지원 페이지 원문도 함께 확인해요.'
 
   return <section className="application-requirements" aria-label="지원서 원문">
     <div className="application-requirements-heading">
-      <div><h3>지원서 원문</h3><p>공개 지원 페이지에서 가져온 원문을 확인하고, 필요하면 직접 수정해 새 버전으로 저장해요.</p></div>
-      <span>이력 {history.length}건</span>
+      <div><h3>지원서 원문</h3><p>수집 실행별 확인 상태와 원문 버전을 구분해 보여줘요. 내용이 같으면 새 버전은 만들지 않아요.</p></div>
+      <span>원문 {versions.length}개</span>
     </div>
-    <div className={`application-requirement-status-line ${selected?.status.toLowerCase() ?? 'unknown'}`}>
-      <div><strong>{statusLabel}</strong><span>{selected ? `${sourceLabel[selected.source]} · ${new Date(selected.createdAt).toLocaleString('ko-KR')}` : '자동 수집 기록 없음'}</span></div>
+    <div className={`application-requirement-status-line ${latestActivity?.status.toLowerCase() ?? 'unknown'}`}>
+      <div><strong>{statusLabel}</strong><span>{latestActivity ? `${sourceLabel[latestActivity.source]} · ${new Date(latestActivity.updatedAt).toLocaleString('ko-KR')}` : '자동 수집 기록 없음'}</span></div>
       <p>{statusDetail}</p>
-      {selected?.status === 'FAILED' && selected.errorMessage && <small>실패 사유 · {selected.errorMessage}</small>}
-      {selected?.source === 'PUBLIC_PAGE' && selected.sourceUrl && <a href={selected.sourceUrl} target="_blank" rel="noreferrer">지원 페이지 열기</a>}
+      {latestActivity?.status === 'FAILED' && latestActivity.errorMessage && <small>실패 사유 · {latestActivity.errorMessage}</small>}
+      {latestActivity?.source === 'PUBLIC_PAGE' && latestActivity.sourceUrl && <a href={latestActivity.sourceUrl} target="_blank" rel="noreferrer">지원 페이지 열기</a>}
     </div>
     <div className="application-requirement-editor-heading">
       <label htmlFor="application-requirements-text">지원 페이지 원문</label>
-      {history.length > 1 && <label className="application-requirement-version">버전
+      {showVersionSelector && <label className="application-requirement-version">버전
         <select value={selected?.id ?? ''} onChange={event => selectVersion(event.target.value)} aria-label="지원서 원문 버전 선택">
-          {history.map(item => <option key={item.id} value={item.id}>{new Date(item.createdAt).toLocaleString('ko-KR')} · {sourceLabel[item.source]}</option>)}
+          {!selected && <option value="" disabled>이전 원문 선택</option>}
+          {versions.map(item => <option key={item.id} value={item.id}>{new Date(item.createdAt).toLocaleString('ko-KR')} · {sourceLabel[item.source]}</option>)}
         </select>
       </label>}
     </div>
@@ -155,7 +167,7 @@ export function ApplicationRequirementsPanel({ job }: { job: Job }) {
       id="application-requirements-text"
       value={rawText}
       onChange={event => { setRawText(event.target.value); dirtyRef.current = true; setDirty(true) }}
-      placeholder={selected?.errorMessage ? `원문을 가져오지 못했어요. 실패 사유: ${selected.errorMessage}\n\n직접 복사한 지원서 문항과 제출 안내를 붙여넣을 수 있어요.` : '공개 지원 페이지 원문이 아직 없어요. 공고 수집을 실행하면 자동으로 확인합니다. 필요하면 실제 지원 페이지에서 복사한 문항·제출 안내를 여기에 붙여넣으세요.'}
+      placeholder={latestActivity?.status === 'FAILED' && latestActivity.errorMessage ? `원문을 가져오지 못했어요. 실패 사유: ${latestActivity.errorMessage}\n\n직접 복사한 지원서 문항과 제출 안내를 붙여넣을 수 있어요.` : '공개 지원 페이지 원문이 아직 없어요. 공고 수집을 실행하면 자동으로 확인합니다. 필요하면 실제 지원 페이지에서 복사한 문항·제출 안내를 여기에 붙여넣으세요.'}
       rows={10}
       maxLength={100_000}
       disabled={loading}

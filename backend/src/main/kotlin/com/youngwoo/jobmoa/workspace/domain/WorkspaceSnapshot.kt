@@ -2,7 +2,7 @@ package com.youngwoo.jobmoa.workspace.domain
 
 /** 테이블 이름·컬럼은 서버가 정한 목록만 사용한다. SQL을 백업에서 읽어 실행하지 않는다. */
 data class SnapshotTable(val columns: List<String>, val rows: List<List<Any?>>)
-data class WorkspaceSnapshot(val format: String = "jobmoa", val version: Int = 2, val schema: Int = 15,
+data class WorkspaceSnapshot(val format: String = "jobmoa", val version: Int = 2, val schema: Int = 16,
     val exportedAt: String, val tables: Map<String, SnapshotTable>, val captures: List<String>, val careerFiles: List<String> = emptyList())
 interface WorkspaceSnapshotRepository {
     fun revision(): String

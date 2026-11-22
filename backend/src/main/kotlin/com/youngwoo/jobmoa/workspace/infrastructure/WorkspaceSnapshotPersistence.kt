@@ -45,7 +45,7 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
         SnapshotTable(columns.map { it.name }, rows)
     }
     override fun validate(snapshot: WorkspaceSnapshot) {
-        require(snapshot.format == "jobmoa" && snapshot.version in setOf(1, 2) && snapshot.schema in setOf(10, 11, 12, 13, 14, 15)) { "이 버전에서 지원하는 JobMoa 백업 파일이 아닙니다." }
+        require(snapshot.format == "jobmoa" && snapshot.version in setOf(1, 2) && snapshot.schema in setOf(10, 11, 12, 13, 14, 15, 16)) { "이 버전에서 지원하는 JobMoa 백업 파일이 아닙니다." }
         val expectedTables = when (snapshot.schema) {
             10 -> tables.filterNot { it.startsWith("career_") || it == "posting_application_requirement" }.toSet()
             11 -> tables.filterNot { it == "posting_application_requirement" || it == "career_assistant_task" }.toSet()
@@ -57,9 +57,11 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
         snapshot.tables.keys.forEach { table ->
             val data = snapshot.tables.getValue(table)
             val currentColumns = metadata(table).map { it.name }
-            val legacyApplicationColumns = currentColumns - setOf("collection_run_id", "public_page_fetched")
+            val schema13ApplicationColumns = currentColumns - setOf("collection_run_id", "public_page_fetched", "version_saved", "content_version_id")
+            val schema15ApplicationColumns = currentColumns - setOf("version_saved", "content_version_id")
             val schemaMatches = data.columns == currentColumns ||
-                (snapshot.schema == 13 && table == "posting_application_requirement" && data.columns == legacyApplicationColumns)
+                (snapshot.schema == 13 && table == "posting_application_requirement" && data.columns == schema13ApplicationColumns) ||
+                (snapshot.schema in 14..15 && table == "posting_application_requirement" && data.columns == schema15ApplicationColumns)
             require(schemaMatches) { "$table 백업 스키마가 일치하지 않습니다." }
             require(data.rows.all { row -> row.size == data.columns.size && row.all { it == null || it is String || it is Number || it is Boolean } }) { "$table 데이터 형식이 잘못되었습니다." }
         }
@@ -120,6 +122,20 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
             require(values("posting_application_requirement", "status").all { it in setOf("WAITING_PUBLIC", "FETCHING_PUBLIC", "SAVED", "WAITING_AI", "ANALYZING", "REVIEW", "CONFIRMED", "FAILED") }) { "지원서 정보 상태가 올바르지 않습니다." }
         }
         if (snapshot.schema >= 14) references("posting_application_requirement", "collection_run_id", "collection_run")
+        if (snapshot.schema >= 16) {
+            references("posting_application_requirement", "content_version_id", "posting_application_requirement")
+            val requirements = snapshot.tables.getValue("posting_application_requirement")
+            val positions = requirements.columns.withIndex().associate { it.value to it.index }
+            val rowsById = requirements.rows.associateBy { it[positions.getValue("id")].toString() }
+            requirements.rows.forEach { row ->
+                if (row[positions.getValue("version_saved")] == true) {
+                    require(row[positions.getValue("content_version_id")] == row[positions.getValue("id")]) { "지원서 원문 버전 참조가 올바르지 않습니다." }
+                }
+                val contentVersionId = row[positions.getValue("content_version_id")]?.toString() ?: return@forEach
+                val target = requireNotNull(rowsById[contentVersionId])
+                require(target[positions.getValue("version_saved")] == true && target[positions.getValue("posting_id")] == row[positions.getValue("posting_id")]) { "지원서 확인 이력이 같은 공고의 원문 버전을 참조하지 않습니다." }
+            }
+        }
         if (snapshot.schema >= 14) {
             val appRequirements = snapshot.tables.getValue("posting_application_requirement")
             val runPosition = appRequirements.columns.indexOf("collection_run_id")
@@ -148,7 +164,28 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
                 columns.forEachIndexed { index, column ->
                     val inputIndex = incomingColumns[column.name]
                     val value = if (inputIndex != null) row[inputIndex]
-                        else if (snapshot.schema == 13 && table == "posting_application_requirement" && column.name == "public_page_fetched") false
+                        else if (table == "posting_application_requirement" && column.name == "public_page_fetched") false
+                        else if (table == "posting_application_requirement" && column.name == "version_saved") {
+                            val sourceIndex = incomingColumns["source"]
+                            val statusIndex = incomingColumns["status"]
+                            val rawTextIndex = incomingColumns["raw_text"]
+                            val source = sourceIndex?.let { row[it]?.toString() }
+                            val status = statusIndex?.let { row[it]?.toString() }
+                            val rawText = rawTextIndex?.let { row[it]?.toString().orEmpty() }.orEmpty()
+                            source in setOf("PUBLIC_PAGE", "USER_PASTED") && status == "SAVED" && rawText.isNotBlank()
+                        }
+                        else if (table == "posting_application_requirement" && column.name == "content_version_id") {
+                            val versionIndex = incomingColumns["version_saved"]
+                            val sourceIndex = incomingColumns["source"]
+                            val statusIndex = incomingColumns["status"]
+                            val rawTextIndex = incomingColumns["raw_text"]
+                            val source = sourceIndex?.let { row[it]?.toString() }
+                            val status = statusIndex?.let { row[it]?.toString() }
+                            val rawText = rawTextIndex?.let { row[it]?.toString().orEmpty() }.orEmpty()
+                            val isVersion = versionIndex?.let { row[it] == true }
+                                ?: (source in setOf("PUBLIC_PAGE", "USER_PASTED") && status == "SAVED" && rawText.isNotBlank())
+                            if (isVersion) row[incomingColumns.getValue("id")] else null
+                        }
                         else null
                     when {
                         value == null -> ps.setNull(index + 1, column.type)
@@ -165,6 +202,7 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
                     WHEN source = 'POSTING_BODY' THEN 'FAILED'
                     WHEN status IN ('WAITING_PUBLIC', 'FETCHING_PUBLIC') THEN 'WAITING_PUBLIC'
                     WHEN status = 'FAILED' AND source = 'PUBLIC_PAGE' AND public_page_fetched = 0 THEN 'FAILED'
+                    WHEN source = 'PUBLIC_PAGE' AND public_page_fetched = 1 AND content_version_id IS NOT NULL THEN 'SAVED'
                     WHEN CHAR_LENGTH(TRIM(raw_text)) > 0 THEN 'SAVED'
                     ELSE 'FAILED'
                 END,
@@ -175,6 +213,7 @@ class WorkspaceSnapshotPersistence(private val jdbc: JdbcTemplate) : WorkspaceSn
                     WHEN source = 'POSTING_BODY' THEN '이전 버전에서 공고 본문을 지원서 원문으로 저장한 기록입니다. 실제 지원 페이지 원문만 사용하세요.'
                     WHEN status IN ('WAITING_PUBLIC', 'FETCHING_PUBLIC') THEN NULL
                     WHEN status = 'FAILED' AND source = 'PUBLIC_PAGE' AND public_page_fetched = 0 THEN error_message
+                    WHEN source = 'PUBLIC_PAGE' AND public_page_fetched = 1 AND content_version_id IS NOT NULL THEN NULL
                     WHEN CHAR_LENGTH(TRIM(raw_text)) > 0 THEN NULL
                     ELSE COALESCE(error_message, '저장된 지원서 원문이 없습니다.')
                 END,

@@ -34,18 +34,22 @@ open class ApplicationRequirementEntity(
     @field:Column(name = "confirmed_at") open var confirmedAt: Instant? = null,
     @field:Column(name = "collection_run_id", length = 36) open var collectionRunId: String? = null,
     @field:Column(name = "public_page_fetched", nullable = false) open var publicPageFetched: Boolean = false,
+    @field:Column(name = "version_saved", nullable = false) open var versionSaved: Boolean = false,
+    @field:Column(name = "content_version_id", length = 36) open var contentVersionId: String? = null,
 ) {
     fun domain() = ApplicationRequirement(id, postingId, RequirementSource.valueOf(source), sourceUrl, rawText,
         RequirementStatus.valueOf(status), attempts, errorMessage, leaseToken, leaseExpiresAt,
-        createdAt, updatedAt, collectionRunId, publicPageFetched)
+        createdAt, updatedAt, collectionRunId, publicPageFetched, versionSaved, contentVersionId)
 }
 
 private fun ApplicationRequirement.entity() = ApplicationRequirementEntity(id, postingId, source.name, sourceUrl, rawText,
     null, status.name, attempts, errorMessage, leaseToken, leaseExpiresAt, createdAt, updatedAt, null,
-    collectionRunId, publicPageFetched)
+    collectionRunId, publicPageFetched, versionSaved, contentVersionId)
 
 interface ApplicationRequirementJpaRepository : JpaRepository<ApplicationRequirementEntity, String> {
     fun findAllByPostingIdOrderByCreatedAtDescIdDesc(postingId: Long): List<ApplicationRequirementEntity>
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    fun findFirstByPostingIdAndVersionSavedTrueOrderByCreatedAtDescIdDesc(postingId: Long): ApplicationRequirementEntity?
     fun findFirstByCollectionRunIdAndPostingId(collectionRunId: String, postingId: Long): ApplicationRequirementEntity?
     @Query("select r.status as status, r.publicPageFetched as publicPageFetched, count(r) as total from ApplicationRequirementEntity r where r.collectionRunId = :runId group by r.status, r.publicPageFetched")
     fun collectionStatusCounts(@Param("runId") runId: String): List<ApplicationRequirementStatusCountProjection>
@@ -57,6 +61,10 @@ interface ApplicationRequirementJpaRepository : JpaRepository<ApplicationRequire
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from ApplicationRequirementEntity r where r.id = :id")
     fun lockById(@Param("id") id: String): ApplicationRequirementEntity?
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from PostingEntity p where p.id = :postingId")
+    fun lockPostingById(@Param("postingId") postingId: Long): PostingEntity?
 
     @Query(value = "SELECT * FROM posting_application_requirement WHERE status='WAITING_PUBLIC' OR (status='FETCHING_PUBLIC' AND lease_expires_at <= :now) ORDER BY created_at, id LIMIT 1 FOR UPDATE SKIP LOCKED", nativeQuery = true)
     fun nextPublicPageForUpdate(@Param("now") now: Instant): ApplicationRequirementEntity?
@@ -87,6 +95,7 @@ interface ApplicationRequirementRunSummaryProjection {
 class ApplicationRequirementPersistence(private val jpa: ApplicationRequirementJpaRepository) : ApplicationRequirementRepository {
     override fun find(id: String) = jpa.findById(id).orElse(null)?.domain()
     override fun findByPosting(postingId: Long) = jpa.findAllByPostingIdOrderByCreatedAtDescIdDesc(postingId).map { it.domain() }
+    override fun latestSavedVersionForUpdate(postingId: Long) = jpa.findFirstByPostingIdAndVersionSavedTrueOrderByCreatedAtDescIdDesc(postingId)?.domain()
     override fun findByCollectionRunAndPosting(runId: String, postingId: Long) = jpa.findFirstByCollectionRunIdAndPostingId(runId, postingId)?.domain()
     override fun countByCollectionRun(runId: String) = jpa.collectionStatusCounts(runId).map {
         ApplicationRequirementStatusCount(RequirementStatus.valueOf(it.status), it.publicPageFetched, it.total.toInt())
@@ -98,6 +107,7 @@ class ApplicationRequirementPersistence(private val jpa: ApplicationRequirementJ
         ApplicationRequirementRunSummary(it.postingId, it.sourceId, it.company, it.url, RequirementStatus.valueOf(it.status), it.publicPageFetched, it.errorMessage)
     }
     override fun lock(id: String) = jpa.lockById(id)?.domain()
+    override fun lockPosting(postingId: Long) = jpa.lockPostingById(postingId) != null
     override fun save(requirement: ApplicationRequirement) { jpa.save(requirement.entity()) }
     override fun claimPublicPage(now: Instant, lease: Duration): ApplicationRequirement? {
         val row = jpa.nextPublicPageForUpdate(now) ?: return null
