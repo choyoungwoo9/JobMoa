@@ -7,6 +7,10 @@ import { Icon } from './Icon'
 import { Modal } from './Modal'
 
 interface Preset { id: string; name: string; categoryIds: string[]; companyIds: string[] }
+const applicationPageStatusLabel: Record<NonNullable<Company['applicationPageStatus']>, string> = {
+  unchecked: '확인 전', checking: '확인 중', public: '공개 페이지 확인됨', mixed: '공고별로 다름',
+  'login-required': '로그인 필요', failed: '확인 실패', review: '재확인 필요',
+}
 export function CollectDialog({ onClose, onStart, demo, availableSources, categories, companies, initialCategoryId }: {
   onClose: () => void
   onStart: (ids: SourceId[], failure: FailureStage | null, categoryId: string, companyIds: string[], categoryIds?: string[]) => void
@@ -87,6 +91,9 @@ export function CollectDialog({ onClose, onStart, demo, availableSources, catego
                     {members.map(company => (
                       <label key={company.id} className={selected.includes(company.id) ? 'selected' : ''}>
                         <input type="checkbox" checked={selected.includes(company.id)} onChange={() => toggle([company.id])} /><span>{company.name}</span>
+                        {!demo && <small className={`company-application-status ${company.applicationPageStatus ?? 'unchecked'}`} title={company.applicationPageNote ?? '지원 페이지 상태를 아직 확인하지 않았어요.'}>
+                          {applicationPageStatusLabel[company.applicationPageStatus ?? 'unchecked']}<Icon name="info" size={11} />
+                        </small>}
                       </label>
                     ))}
                   </div>

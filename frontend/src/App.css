@@ -1068,6 +1068,9 @@ tbody > tr:hover {
   margin-left: auto;
   font-size: 9px;
 }
+.live-application-progress { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; padding: 0 17px 13px; color: #81916f; font-size: 9px; }
+.live-application-progress strong { color: #5d7445; font-size: 10px; }
+.live-application-progress small { color: #98a28e; font-size: 8px; }
 .live-source-list {
   display: flex;
   gap: 9px;
@@ -3288,6 +3291,19 @@ dialog::backdrop {
 .collection-progress { margin: 8px 0 20px; }
 .collection-progress > div { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; font-size: 12px; color: #77836c; margin-bottom: 8px; }
 .collection-progress progress { width: 100%; height: 8px; accent-color: #6b884c; }
+.application-page-progress { padding-top: 9px; border-top: 1px solid #edf0e8; }
+.application-page-progress > p,.application-page-progress > small { color: #8f9985; font-size: 10px; }
+.application-page-progress > small { display: block; margin-top: 6px; }
+.application-company-results { margin: -7px 0 18px; }
+.application-company-results > strong { display: block; margin-bottom: 8px; color: #75836a; font-size: 11px; }
+.application-company-results > div { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 7px; }
+.application-company-results article { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 4px 8px; padding: 9px 10px; border: 1px solid #e9ede3; border-radius: 7px; background: #fff; }
+.application-company-results article > span { color: #536047; font-size: 10px; }
+.application-company-results article > b { color: #75836a; font-size: 9px; font-weight: 550; }
+.application-company-results article > small { grid-column: 1 / -1; color: #99a18f; font-size: 8px; }
+.application-company-results .status-success > b { color: #588044; }
+.application-company-results .status-login-required > b,.application-company-results .status-failed > b { color: #a6544c; }
+.application-company-results .status-partial > b { color: #9a7b44; }
 .source-choice:has(input:disabled) { opacity: .45; cursor: default; }
 
 .category-tabs { display: flex; gap: 6px; margin: 0 0 20px; padding: 4px; width: fit-content; max-width: 100%; border: 1px solid #e4ebdc; border-radius: 10px; background: #f1f5eb; }
@@ -3314,6 +3330,11 @@ dialog::backdrop {
 .company-members { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 0 12px 12px; }
 .company-members label { display: flex; align-items: center; gap: 7px; padding: 9px; font-size: 11px; line-height: 1.4; border-radius: 5px; cursor: pointer; background: #f8faf4; }
 .company-members label.selected { color: #4f6f37; background: #f0f6e8; }
+.company-application-status { display: inline-flex; align-items: center; gap: 3px; margin-left: auto; color: #88927e; font-size: 8px; white-space: nowrap; }
+.company-application-status.public { color: #5d8547; }
+.company-application-status.login-required,.company-application-status.failed { color: #a6544c; }
+.company-application-status.mixed,.company-application-status.review { color: #9a7b44; }
+.company-application-status svg { flex: 0 0 auto; }
 .company-empty { padding: 24px 10px; text-align: center; font-size: 12px; color: #8a9c77; }
 .job-category { border-radius: 3px; padding: 1px 5px; font-size: 9px; color: #779453; background: #edf5e3; }
 @media (max-width: 550px) {
@@ -3620,6 +3641,16 @@ dialog::backdrop {
 .application-requirements-heading h3 { color: #47583e; font-size: 13px; }
 .application-requirements-heading p,.application-requirements-note,.application-requirements-empty { margin-top: 4px; color: #89947d; font-size: 10px; line-height: 1.7; }
 .application-requirements-heading > span { color: #82926e; white-space: nowrap; }
+.application-company-page-status { margin: 10px 0 14px; padding: 10px 12px; border: 1px solid #e6eadf; border-radius: 7px; background: #fff; }
+.application-company-page-status > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.application-company-page-status strong { color: #5b684f; font-size: 10px; }
+.application-company-page-status > div span { padding: 3px 7px; border-radius: 999px; background: #f1f3ec; color: #74816b; font-size: 9px; white-space: nowrap; }
+.application-company-page-status.fetched > div span { background: #edf5e7; color: #54713e; }
+.application-company-page-status.login > div span,.application-company-page-status.failed > div span { background: #fff0ed; color: #a6544c; }
+.application-company-page-status.pending > div span { background: #eef3f8; color: #58718c; }
+.application-company-page-status p { margin-top: 5px; color: #7f8876; font-size: 9px; line-height: 1.6; }
+.application-company-page-status small { display: flex; align-items: flex-start; gap: 4px; margin-top: 6px; color: #9aa28f; font-size: 8px; line-height: 1.5; }
+.application-company-page-status small svg { flex: 0 0 auto; margin-top: 1px; }
 .application-requirements-input-label { display: block; margin-bottom: 6px; color: #63744f; font-weight: 600; }
 .application-requirements textarea { width: 100%; min-height: 110px; resize: vertical; border: 1px solid #dfe7d7; border-radius: 7px; padding: 10px; color: #485242; background: #fff; font: inherit; line-height: 1.7; }
 .application-requirements textarea:focus { outline: 2px solid #c6d8b7; outline-offset: 1px; }
@@ -3627,9 +3658,9 @@ dialog::backdrop {
 .application-secondary-actions { justify-content: flex-start; flex-wrap: wrap; margin-top: 9px; }
 .application-requirements-actions > span,.application-requirement-card time { color: #97a08e; font-size: 9px; }
 .application-requirements-actions .button,.application-requirement-card .button { height: 34px; padding: 0 12px; font-size: 10px; }
-.application-body-analysis { margin-top: 9px; padding: 0; color: #63804b; font-size: 10px; }
 .application-requirements-note { margin: 8px 0; }
 .application-requirements-error { margin: 8px 0; color: #aa5148; font-size: 10px; line-height: 1.6; }
+.application-requirements-warning { margin: 8px 0; padding: 8px 10px; border-radius: 6px; background: #fff8e9; color: #927847; font-size: 9px; line-height: 1.6; }
 .application-requirements-list { display: grid; gap: 9px; margin-top: 12px; }
 .application-requirement-card { padding: 11px; border: 1px solid #e7ebdf; border-radius: 7px; background: #fff; }
 .application-requirement-card > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 9px; }

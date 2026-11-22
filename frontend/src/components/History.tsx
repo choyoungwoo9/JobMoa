@@ -12,6 +12,11 @@ import type { CollectionRun, Company, Category } from '../types'
 import { BrandMark } from './BrandMark'
 import { Icon } from './Icon'
 
+const applicationCompanyStatusLabel: Record<string, string> = {
+  running: '확인 중', success: '공개 확인 완료', partial: '일부 확인',
+  'login-required': '로그인 필요', failed: '공개 경로 확인 실패', waiting: '대기',
+}
+
 export function RunCard({
   run,
   expanded,
@@ -112,6 +117,19 @@ export function RunCard({
             <div><strong>{run.progress.discoveryFinished ? '공고 처리' : '공고 목록 탐색 중'}</strong><span>{run.progress.completed + run.progress.failed} / {run.progress.total}개 · 처리 중 {run.progress.processing} · 대기 {run.progress.pending}</span></div>
             <progress aria-label="전체 수집 진행률" max={100} value={run.progress.percent ?? undefined} />
           </div>}
+          {run.applicationProgress && (run.applicationProgress.total > 0 || !run.finishedAt) && <div className="collection-progress application-page-progress">
+            <div><strong>지원 페이지 확인</strong><span>{run.applicationProgress.fetched + run.applicationProgress.failed} / {run.applicationProgress.total}개 · 페이지 저장 {run.applicationProgress.fetched} · 확인 실패 {run.applicationProgress.failed} · 대기 {run.applicationProgress.pending} · 진행 중 {run.applicationProgress.processing}</span></div>
+            {run.applicationProgress.total > 0 ? <progress aria-label="지원 페이지 확인 진행률" max={run.applicationProgress.total} value={run.applicationProgress.fetched + run.applicationProgress.failed} /> : <p>공고가 저장되는 대로 지원 페이지 확인을 시작해요.</p>}
+            {(run.applicationProgress.analysisPending > 0 || run.applicationProgress.analysisFailed > 0) && <small>AI 정리 대기·진행 {run.applicationProgress.analysisPending} · AI 분석 실패 {run.applicationProgress.analysisFailed}</small>}
+          </div>}
+          {!!run.applicationResults?.length && <section className="application-company-results" aria-label="회사별 지원 페이지 확인 결과">
+            <strong>회사별 지원 페이지 확인</strong>
+            <div>{run.applicationResults.map(result => <article key={result.companyId} className={`status-${result.status}`}>
+              <span>{result.company}</span>
+              <b>{applicationCompanyStatusLabel[result.status] ?? '확인 상태 미상'}</b>
+              <small>페이지 저장 {result.fetched}/{result.total} · 로그인 필요 {result.loginRequired} · 실패 {result.failed}{result.analysisPending ? ` · AI 정리 대기 ${result.analysisPending}` : ''}{result.analysisFailed ? ` · AI 분석 실패 ${result.analysisFailed}` : ''}</small>
+            </article>)}</div>
+          </section>}
           <div className="table-scroll">
             <table className="results-table">
               <thead>
