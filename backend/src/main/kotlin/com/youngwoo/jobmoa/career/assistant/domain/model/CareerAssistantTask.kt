@@ -48,11 +48,21 @@ data class CareerPortfolioProjectProposal(
     val selectionReason: String,
     val summary: String,
     val verifiedFactIds: List<String> = emptyList(),
+    val role: String? = null,
+    val period: String? = null,
+    val technologies: List<String> = emptyList(),
+    val problem: String? = null,
+    val contributions: List<String> = emptyList(),
+    val outcome: String? = null,
 )
 
 data class CareerPostingDraftProposal(
     val resumeHeadline: String,
     val resumeSummary: String,
+    val candidateName: String? = null,
+    val contactEmail: String? = null,
+    val contactPhone: String? = null,
+    val contactLinks: List<String> = emptyList(),
     val resumeHeadlineFactIds: List<String> = emptyList(),
     val resumeSummaryFactIds: List<String> = emptyList(),
     val resumeSections: List<CareerDraftSectionProposal> = emptyList(),

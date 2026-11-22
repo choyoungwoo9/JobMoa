@@ -56,6 +56,10 @@ class ApplicationPreparationController(
     fun generateMaterials(@PathVariable applicationId: String): ResponseEntity<ApplicationAiTaskView> =
         ResponseEntity.status(HttpStatus.ACCEPTED).body(service.generateMaterials(applicationId))
 
+    @PostMapping("/api/applications/{applicationId}/materials/regenerate")
+    fun regenerateMaterials(@PathVariable applicationId: String): ResponseEntity<ApplicationAiTaskView> =
+        ResponseEntity.status(HttpStatus.ACCEPTED).body(service.regenerateMaterials(applicationId))
+
     @PutMapping("/api/applications/{applicationId}/materials")
     fun saveMaterials(@PathVariable applicationId: String, @RequestBody request: SaveApplicationMaterialsRequest) =
         service.saveMaterials(applicationId, request)

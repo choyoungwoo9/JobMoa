@@ -181,8 +181,17 @@ class ApplicationPreparationService(
 
     @Transactional
     fun generateMaterials(applicationId: String): ApplicationAiTaskView {
+        return enqueueMaterialsDraft(applicationId, allowExisting = false)
+    }
+
+    @Transactional
+    fun regenerateMaterials(applicationId: String): ApplicationAiTaskView {
+        return enqueueMaterialsDraft(applicationId, allowExisting = true)
+    }
+
+    private fun enqueueMaterialsDraft(applicationId: String, allowExisting: Boolean): ApplicationAiTaskView {
         val app = requireCase(applicationId)
-        repository.draft(applicationId)?.let { throw IllegalArgumentException("이 공고의 맞춤 자료 초안이 이미 있습니다. 저장된 초안을 편집하세요.") }
+        if (!allowExisting) repository.draft(applicationId)?.let { throw IllegalArgumentException("이 공고의 맞춤 자료 초안이 이미 있습니다. 저장된 초안을 편집하세요.") }
         activeTask(applicationId, ApplicationAiTaskType.MATERIAL_DRAFT)?.let { return taskView(it)!! }
         val posting = postings.find(app.postingId) ?: throw ResourceNotFound("공고를 찾을 수 없습니다.")
         val body = postings.latestVersion(app.postingId)?.bodyText.orEmpty()
@@ -208,6 +217,7 @@ class ApplicationPreparationService(
         val sections = base["resumeSections"]?.takeIf { it.isArray }?.associateBy { it["id"].asString() }.orEmpty()
         val projects = base["portfolioProjects"]?.takeIf { it.isArray }?.associateBy { it["id"].asString() }.orEmpty()
         require(request.resumeHeadline.length <= 500 && request.resumeSummary.length <= 3000) { "이력서 소개·요약이 허용 길이를 넘었습니다." }
+        require(request.candidateName.length <= 100 && request.contactEmail.length <= 320 && request.contactPhone.length <= 100 && request.contactLinks.size <= 8) { "문서 기본 정보가 허용 길이를 넘었습니다." }
         require(request.resumeSections.size <= 10 && request.portfolioProjects.size <= 8) { "이력서 또는 포트폴리오 항목이 너무 많습니다." }
         val updatedSections = request.resumeSections.map { edit ->
             val source = sections[edit.id] ?: throw IllegalArgumentException("초안에 없는 이력서 항목입니다.")
@@ -221,14 +231,19 @@ class ApplicationPreparationService(
         val updatedProjects = request.portfolioProjects.map { edit ->
             val source = projects[edit.id] ?: throw IllegalArgumentException("초안에 없는 포트폴리오 항목입니다.")
             require(edit.title.isNotBlank() && edit.title.length <= 200 && edit.summary.isNotBlank() && edit.summary.length <= 3000) { "프로젝트 제목은 200자, 요약은 3,000자까지 입력하세요." }
-            mapper.createObjectNode().apply {
-                put("id", edit.id); put("title", edit.title.trim()); put("selectionReason", edit.selectionReason.trim().take(1000))
+            (source.deepCopy() as ObjectNode).apply {
+                put("title", edit.title.trim()); put("selectionReason", edit.selectionReason.trim().take(1000))
                 put("summary", edit.summary.trim()); put("included", edit.included); put("order", edit.order.coerceIn(0, 99))
-                set("factIds", source["factIds"]); set("evidence", source["evidence"])
+                put("role", edit.role?.trim().orEmpty().take(300)); put("period", edit.period?.trim().orEmpty().take(200))
+                put("problem", edit.problem?.trim().orEmpty().take(3000)); put("outcome", edit.outcome?.trim().orEmpty().take(3000))
+                set("technologies", mapper.valueToTree(edit.technologies.map(String::trim).filter(String::isNotBlank).distinct().take(12).map { it.take(80) }))
+                set("contributions", mapper.valueToTree(edit.contributions.map(String::trim).filter(String::isNotBlank).distinct().take(8).map { it.take(1500) }))
             }
         }.sortedBy { it["order"].asInt() }
         val saved = (base.deepCopy() as ObjectNode).apply {
             put("resumeHeadline", request.resumeHeadline.trim()); put("resumeSummary", request.resumeSummary.trim())
+            put("candidateName", request.candidateName.trim()); put("contactEmail", request.contactEmail.trim()); put("contactPhone", request.contactPhone.trim())
+            set("contactLinks", mapper.valueToTree(request.contactLinks.map(String::trim).filter(String::isNotBlank).distinct().take(8).map { it.take(500) }))
             set("resumeSections", mapper.valueToTree(updatedSections)); set("portfolioProjects", mapper.valueToTree(updatedProjects))
             put("editedByUser", true)
         }
@@ -440,6 +455,10 @@ class ApplicationPreparationService(
         result.set("posting", request["posting"])
         result.put("resumeHeadline", proposal.resumeHeadline.trim().take(500))
         result.put("resumeSummary", proposal.resumeSummary.trim().take(3000))
+        result.put("candidateName", proposal.candidateName?.trim().orEmpty().take(100))
+        result.put("contactEmail", proposal.contactEmail?.trim().orEmpty().take(320))
+        result.put("contactPhone", proposal.contactPhone?.trim().orEmpty().take(100))
+        result.set("contactLinks", mapper.valueToTree(proposal.contactLinks.map(String::trim).filter(String::isNotBlank).distinct().take(8).map { it.take(500) }))
         result.set("resumeHeadlineFactIds", mapper.valueToTree(headingFactIds))
         result.set("resumeSummaryFactIds", mapper.valueToTree(summaryFactIds))
         result.set("resumeHeadlineEvidence", mapper.valueToTree(evidence(headingFactIds)))
@@ -458,6 +477,12 @@ class ApplicationPreparationService(
             mapper.createObjectNode().apply {
                 put("id", "project-${index + 1}"); put("title", item.title.trim().take(200)); put("selectionReason", item.selectionReason.trim().take(1000))
                 put("summary", item.summary.trim().take(3000)); put("included", true); put("order", index)
+                item.role?.trim()?.takeIf(String::isNotBlank)?.let { put("role", it.take(300)) }
+                item.period?.trim()?.takeIf(String::isNotBlank)?.let { put("period", it.take(200)) }
+                set("technologies", mapper.valueToTree(item.technologies.map(String::trim).filter(String::isNotBlank).distinct().take(12).map { it.take(80) }))
+                item.problem?.trim()?.takeIf(String::isNotBlank)?.let { put("problem", it.take(3000)) }
+                set("contributions", mapper.valueToTree(item.contributions.map(String::trim).filter(String::isNotBlank).distinct().take(8).map { it.take(1500) }))
+                item.outcome?.trim()?.takeIf(String::isNotBlank)?.let { put("outcome", it.take(3000)) }
                 set("factIds", mapper.valueToTree(ids)); set("evidence", mapper.valueToTree(evidence(ids)))
             }
         }
@@ -471,7 +496,21 @@ class ApplicationPreparationService(
         result.put("hasUnlinkedContent", hasUnlinkedContent)
         result.set("informationGaps", mapper.valueToTree(gaps.distinct().take(12)))
         val now = Instant.now()
-        repository.saveDraft(ApplicationMaterialsDraft(task.applicationId, task.id, mapper.writeValueAsString(result), 1, now, now))
+        val previous = repository.draft(task.applicationId)
+        if (previous != null) {
+            val previousVersions = mapper.createArrayNode()
+            val previousDraft = mapper.readTree(previous.draftJson) as? ObjectNode
+            listOf("candidateName", "contactEmail", "contactPhone").forEach { field ->
+                previousDraft?.get(field)?.asString()?.takeIf(String::isNotBlank)?.let { result.put(field, it) }
+            }
+            previousDraft?.get("contactLinks")?.takeIf { it.isArray && it.size() > 0 }?.let { result.set("contactLinks", it.deepCopy()) }
+            previousDraft?.remove("previousVersions")
+            previousVersions.add(mapper.createObjectNode().put("version", previous.version).set("draft", previousDraft ?: mapper.createObjectNode()))
+            mapper.readTree(previous.draftJson)["previousVersions"]?.takeIf { it.isArray }?.values()?.take(4)?.forEach(previousVersions::add)
+            result.set("previousVersions", previousVersions)
+        }
+        repository.saveDraft(ApplicationMaterialsDraft(task.applicationId, task.id, mapper.writeValueAsString(result),
+            (previous?.version ?: 0) + 1, previous?.createdAt ?: now, now))
         return result
     }
 
@@ -735,8 +774,13 @@ data class ApplicationAiFailureRequest(val leaseToken: String, val message: Stri
 data class ApplicationAiTaskViewEnvelope(val task: ApplicationAiTaskView)
 data class SaveApplicationMaterialsRequest(
     val resumeHeadline: String, val resumeSummary: String, val resumeSections: List<ApplicationResumeSectionEdit>, val portfolioProjects: List<ApplicationPortfolioProjectEdit>,
+    val candidateName: String = "", val contactEmail: String = "", val contactPhone: String = "", val contactLinks: List<String> = emptyList(),
 )
 data class ApplicationResumeSectionEdit(val id: String, val heading: String, val content: String, val included: Boolean, val order: Int)
-data class ApplicationPortfolioProjectEdit(val id: String, val title: String, val selectionReason: String, val summary: String, val included: Boolean, val order: Int)
+data class ApplicationPortfolioProjectEdit(
+    val id: String, val title: String, val selectionReason: String, val summary: String, val included: Boolean, val order: Int,
+    val role: String? = null, val period: String? = null, val technologies: List<String> = emptyList(), val problem: String? = null,
+    val contributions: List<String> = emptyList(), val outcome: String? = null,
+)
 data class ApplicationInterviewAnswerRequest(val answer: String)
 data class PromoteInterviewExperienceRequest(val title: String, val summary: String)

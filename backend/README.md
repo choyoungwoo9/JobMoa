@@ -164,7 +164,7 @@ V18은 `application_case`, `application_question`, `application_material_draft`,
 | `GET /api/applications/{applicationId}` | 지원 건·원문·문항·자료·최근 작업·면접 세션 조회 |
 | `PATCH /api/applications/{applicationId}/status` | `PREPARING`·`APPLIED` 상태 변경. `APPLIED` 최초 전환 시각은 서버가 기록 |
 | `/api/applications/{applicationId}/questions/**` | 원문에서 문항 추출 요청, 수동 CRUD, 문항별 답변 생성·저장 |
-| `/api/applications/{applicationId}/materials/**` | 맞춤 이력서·포트폴리오 생성 및 수정·저장 |
+| `/api/applications/{applicationId}/materials/**` | 맞춤 이력서·포트폴리오 생성·재구성·수정·저장 |
 | `/api/applications/{applicationId}/interview/**` | 공개 면접 조사, 질문 기반 경험 인터뷰·꼬리 질문·승인된 경력 후보 저장 |
 | `/api/applications/{applicationId}/tasks/{taskId}` | 저장된 작업 진행·결과 조회 및 실패 작업 재시도 |
 | `/api/applications/worker/tasks/**` | 지원 준비 큐의 claim·lease·진행 상태·완료·실패 보고 |
@@ -172,6 +172,8 @@ V18은 `application_case`, `application_question`, `application_material_draft`,
 AI 생성 요청은 DB 작업을 만들고 `202 Accepted`와 작업 ID를 즉시 반환한다. 작업 유형은 지원서 문항 추출, 문항별 답변, 맞춤 자료, 면접 조사, 경험 인터뷰 꼬리 질문이다. 작업은 `WAITING_AI`·`ANALYZING`·`COMPLETED`·`FAILED` 상태로 보관하며 워커가 없어도 대기한다. `AiWorkerMain`은 지원 준비 큐를 AI 질문·경력 자료·추천/초안 큐와 순환해 claim한다. UI는 작업 상태를 조회하고 재진입 때 최근 작업에서 대기 상태를 복원한다.
 
 맞춤 자료·문항 답변·면접 조사·경험 인터뷰는 `REJECTED`가 아닌 경력 사실 중 공고/문항 관련도가 높은 항목을 먼저 선별해 최대 80개 전달한다. 원문 인용 ID가 입력 사실 집합에 있으면 evidence로 연결하고, ID가 없거나 무효여도 초안 문안은 저장하며 UI가 원문 대조 필요를 표시한다. 문항 답변은 글자 수 제한을 넘으면 저장하지 않는다. 공개 면접 조사는 `gpt-6-luna`와 live web search를 사용하며 공식 사실·복수 후기에서 반복된 경향·개별 후기·공고 추론을 구조화한다. URL은 HTTP(S) 공개 주소만 허용하고, 반복 경향에는 서로 다른 후기 URL 2개 이상을 요구한다. 지원서 원문·공고·사용자 경력 파일 안의 지시문은 분석 데이터로 취급한다. Codex는 지원 상태 변경이나 실제 지원 제출을 하지 않는다.
+
+맞춤 자료 재구성은 `POST /api/applications/{applicationId}/materials/regenerate`로 요청한다. 기존 자료가 있어도 비동기 작업을 만들며 완료 시 새 초안 버전을 저장하고, 이전 생성본 최대 5개를 `draftJson.previousVersions`에 포함한다. 편집 저장은 이름·연락처·개인 링크와 이력서 항목, 프로젝트별 역할·기간·기술·문제·기여·결과를 보존한다. PDF 파일 생성·보관 API는 두지 않으며, 브라우저 미리보기 HTML을 인쇄해 사용자 기기에 저장한다. 근거와 정보 공백은 JSON 초안과 편집 화면에만 보이고 인쇄 문서에는 포함하지 않는다.
 
 2026-11-22 메인 데이터 검증: 수집과 지원 페이지 확인 큐가 모두 종료된 뒤 Docker 앱을 재빌드·재시작했다. 이전에 `근거가 연결된 이력서 초안을 만들지 못했습니다`로 실패했던 토스 서버 개발자 지원 자료 작업을 `gpt-6-luna`로 재시도해 완료했고, 이력서 제목·요약·섹션 1개와 포트폴리오 프로젝트 2개가 초안 버전 1로 저장되는 것을 확인했다. 이번 결과는 근거 ID가 모두 비어 있었지만 본문이 보존됐고 `hasUnlinkedContent=true`와 원문 대조 안내가 저장됐다. 전달된 경력 자료에 테스트용 가상 정보 안내가 있어 AI가 실제 수행 여부·기술·역할 확인을 요청했고, 수치 성과를 임의로 넣지 않았다. 로컬 AI 워커 PID와 `/api/ai/status`의 새 `workerId` heartbeat 일치, 기존 DB/캡처 볼륨 보존도 확인했다. 당시 해당 지원 건에 문항이 없어 미작성 답변 전체 생성은 UI 빌드만 확인했고 AI 요청은 하지 않았다. 80개 초과 경력 사실의 선별은 이번 실제 데이터에서 발생하지 않았다.
 
