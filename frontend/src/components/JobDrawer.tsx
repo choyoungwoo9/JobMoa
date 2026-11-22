@@ -44,6 +44,8 @@ export function JobDrawer({
   onPrevious,
   onNext,
   demo = false,
+  applicationStatus,
+  onStartApplication,
 }: {
   job: Job
   categories: Category[]
@@ -56,6 +58,8 @@ export function JobDrawer({
   onPrevious: () => void
   onNext: () => void
   demo?: boolean
+  applicationStatus?: 'PREPARING' | 'APPLIED'
+  onStartApplication?: (postingId: string) => void
 }) {
   const [tab, setTab] = useState<'capture' | 'text' | 'diff' | 'application'>('capture')
   const [versionId, setVersionId] = useState(job.versions[0].id)
@@ -214,6 +218,10 @@ export function JobDrawer({
           </details> : <p>아직 자동 분류를 실행하지 않은 공고예요.</p>}
         </section>
         <div className="drawer-actions">
+          {!demo && onStartApplication && <button className="button primary" onClick={() => onStartApplication(job.id)}>
+            <Icon name="file" size={16} />
+            {applicationStatus === 'APPLIED' ? '지원 준비 열기 · 지원 완료' : applicationStatus === 'PREPARING' ? '지원 준비 이어하기' : '지원 준비 시작'}
+          </button>}
           <button
             className={`button ${job.read ? 'read-button' : 'secondary'}`}
             onClick={onToggleRead}

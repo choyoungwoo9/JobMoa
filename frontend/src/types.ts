@@ -58,7 +58,7 @@ export interface PostingInterest {
   appliedOn: string | null
   updatedAt?: string | null
 }
-export type InterestManagement = Pick<PostingInterest, 'note' | 'priority' | 'applicationStatus' | 'appliedOn'>
+export type InterestManagement = Pick<PostingInterest, 'note' | 'priority'>
 export interface Job {
   interest?: PostingInterest
   companyId?: string

@@ -1,9 +1,9 @@
 import type { SourceId } from './types'
 
-export type WorkspaceView = 'jobs' | 'history' | 'statistics' | 'interests' | 'ai' | 'career' | 'my'
+export type WorkspaceView = 'jobs' | 'history' | 'statistics' | 'interests' | 'applications' | 'ai' | 'career' | 'my'
 export type CareerTab = 'materials' | 'assistant'
 export type JobListTab = 'all' | 'unread' | 'new'
-export type InterestStatusTab = 'all' | 'BEFORE_APPLY' | 'APPLIED'
+export type InterestStatusTab = 'all' | 'not_started' | 'PREPARING' | 'BEFORE_APPLY' | 'APPLIED'
 
 export interface InterestNavigationSnapshot {
   tab: InterestStatusTab
@@ -35,6 +35,7 @@ export interface AppNavigationSnapshot {
   collectOpen: boolean
   modal: string | null
   selectedJob: string | null
+  applicationId?: string | null
   browseQueue: string[]
   expandedRuns: string[]
   scrollY: number
@@ -63,6 +64,7 @@ export function emptyNavigationSnapshot(): AppNavigationSnapshot {
     collectOpen: false,
     modal: null,
     selectedJob: null,
+    applicationId: null,
     browseQueue: [],
     expandedRuns: [],
     scrollY: 0,

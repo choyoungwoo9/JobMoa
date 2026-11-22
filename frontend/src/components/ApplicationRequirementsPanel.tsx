@@ -26,7 +26,7 @@ const sourceLabel: Record<RequirementSource, string> = {
   PUBLIC_PAGE: '자동 확인한 지원 페이지',
 }
 
-export function ApplicationRequirementsPanel({ job }: { job: Job }) {
+export function ApplicationRequirementsPanel({ job, onSaved }: { job: Job; onSaved?: () => void }) {
   const [items, setItems] = useState<Requirement[]>([])
   const [selectedId, setSelectedId] = useState('')
   const [rawText, setRawText] = useState('')
@@ -106,6 +106,7 @@ export function ApplicationRequirementsPanel({ job }: { job: Job }) {
       setRawText('')
       setDirty(false)
       await refresh()
+      onSaved?.()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '새 원문 버전을 저장하지 못했어요.')
     } finally {

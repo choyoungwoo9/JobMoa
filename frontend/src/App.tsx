@@ -17,6 +17,8 @@ import { AiChat } from './components/AiChat'
 import { PostingMockGallery } from './components/PostingMockGallery'
 import { CategoryPicker } from './components/CategoryPicker'
 import { CareerMaterials } from './components/CareerMaterials'
+import { ApplicationWorkspace } from './components/ApplicationWorkspace'
+import { api } from './api'
 import { emptyNavigationSnapshot, readNavigationSnapshot, writeNavigationSnapshot, type AppNavigationSnapshot, type WorkspaceView } from './navigation'
 import './App.css'
 
@@ -49,11 +51,25 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
   const [includeClosed, setIncludeClosed] = useState(initialNavigation.includeClosed)
   const [collectOpen, setCollectOpen] = useState(initialNavigation.collectOpen)
   const [selectedJob, setSelectedJob] = useState<string | null>(initialNavigation.selectedJob)
+  const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(initialNavigation.applicationId ?? null)
+  const [applicationStatuses, setApplicationStatuses] = useState<Record<string, { status: 'PREPARING' | 'APPLIED'; appliedAt: string | null }>>({})
+  const updateApplicationCases = useCallback((items: { postingId: number; status: 'PREPARING' | 'APPLIED'; appliedAt: string | null }[]) => {
+    setApplicationStatuses(Object.fromEntries(items.map(item => [String(item.postingId), { status: item.status, appliedAt: item.appliedAt }])))
+  }, [])
   const [browseQueue, setBrowseQueue] = useState<string[]>(initialNavigation.browseQueue)
   const [expandedRuns, setExpandedRuns] = useState<string[]>(restoredNavigation?.expandedRuns ?? [data.runs[0]?.id].filter((id): id is string => !!id))
   const pendingScrollRestore = useRef<{ y: number; tableTop: number; tableLeft: number } | null>(restoredNavigation ? { y: restoredNavigation.scrollY, tableTop: restoredNavigation.tableScrollTop, tableLeft: restoredNavigation.tableScrollLeft } : null)
   const latestRun = data.runs[0]
   const latest = latestRun ? summarize(latestRun) : null
+  useEffect(() => {
+    if (demo) { setApplicationStatuses({}); return }
+    let alive = true
+    const refresh = () => void api<{ postingId: number; status: 'PREPARING' | 'APPLIED'; appliedAt: string | null }[]>('/api/applications/statuses')
+      .then(items => { if (alive) updateApplicationCases(items) }).catch(() => undefined)
+    refresh()
+    const timer = window.setInterval(refresh, 15000)
+    return () => { alive = false; window.clearInterval(timer) }
+  }, [demo, updateApplicationCases])
   const captureNavigation = useCallback((): AppNavigationSnapshot => {
     const savedNavigation = readNavigationSnapshot()
     const savedInterest = savedNavigation?.interest
@@ -75,6 +91,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
       collectOpen,
       modal: savedNavigation?.modal ?? null,
       selectedJob,
+      applicationId: selectedApplicationId,
       browseQueue,
       expandedRuns,
       scrollY: window.scrollY,
@@ -82,7 +99,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
       tableScrollLeft: table?.scrollLeft ?? 0,
       ...(savedInterest ? { interest: savedInterest } : {}),
     }
-  }, [view, careerTab, changeScope, categoryId, source, companyFilter, tab, query, sort, page, pageSize, includeClosed, collectOpen, selectedJob, browseQueue, expandedRuns])
+  }, [view, careerTab, changeScope, categoryId, source, companyFilter, tab, query, sort, page, pageSize, includeClosed, collectOpen, selectedJob, selectedApplicationId, browseQueue, expandedRuns])
   const applyNavigation = useCallback((navigation: AppNavigationSnapshot) => {
     setView(navigation.view)
     setCareerTab(navigation.careerTab ?? 'materials')
@@ -98,6 +115,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
     setIncludeClosed(navigation.includeClosed)
     setCollectOpen(navigation.collectOpen)
     setSelectedJob(navigation.selectedJob)
+    setSelectedApplicationId(navigation.applicationId ?? null)
     setBrowseQueue(navigation.browseQueue)
     setExpandedRuns(navigation.expandedRuns)
     pendingScrollRestore.current = { y: navigation.scrollY, tableTop: navigation.tableScrollTop, tableLeft: navigation.tableScrollLeft }
@@ -281,6 +299,16 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
     navigateApp({ view: 'jobs', changeScope: null, categoryId: 'all', source: 'all', companyFilter: null, tab: 'all', query: '', includeClosed: true, page: 1, browseQueue: [id], selectedJob: id, scrollY: 0, tableScrollTop: 0, tableScrollLeft: 0 })
   }
 
+  const startApplication = async (postingId: string) => {
+    if (demo) return
+    try {
+      const application = await api<{ id: string }>(`/api/postings/${postingId}/application-case`, { method: 'POST' })
+      setSelectedApplicationId(application.id)
+      navigateApp({ view: 'applications', applicationId: application.id, selectedJob: null, scrollY: 0, tableScrollTop: 0, tableScrollLeft: 0 })
+    } catch (cause) {
+      window.alert(cause instanceof Error ? cause.message : '지원 준비를 시작하지 못했어요.')
+    }
+  }
   return (
     <div
       className={`app-shell ${view === 'jobs' && activeJob ? 'reading-mode' : ''}`}
@@ -309,6 +337,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
             <span className="nav-count">{available.length}</span>
           </button>
           <button className={view === 'interests' ? 'active' : ''} onClick={() => navigateApp({ view: 'interests', selectedJob: null, scrollY: 0, tableScrollTop: 0, tableScrollLeft: 0 })}><Icon name="star" size={18} /><span>관심 공고</span><span className="nav-count">{data.jobs.filter(job => interestOf(job).starred).length}</span></button>
+          <button className={view === 'applications' ? 'active' : ''} onClick={() => navigateApp({ view: 'applications', selectedJob: null, scrollY: 0, tableScrollTop: 0, tableScrollLeft: 0 })}><Icon name="file" size={18} /><span>지원 준비</span><span className="nav-count">{Object.keys(applicationStatuses).length}</span></button>
           <button
             className={view === 'history' ? 'active' : ''}
             onClick={() => navigateApp({ view: 'history', selectedJob: null, scrollY: 0, tableScrollTop: 0, tableScrollLeft: 0 })}
@@ -379,7 +408,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
             <Icon name="layers" size={16} />
             <span>내 워크스페이스</span>
             <Icon name="chevron" size={12} />
-            <strong>{view === 'jobs' ? '공고 모아보기' : view === 'my' ? '마이페이지' : view === 'interests' ? '관심 공고' : view === 'statistics' ? '채용 통계' : view === 'ai' ? 'AI에게 질문' : view === 'career' ? '경력 자료' : '수집 기록'}</strong>
+            <strong>{view === 'jobs' ? '공고 모아보기' : view === 'my' ? '마이페이지' : view === 'interests' ? '관심 공고' : view === 'applications' ? '지원 준비' : view === 'statistics' ? '채용 통계' : view === 'ai' ? 'AI에게 질문' : view === 'career' ? '경력 자료' : '수집 기록'}</strong>
           </div>
           <div className="topbar-right">
             <span className="preview-badge">
@@ -403,10 +432,10 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
                   ? source === 'all'
                     ? categoryId === 'all' ? '공고 모아보기' : `${categoryName(categoryId)} 공고`
                     : `${sourceById(source).name} 공고`
-                  : view === 'my' ? '마이페이지' : view === 'interests' ? '관심 공고' : view === 'statistics' ? '채용 통계' : view === 'ai' ? 'AI에게 질문' : view === 'career' ? '경력 자료' : '수집 기록'}
+                  : view === 'my' ? '마이페이지' : view === 'interests' ? '관심 공고' : view === 'applications' ? '지원 준비' : view === 'statistics' ? '채용 통계' : view === 'ai' ? 'AI에게 질문' : view === 'career' ? '경력 자료' : '수집 기록'}
                 <span className="heading-dot">.</span>
               </h1>
-              {view !== 'jobs' && <p>{view === 'my' ? '내 데이터를 백업하고 필요한 범위만 초기화해요.' : view === 'interests' ? '지원하고 싶은 공고와 다음 할 일을 차곡차곡 관리해요.' : view === 'statistics' ? '쌓아온 공고에서 채용의 흐름을 살펴봐요.' : view === 'ai' ? '전체 공고를 바탕으로 질문하고 근거를 확인해요.' : view === 'career' ? '이력서와 포트폴리오를 올리고 경력 근거를 정리해요.' : '언제, 어디에서, 얼마나 모았는지 확인해요.'}</p>}
+              {view !== 'jobs' && <p>{view === 'my' ? '내 데이터를 백업하고 필요한 범위만 초기화해요.' : view === 'interests' ? '관심 공고를 훑어보고 우선순위와 메모를 관리해요.' : view === 'applications' ? '공고별 맞춤 자료와 지원서 답변, 면접 준비를 이어가요.' : view === 'statistics' ? '쌓아온 공고에서 채용의 흐름을 살펴봐요.' : view === 'ai' ? '전체 공고를 바탕으로 질문하고 근거를 확인해요.' : view === 'career' ? '이력서와 포트폴리오를 올리고 경력 근거를 정리해요.' : '언제, 어디에서, 얼마나 모았는지 확인해요.'}</p>}
             </div>
             {view === 'jobs' && <button
               className="button primary collect-button"
@@ -685,7 +714,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
                               </div>
                               <span className="saved-indicator">
                                 <Icon name="image" size={12} />
-                                <span>캡처 {job.versions[0].captureAvailable ? demo ? '예시' : '저장됨' : '미저장'}</span>
+                                <span>캡처 {job.versions[0]?.captureAvailable ? demo ? '예시' : '저장됨' : '미저장'}</span>
                                 <span className="saved-dot">·</span>
                                 <Icon name="file" size={12} />
                                 <span>본문</span>
@@ -770,7 +799,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
                   </div>
                 </section>
                 {activeJob && (
-                  <JobDrawer
+                    <JobDrawer
                     job={activeJob}
                     categories={categories}
                     onClose={closeJob}
@@ -782,6 +811,8 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
                     onPrevious={() => navigateJob(-1)}
                     onNext={() => navigateJob(1)}
                     demo={demo}
+                    applicationStatus={applicationStatuses[activeJob.id]?.status}
+                    onStartApplication={startApplication}
                   />
                 )}
               </div>
@@ -792,7 +823,7 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
                 </span>
               </div>
             </>
-          ) : view === 'career' ? <CareerMaterials demo={demo} categories={categories} companies={companies} tab={careerTab} onTabChange={(next) => navigateApp({ careerTab: next })} onOpenPosting={openAiPosting} /> : view === 'my' ? <MyPage key={data.workspaceRevision} demo={demo} running={running} /> : view === 'interests' ? <InterestBoard key={data.workspaceRevision} jobs={data.jobs} categories={categories} onStar={setStarred} onSave={saveInterest} markRead={markRead} toggleRead={toggleRead} loadJob={loadJob} onBrowse={() => changeSource('all')} /> : view === 'statistics' ? <Statistics categories={categories} companies={companies} demo={demo} onBrowse={browseStatistics} /> : view === 'ai' ? <AiChat demo={demo} onOpenPosting={openAiPosting} /> : (
+          ) : view === 'career' ? <CareerMaterials demo={demo} categories={categories} companies={companies} tab={careerTab} onTabChange={(next) => navigateApp({ careerTab: next })} onOpenPosting={openAiPosting} /> : view === 'my' ? <MyPage key={data.workspaceRevision} demo={demo} running={running} /> : view === 'applications' ? <ApplicationWorkspace jobs={data.jobs} demo={demo} initialApplicationId={selectedApplicationId} onCasesChanged={updateApplicationCases} onSelectApplication={setSelectedApplicationId} onOpenCareer={() => navigateApp({ view: 'career', selectedJob: null })} onBrowseJobs={() => changeSource('all')} /> : view === 'interests' ? <InterestBoard key={data.workspaceRevision} jobs={data.jobs} categories={categories} onStar={setStarred} onSave={saveInterest} markRead={markRead} toggleRead={toggleRead} loadJob={loadJob} onBrowse={() => changeSource('all')} demo={demo} applicationStatuses={applicationStatuses} onStartApplication={startApplication} /> : view === 'statistics' ? <Statistics categories={categories} companies={companies} demo={demo} onBrowse={browseStatistics} /> : view === 'ai' ? <AiChat demo={demo} onOpenPosting={openAiPosting} /> : (
             <section className="history-view">
               <div className="section-heading">
                 <h2>

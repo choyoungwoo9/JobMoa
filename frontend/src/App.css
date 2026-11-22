@@ -3667,3 +3667,147 @@ dialog::backdrop {
   .collection-changes-compact .change-links { grid-column: 1 / -1; grid-row: 2; }
   .collection-changes-compact .collection-run-link { grid-column: 2; grid-row: 1; }
 }
+
+/* Job-specific application preparation workspace */
+.application-workspace { display: grid; grid-template-columns: minmax(230px, 285px) minmax(0, 1fr); gap: 16px; align-items: start; min-width: 0; }
+.application-case-list,.application-case-detail { min-width: 0; border: 1px solid #e3e9dc; border-radius: 11px; background: #fff; }
+.application-case-list { position: sticky; top: 16px; overflow: hidden; }
+.application-case-list-heading { display: flex; flex-direction: column; gap: 6px; padding: 16px; border-bottom: 1px solid #edf0e8; }
+.application-case-list-heading > div { display: flex; justify-content: space-between; align-items: center; color: #4e6540; font-size: 13px; }
+.application-case-list-heading > div span { color: #87967a; font-size: 10px; }
+.application-case-list-heading small,.application-list-loading { color: #8a9680; font-size: 10px; }
+.application-case-card { display: block; width: 100%; padding: 14px 15px; border: 0; border-bottom: 1px solid #edf0e8; background: #fff; text-align: left; cursor: pointer; }
+.application-case-card:hover,.application-case-card.active { background: #f5f8f0; }
+.application-case-company { display: flex; align-items: center; gap: 6px; color: #7d8d70; font-size: 10px; }
+.application-status-badge { flex: 0 0 auto; display: inline-flex; align-items: center; padding: 3px 7px; border-radius: 999px; background: #eef3e7; color: #60764d; font-size: 9px; font-weight: 600; }
+.application-status-badge.applied { background: #e9f3ea; color: #4d765a; }
+.application-case-company .application-status-badge { margin-left: auto; }
+.application-case-card > strong { display: block; margin: 9px 0 6px; color: #35462e; font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
+.application-case-card > small { color: #96a18d; font-size: 9px; }
+.application-list-empty { padding: 20px 15px; }
+.application-list-empty h3 { margin-bottom: 7px; color: #536749; font-size: 12px; }
+.application-list-empty p,.application-empty p { color: #89957f; font-size: 11px; line-height: 1.7; }
+.application-list-loading { padding: 12px 15px; }
+.application-case-detail { padding: 20px; }
+.application-detail-heading,.application-detail-title,.application-detail-actions,.application-pane-heading,.application-material-card-heading,.application-case-list-heading > div,.application-answer-footer,.application-task-notice,.application-ai-progress,.application-task-error,.application-interview-session > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.application-detail-title { justify-content: flex-start; min-width: 0; }
+.application-detail-title > div { min-width: 0; }
+.application-detail-title > div > span { color: #80916f; font-size: 10px; }
+.application-detail-title h2 { margin: 5px 0; color: #34452d; font-size: 19px; line-height: 1.5; overflow-wrap: anywhere; }
+.application-detail-title small { color: #95a08b; font-size: 9px; }
+.application-status-control { display: flex; align-items: center; gap: 7px; flex: 0 0 auto; color: #78876b; font-size: 10px; }
+.application-status-control select,.application-workspace input,.application-workspace textarea { min-width: 0; max-width: 100%; padding: 9px 10px; border: 1px solid #e0e7d9; border-radius: 7px; color: #3f4d37; background: #fff; font: inherit; font-size: 11px; }
+.application-workspace textarea { width: 100%; resize: vertical; line-height: 1.65; }
+.application-workspace input:focus,.application-workspace textarea:focus,.application-status-control select:focus { outline: 2px solid #c6d8b7; outline-offset: 1px; }
+.application-detail-actions { justify-content: flex-start; flex-wrap: wrap; margin: 14px 0 17px; color: #8d9982; font-size: 9px; }
+.application-detail-actions > span { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
+.application-detail-actions em { color: #a77b46; font-style: normal; }
+.application-detail-actions .button { height: 31px; font-size: 10px; }
+.application-panes { display: flex; overflow-x: auto; gap: 4px; border-bottom: 1px solid #e9ede3; }
+.application-panes button { flex: 0 0 auto; padding: 11px 13px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: #87947b; font: inherit; font-size: 10px; cursor: pointer; }
+.application-panes button.active { border-color: #829b65; color: #4f673c; font-weight: 650; }
+.application-pane-content { min-width: 0; padding-top: 18px; }
+.application-pane-heading { align-items: flex-start; margin-bottom: 16px; }
+.application-pane-heading > div { min-width: 0; }
+.application-pane-heading h3 { margin: 0 0 5px; color: #455b38; font-size: 14px; }
+.application-pane-heading p { margin: 0; color: #8a9680; font-size: 10px; line-height: 1.65; }
+.application-pane-heading > .button { flex: 0 0 auto; font-size: 10px; }
+.application-ai-progress { justify-content: flex-start; margin: 12px 0; padding: 12px; border: 1px solid #dce8d2; border-radius: 8px; background: #f5f8ef; }
+.application-ai-spinner { width: 15px; height: 15px; flex: 0 0 auto; border: 2px solid #d5e1c9; border-top-color: #718c53; border-radius: 50%; animation: application-spin .8s linear infinite; }
+@keyframes application-spin { to { transform: rotate(360deg); } }
+.application-ai-progress > div,.application-task-error > div { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 4px; }
+.application-ai-progress strong,.application-task-error strong { color: #5b7148; font-size: 10px; }
+.application-ai-progress small,.application-task-error p { margin: 0; color: #8b9880; font-size: 9px; line-height: 1.6; }
+.application-task-error,.application-task-notice { margin: 12px 0; padding: 11px 12px; border: 1px solid #eadbd4; border-radius: 8px; background: #fcf7f4; }
+.application-task-error strong,.application-task-error p { color: #9c5e50; }
+.application-task-notice { align-items: flex-start; border-color: #e6eadf; background: #fafbf7; }
+.application-task-notice > div { min-width: 0; flex: 1; }
+.application-task-notice strong { color: #5f704f; font-size: 10px; }
+.application-task-notice p,.application-task-notice small { display: block; margin: 5px 0 0; color: #8c9684; font-size: 9px; line-height: 1.6; overflow-wrap: anywhere; }
+.application-task-notice.failed { border-color: #eadbd4; background: #fcf7f4; }
+.application-task-notice.failed strong,.application-task-notice.failed p { color: #9c5e50; }
+.application-empty,.application-empty-inline { padding: 22px; border: 1px dashed #dfe7d7; border-radius: 9px; background: #fbfcf8; text-align: center; }
+.application-empty { padding: 48px 22px; }
+.application-empty > span { color: #91a979; font-size: 24px; }
+.application-empty h2 { margin: 10px 0; color: #4c6240; font-size: 16px; }
+.application-empty-inline { margin: 12px 0; text-align: left; }
+.application-empty-inline > strong { color: #596e4a; font-size: 11px; }
+.application-empty-inline p { color: #8c9783; font-size: 10px; line-height: 1.7; }
+.application-empty-inline button { padding: 0; }
+.application-material-card,.application-question-card,.application-research-group,.application-interview-session { min-width: 0; margin: 13px 0; padding: 15px; border: 1px solid #e7ebdf; border-radius: 9px; background: #fff; }
+.application-material-card-heading { margin-bottom: 12px; }
+.application-material-card-heading h4,.application-research-group h4 { margin: 0; color: #526847; font-size: 12px; }
+.application-material-card-heading span { color: #96a08a; font-size: 9px; }
+.application-material-card > label,.application-edit-item > label,.application-question-card > label,.application-experience-proposal > label { display: block; margin: 10px 0; color: #748367; font-size: 10px; }
+.application-material-card > label input,.application-material-card > label textarea,.application-edit-item > input,.application-edit-item > textarea,.application-edit-item > label input,.application-question-card > label textarea,.application-question-card > label input { display: block; width: 100%; margin-top: 5px; }
+.application-edit-item { margin: 11px 0; padding: 12px; border: 1px solid #ecf0e8; border-radius: 8px; background: #fbfcf9; }
+.application-edit-item.excluded { opacity: .68; }
+.application-edit-item-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; }
+.application-edit-item-heading > label { display: flex; align-items: center; gap: 6px; color: #718064; font-size: 9px; }
+.application-edit-item-heading input[type="checkbox"] { accent-color: #78945a; }
+.application-edit-item-heading > div { display: flex; gap: 4px; }
+.application-edit-item-heading button { width: 26px; height: 25px; border: 1px solid #e5eadf; border-radius: 5px; background: white; color: #758966; cursor: pointer; }
+.application-edit-item-heading button:disabled { opacity: .35; cursor: default; }
+.application-evidence { margin-top: 8px; color: #7d8b70; font-size: 9px; }
+.application-evidence summary { cursor: pointer; }
+.application-evidence blockquote,.application-question-card blockquote,.application-interview-turn blockquote { margin: 7px 0; padding: 8px 10px; border-left: 2px solid #cfdbbf; background: #f8faf5; color: #697660; font-size: 9px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.application-evidence blockquote strong,.application-question-card blockquote small { display: block; margin-bottom: 3px; color: #657a50; }
+.application-information-gaps { margin: 13px 0; padding: 13px; border-radius: 8px; background: #faf7ef; color: #89734f; font-size: 10px; }
+.application-information-gaps ul { margin: 8px 0 0; padding-left: 18px; line-height: 1.7; }
+.application-save-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 15px; padding: 12px 0; border-top: 1px solid #edf0e8; }
+.application-save-bar span { color: #8b9781; font-size: 9px; line-height: 1.5; }
+.application-add-question { margin: 13px 0; padding: 14px; border: 1px solid #e7ebdf; border-radius: 9px; background: #fbfcf8; }
+.application-add-question h4 { margin: 0 0 9px; color: #5c704d; font-size: 11px; }
+.application-add-question > div { display: flex; justify-content: flex-end; align-items: end; gap: 8px; margin-top: 8px; }
+.application-add-question label,.application-limit-field { display: flex; align-items: center; gap: 7px; color: #87947b; font-size: 9px; }
+.application-add-question input,.application-limit-field input { width: 120px; }
+.application-no-evidence { color: #9aa18f; font-size: 9px; }
+.application-question-card { padding: 15px; }
+.application-question-card > header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; color: #61774e; font-size: 10px; font-weight: 650; }
+.application-question-card .danger-text { color: #a66d61; font-size: 9px; }
+.application-limit-field { justify-content: flex-end; margin: 6px 0 12px; }
+.application-limit-field input { width: 140px; }
+.application-question-card > blockquote { display: block; }
+.application-answer-footer { flex-wrap: wrap; margin-top: 9px; }
+.application-answer-footer > span,.application-fact-note { color: #8d9883; font-size: 9px; }
+.application-answer-footer > div { display: flex; gap: 7px; }
+.application-fact-note { margin: 8px 0 0; overflow-wrap: anywhere; }
+.application-research-meta { margin: 10px 0; color: #88957d; font-size: 9px; }
+.application-research-group > article { margin: 9px 0; padding: 11px; border: 1px solid #edf0e8; border-radius: 7px; background: #fbfcf9; }
+.application-research-group > article > strong { display: block; color: #526847; font-size: 10px; line-height: 1.6; }
+.application-research-group > article > p { color: #75826d; font-size: 10px; line-height: 1.7; }
+.application-research-group > article > small { display: block; margin-top: 5px; color: #919c88; font-size: 9px; }
+.application-source-links { margin: 7px 0 0; padding: 0; list-style: none; }
+.application-source-links li { margin-top: 5px; color: #7e8e70; font-size: 9px; overflow-wrap: anywhere; }
+.application-source-links a,.application-question-bank a { color: #66844b; text-decoration: underline; text-underline-offset: 2px; }
+.application-source-links small { display: inline-block; margin-left: 6px; color: #9aa28f; }
+.application-source-links p { margin: 4px 0; color: #82907a; line-height: 1.6; }
+.application-question-bank { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.application-question-bank article { min-width: 0; padding: 11px; border: 1px solid #edf0e8; border-radius: 7px; background: #fbfcf9; }
+.application-question-bank article > span { display: inline-block; margin-bottom: 7px; padding: 4px 6px; border-radius: 5px; background: #eef3e8; color: #647a51; font-size: 9px; }
+.application-question-bank article > strong { display: block; color: #46583c; font-size: 10px; line-height: 1.6; }
+.application-question-bank article > p { color: #84907b; font-size: 9px; line-height: 1.6; }
+.application-question-bank article > a { display: inline-flex; align-items: center; gap: 4px; margin: 3px 8px 0 0; font-size: 9px; }
+.application-interview-start { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 14px 0; padding: 14px; border-radius: 8px; background: #f5f8ef; }
+.application-interview-start strong { color: #526a43; font-size: 11px; }
+.application-interview-start p { color: #87947b; font-size: 9px; line-height: 1.6; }
+.application-interview-session { padding: 0; overflow: hidden; }
+.application-interview-session > header { padding: 13px 15px; border-bottom: 1px solid #edf0e8; }
+.application-interview-session > header > div { display: flex; gap: 8px; align-items: center; color: #536946; font-size: 11px; }
+.application-interview-session > header small { color: #929c88; font-size: 9px; }
+.application-interview-turn { padding: 14px 15px; border-bottom: 1px solid #edf0e8; }
+.application-interview-turn:last-child { border-bottom: 0; }
+.application-interview-turn > span { color: #82936f; font-size: 9px; }
+.application-interview-turn h4 { margin: 7px 0; color: #46583b; font-size: 12px; line-height: 1.6; }
+.application-interview-turn > p { color: #8b9682; font-size: 9px; }
+.application-interview-turn > textarea { margin: 5px 0 8px; }
+.application-follow-up,.application-experience-proposal { margin-top: 12px; padding: 12px; border-radius: 7px; background: #f7f9f3; }
+.application-follow-up > strong,.application-experience-proposal > strong { color: #5c714a; font-size: 10px; }
+.application-follow-up > p,.application-experience-proposal > p { color: #607052; font-size: 10px; line-height: 1.6; }
+.application-experience-proposal > small { display: block; margin: 8px 0; color: #87937c; font-size: 9px; line-height: 1.6; }
+.application-experience-proposal > label { display: block; margin: 8px 0; color: #748367; font-size: 9px; }
+.application-experience-proposal > label input,.application-experience-proposal > label textarea { display: block; width: 100%; margin-top: 5px; }
+.application-global-error,.application-global-notice { position: sticky; bottom: 8px; z-index: 2; margin: 10px 0 0; padding: 10px 12px; border: 1px solid #ead6d1; border-radius: 8px; background: #fff9f6; color: #9a594b; font-size: 10px; overflow-wrap: anywhere; }
+.application-global-notice { border-color: #dbe6d0; background: #f6f9f1; color: #60764f; }
+@media (max-width: 1050px) { .application-workspace { grid-template-columns: 220px minmax(0,1fr); } .application-case-detail { padding: 16px; } }
+@media (max-width: 760px) { .application-workspace { display: flex; flex-direction: column; } .application-workspace > * { width: 100%; } .application-case-list { position: static; } .application-case-list:not(:has(.application-case-card)) { display: none; } .application-case-detail { padding: 13px; } .application-detail-heading { align-items: flex-start; flex-direction: column; } .application-status-control { align-self: flex-end; } .application-pane-heading { flex-direction: column; } .application-pane-heading > .button { align-self: flex-start; } .application-question-bank { grid-template-columns: minmax(0,1fr); } .application-save-bar,.application-interview-start { align-items: flex-start; flex-direction: column; } .application-detail-title h2 { font-size: 16px; } }
