@@ -44,7 +44,7 @@ export function ApplicationRequirementsPanel({ job }: { job: Job }) {
       const versions = history.filter(item => item.versionSaved)
       setItems(next)
       const selected = versions.find(item => item.id === selectedIdRef.current)
-      if (!selected) {
+      if (!selected && !dirtyRef.current) {
         const latest = history[0]
         const latestVersionId = latest?.contentVersionId ?? (latest?.versionSaved ? latest.id : '')
         const latestVersion = versions.find(item => item.id === latestVersionId)
@@ -53,7 +53,7 @@ export function ApplicationRequirementsPanel({ job }: { job: Job }) {
         setRawText(latestVersion?.rawText ?? '')
         dirtyRef.current = false
         setDirty(false)
-      } else if (!dirtyRef.current) {
+      } else if (selected && !dirtyRef.current) {
         setRawText(selected.rawText)
       }
       setError('')
