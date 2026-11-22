@@ -448,13 +448,15 @@ class ApplicationPreparationService(
         val proposal = mapper.treeToValue(raw, CareerPostingDraftProposal::class.java)
         val factMap = factContextMap(request["facts"])
         fun evidence(ids: List<String>) = ids.distinct().mapNotNull(factMap::get)
+        val reviewNotes = mutableListOf<String>()
+        fun documentText(value: String) = sanitizeDocumentText(value, reviewNotes)
         val headingFactIds = proposal.resumeHeadlineFactIds.filter { it in factMap }
         val summaryFactIds = proposal.resumeSummaryFactIds.filter { it in factMap }
         val result = mapper.createObjectNode()
         result.put("sourceTaskId", task.id)
         result.set("posting", request["posting"])
-        result.put("resumeHeadline", proposal.resumeHeadline.trim().take(500))
-        result.put("resumeSummary", proposal.resumeSummary.trim().take(3000))
+        result.put("resumeHeadline", documentText(proposal.resumeHeadline).take(500))
+        result.put("resumeSummary", documentText(proposal.resumeSummary).take(3000))
         result.put("candidateName", proposal.candidateName?.trim().orEmpty().take(100))
         result.put("contactEmail", proposal.contactEmail?.trim().orEmpty().take(320))
         result.put("contactPhone", proposal.contactPhone?.trim().orEmpty().take(100))
@@ -465,24 +467,28 @@ class ApplicationPreparationService(
         result.set("resumeSummaryEvidence", mapper.valueToTree(evidence(summaryFactIds)))
         val sections = proposal.resumeSections.take(10).mapIndexedNotNull { index, item ->
             val ids = item.verifiedFactIds.distinct().filter { it in factMap }
-            if (item.heading.isBlank() || item.content.isBlank()) return@mapIndexedNotNull null
+            val heading = documentText(item.heading).take(100)
+            val content = documentText(item.content).take(4000)
+            if (heading.isBlank() || content.isBlank()) return@mapIndexedNotNull null
             mapper.createObjectNode().apply {
-                put("id", "section-${index + 1}"); put("heading", item.heading.trim().take(100)); put("content", item.content.trim().take(4000))
+                put("id", "section-${index + 1}"); put("heading", heading); put("content", content)
                 put("included", true); put("order", index); set("factIds", mapper.valueToTree(ids)); set("evidence", mapper.valueToTree(evidence(ids)))
             }
         }
         val projects = proposal.portfolioProjects.take(8).mapIndexedNotNull { index, item ->
             val ids = item.verifiedFactIds.distinct().filter { it in factMap }
-            if (item.title.isBlank() || item.summary.isBlank()) return@mapIndexedNotNull null
+            val title = documentText(item.title).take(200)
+            val summary = documentText(item.summary).take(3000)
+            if (title.isBlank() || summary.isBlank()) return@mapIndexedNotNull null
             mapper.createObjectNode().apply {
-                put("id", "project-${index + 1}"); put("title", item.title.trim().take(200)); put("selectionReason", item.selectionReason.trim().take(1000))
-                put("summary", item.summary.trim().take(3000)); put("included", true); put("order", index)
-                item.role?.trim()?.takeIf(String::isNotBlank)?.let { put("role", it.take(300)) }
-                item.period?.trim()?.takeIf(String::isNotBlank)?.let { put("period", it.take(200)) }
+                put("id", "project-${index + 1}"); put("title", title); put("selectionReason", item.selectionReason.trim().take(1000))
+                put("summary", summary); put("included", true); put("order", index)
+                item.role?.let(::documentText)?.takeIf(String::isNotBlank)?.let { put("role", it.take(300)) }
+                item.period?.let(::documentText)?.takeIf(String::isNotBlank)?.let { put("period", it.take(200)) }
                 set("technologies", mapper.valueToTree(item.technologies.map(String::trim).filter(String::isNotBlank).distinct().take(12).map { it.take(80) }))
-                item.problem?.trim()?.takeIf(String::isNotBlank)?.let { put("problem", it.take(3000)) }
-                set("contributions", mapper.valueToTree(item.contributions.map(String::trim).filter(String::isNotBlank).distinct().take(8).map { it.take(1500) }))
-                item.outcome?.trim()?.takeIf(String::isNotBlank)?.let { put("outcome", it.take(3000)) }
+                item.problem?.let(::documentText)?.takeIf(String::isNotBlank)?.let { put("problem", it.take(3000)) }
+                set("contributions", mapper.valueToTree(item.contributions.map(::documentText).filter(String::isNotBlank).distinct().take(8).map { it.take(1500) }))
+                item.outcome?.let(::documentText)?.takeIf(String::isNotBlank)?.let { put("outcome", it.take(3000)) }
                 set("factIds", mapper.valueToTree(ids)); set("evidence", mapper.valueToTree(evidence(ids)))
             }
         }
@@ -493,7 +499,7 @@ class ApplicationPreparationService(
         val hasUnlinkedContent = (result["resumeHeadline"].asString().isNotBlank() && headingFactIds.isEmpty()) ||
             (result["resumeSummary"].asString().isNotBlank() && summaryFactIds.isEmpty()) ||
             sections.any { it["factIds"].size() == 0 } || projects.any { it["factIds"].size() == 0 }
-        val gaps = cleanLines(raw["informationGaps"], 12, 500).toMutableList()
+        val gaps = (reviewNotes + cleanLines(raw["informationGaps"], 12, 500)).distinct().toMutableList()
         if (hasUnlinkedContent) gaps.add("일부 초안에 원문 근거가 자동 연결되지 않았습니다. 경력 자료와 대조해 사실·수치를 확인해 주세요.")
         result.put("hasUnlinkedContent", hasUnlinkedContent)
         result.set("informationGaps", mapper.valueToTree(gaps.distinct().take(12)))
@@ -720,6 +726,21 @@ class ApplicationPreparationService(
     private fun normalizeText(value: String) = value.replace(Regex("\\s+"), " ").trim().lowercase()
     private fun cleanLines(node: JsonNode?, limit: Int, maxLength: Int) = node?.takeIf { it.isArray }?.values()?.map { it.asString().trim().take(maxLength) }
         ?.filter(String::isNotBlank)?.distinct()?.take(limit).orEmpty()
+    private fun sanitizeDocumentText(value: String, reviewNotes: MutableList<String>): String {
+        val output = mutableListOf<String>()
+        value.lines().filter(String::isNotBlank).forEach { original ->
+            val line = original.trim()
+            val isBullet = line.startsWith("- ") || line.startsWith("• ") || line.startsWith("▪ ")
+            val sentences = if (isBullet) listOf(line) else line.split(Regex("(?<=[.!?])\\s+"))
+            sentences.map(String::trim).filter(String::isNotBlank).forEach { sentence ->
+                val markerFree = sentence.replaceFirst(Regex("^[-•▪]\\s+"), "").trim()
+                if (DOCUMENT_REVIEW_MARKERS.any { markerFree.contains(it, ignoreCase = true) }) {
+                    reviewNotes.add(markerFree.take(500))
+                } else output.add(sentence)
+            }
+        }
+        return output.joinToString("\n").trim()
+    }
     private fun safeError(value: String) = value.replace(Regex("(?i)bearer\\s+[A-Za-z0-9._~-]+"), "Bearer [숨김]")
         .replace(Regex("sk-[A-Za-z0-9_-]{12,}"), "sk-[숨김]").trim().take(1800)
 
@@ -732,6 +753,11 @@ class ApplicationPreparationService(
         private const val MAX_POSTING_BODY_CHARS = 18_000
         private const val MAX_INTERVIEW_ANSWER_CHARS = 12_000
         private const val MAX_RECENT_TASKS = 20
+        private val DOCUMENT_REVIEW_MARKERS = listOf(
+            "확인 필요", "확인이 필요", "추가 확인", "확인해야", "확인되지", "확인할 수 없", "근거가 부족", "자료가 부족",
+            "검증되지", "검증 전", "가상 자료", "테스트용", "예시 자료", "샘플 자료", "원문과 대조", "제출 전에 확인",
+            "실제 여부", "자료에 따르면", "자료에 기재", "기재되어 있습니다", "업로드 자료에", "경력 자료에 명시",
+        )
         private val TASK_LEASE = Duration.ofMinutes(10)
     }
 }
