@@ -57,7 +57,7 @@ export function JobDrawer({
   onNext: () => void
   demo?: boolean
 }) {
-  const [tab, setTab] = useState<'capture' | 'text' | 'diff'>('capture')
+  const [tab, setTab] = useState<'capture' | 'text' | 'diff' | 'application'>('capture')
   const [versionId, setVersionId] = useState(job.versions[0].id)
   const [zoomed, setZoomed] = useState(() => isCaptureZoomOpen(job.id))
   const closeButton = useRef<HTMLButtonElement>(null)
@@ -213,7 +213,6 @@ export function JobDrawer({
             </div>)}
           </details> : <p>아직 자동 분류를 실행하지 않은 공고예요.</p>}
         </section>
-        {!demo && <ApplicationRequirementsPanel key={job.id} job={job} />}
         <div className="drawer-actions">
           <button
             className={`button ${job.read ? 'read-button' : 'secondary'}`}
@@ -238,7 +237,7 @@ export function JobDrawer({
             열면 자동으로 읽음 처리해요. 원문은 새 탭에서 확인할 수 있어요.
           </span>
         </div>
-        <div className="version-picker">
+        {tab !== 'application' && <div className="version-picker">
           <span>
             <Icon name="history" size={15} />
             저장된 버전
@@ -255,8 +254,8 @@ export function JobDrawer({
               </option>
             ))}
           </select>
-        </div>
-        {index > 0 && (
+        </div>}
+        {tab !== 'application' && index > 0 && (
           <div className="old-version-note">
             이전 버전을 보고 있어요. 최신 내용은 버전을 변경해 확인하세요.
           </div>
@@ -289,6 +288,7 @@ export function JobDrawer({
             캡처 보기
           </button>
           <button role="tab" id="diff-tab" aria-selected={tab === 'diff'} aria-controls="saved-content" className={tab === 'diff' ? 'active' : ''} onClick={() => setTab('diff')}>변경점 비교</button>
+          {!demo && <button role="tab" id="application-tab" aria-selected={tab === 'application'} aria-controls="saved-content" className={tab === 'application' ? 'active' : ''} onClick={() => setTab('application')}>지원서 정보</button>}
           <span>
             v{revision} · {dateLabel(version.savedAt)}
           </span>
@@ -298,7 +298,7 @@ export function JobDrawer({
           id="saved-content"
           aria-labelledby={`${tab}-tab`}
         >
-          {tab === 'diff' ? <VersionDiff key={version.id} versions={job.versions} current={version} /> : tab === 'text' ? (
+          {tab === 'application' ? <ApplicationRequirementsPanel key={job.id} job={job} /> : tab === 'diff' ? <VersionDiff key={version.id} versions={job.versions} current={version} /> : tab === 'text' ? (
             <div className="saved-text">
               {version.bodyLoaded === false ? '저장된 본문을 불러오는 중이에요…' : version.body ||
                 '본문 추출에 실패했어요. 수집 기록에서 해당 단계를 재시도할 수 있어요.'}

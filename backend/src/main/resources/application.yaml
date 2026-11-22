@@ -37,6 +37,7 @@ management:
 jobmoa:
   crawler:
     workers: ${CRAWLER_WORKERS:3}
+    application-page-workers: ${CRAWLER_APPLICATION_PAGE_WORKERS:2}
     site-concurrency: ${CRAWLER_SITE_CONCURRENCY:1}
     minimum-navigation-interval: 700ms
     minimum-navigation-interval-overrides:

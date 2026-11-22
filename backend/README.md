@@ -60,7 +60,7 @@ MySQL 격리 수준은 `READ_COMMITTED`입니다. 여러 작업자가 서로 다
 
 실행 버튼 한 번에 기록 하나를 만들고, 각 계열사 포털의 목록 조회는 독립 작업으로 저장합니다. 한 포털이 실패해도 다른 포털과 공고 처리는 계속하며, 목록 재시도는 실패한 포털만 다시 실행합니다. 공고는 공통 MySQL 큐에 넣고 빈 작업자가 가져갑니다.
 
-작업자는 기본 3개(`CRAWLER_WORKERS`), 사이트별 활성 페이지 작업은 기본 1개(`CRAWLER_SITE_CONCURRENCY`)입니다. 별도 목록 탐색 스레드 1개도 사이트 제한을 공유합니다. 이는 페이지 작업 제한이며 이미지·CSS 등 모든 하위 리소스 요청의 개수 제한은 아닙니다. `site-overrides`로 호스트별 동시성, `minimum-navigation-interval-overrides`로 호스트별 요청 시작 간격을 설정합니다. 현재 기본값은 `www.coupang.jobs` 5초, `boards-api.greenhouse.io` 3초이며, 이는 429가 발생하지 않는다고 검증된 한계값이 아니라 요청을 분산하기 위한 보수적 시작값입니다. 쿠팡의 상세 API 응답도 호스트 제한 대상입니다.
+공고 작업자는 기본 3개(`CRAWLER_WORKERS`), 지원 페이지 작업자는 기본 2개(`CRAWLER_APPLICATION_PAGE_WORKERS`), 사이트별 활성 페이지 작업은 기본 1개(`CRAWLER_SITE_CONCURRENCY`)입니다. 별도 목록 탐색 스레드 1개도 사이트 제한을 공유합니다. 이는 페이지 작업 제한이며 이미지·CSS 등 모든 하위 리소스 요청의 개수 제한은 아닙니다. `site-overrides`로 호스트별 동시성, `minimum-navigation-interval-overrides`로 호스트별 요청 시작 간격을 설정합니다. 현재 기본값은 `www.coupang.jobs` 5초, `boards-api.greenhouse.io` 3초이며, 이는 429가 발생하지 않는다고 검증된 한계값이 아니라 요청을 분산하기 위한 보수적 시작값입니다. 쿠팡의 상세 API 응답도 호스트 제한 대상입니다.
 
 각 작업자는 자기 스레드에서만 Playwright와 브라우저를 생성·재사용·정리합니다. 작업별 컨텍스트는 분리합니다. 쿠팡 상세만 일반 브라우저 모드를 사용하며, 다른 모드의 작업으로 전환할 때 기존 브라우저를 정리해 작업자당 브라우저 하나를 유지합니다. Java는 컨테이너 PID 1로 실행해 종료 신호를 직접 받습니다. 임대 토큰과 주기적 갱신으로 중복 처리를 방지하고, 중단된 공고 작업은 임대 만료 후 체크포인트부터 다시 처리합니다. 브라우저 탐색·본문·캡처는 DB 트랜잭션 밖에서 수행합니다.
 
@@ -137,26 +137,30 @@ Flyway V6은 기존 공고의 마지막 상태를 기준점으로 보존합니�
 
 ## 공고별 지원서 요구 정보
 
-V13 `posting_application_requirement`는 공고에 종속된 원문·분석 이력 테이블이다. 공고 삭제 시 FK cascade로 함께 삭제된다. `POSTING_BODY`는 저장된 공개 공고 본문, `USER_PASTED`는 사용자가 붙여넣은 빈 지원 문항/안내다. 로그인 정보와 세션을 사용하거나 지원 제출을 실행하지 않는다.
+V13 `posting_application_requirement`는 공고에 종속된 원문·분석 이력 테이블이다. 공고 삭제 시 FK cascade로 함께 삭제된다. V15는 수집 실행 연결과 실제 지원 페이지 원문 확인 여부를 추가한다. 실행 이력이 삭제되면 연결만 `NULL`로 바꾸고 지원서 원문은 보존한다. `POSTING_BODY`는 과거 호환 출처이며 신규 등록·확정·재시도를 허용하지 않는다. 마이그레이션과 구버전 백업 복원은 아직 처리되지 않은 과거 공고 본문 분석을 실패 상태로 돌리고, 기존 이력은 출처 경고와 함께 보존한다. `USER_PASTED`는 사용자가 붙여넣은 실제 지원 문항·안내다. 로그인 정보와 세션을 사용하거나 지원 제출을 실행하지 않는다.
 
 | 요청 | 동작 |
 | --- | --- |
 | `GET /api/postings/{postingId}/application-requirements` | 해당 공고의 원문·분석 결과·상태 이력 최신순 조회 |
-| `POST /api/postings/{postingId}/application-requirements` | `{source, sourceUrl, rawText}` 저장 후 AI 작업 대기열 등록 |
+| `POST /api/postings/{postingId}/application-requirements` | 실제 지원 문항·안내의 `{source: USER_PASTED, sourceUrl, rawText}` 저장 후 AI 작업 대기열 등록 |
 | `POST /api/postings/{postingId}/application-requirements/public-page` | 공개 공고 페이지에서 지원 링크·문항 텍스트를 비동기 확인한 뒤 AI 분석 등록 |
 | `POST /api/application-requirements/{id}/confirm` | 검토 상태의 결과를 사용자 확정 상태로 변경 |
 | `POST /api/application-requirements/{id}/retry` | 실패한 분석 이력을 재대기열에 등록 |
 | `/api/application-requirements/worker/tasks/**` | claim·lease 갱신·구조화 결과 완료·실패 보고 |
 
+`/api/state` 회사 항목에는 최근 실제 확인 결과를 요약한 `applicationPageStatus`와 설명이 포함된다. 값은 `unchecked`, `checking`, `public`, `mixed`, `login-required`, `failed`, `review`다. 한 공고의 실패로 회사 전체 미지원이라고 단정하지 않는다. 수집 실행 객체의 `applicationProgress`와 `applicationResults`는 페이지 확인 진행률과 회사별 확인 결과를 나타낸다.
+
 원문은 최대 100,000자다. 출력은 제출 서류와 문항 최대 100개, confidence·안내로 정규화한다. 서버는 인용이 원문에 실제 포함되는지 확인하고, 문항 원문도 입력에 존재하는 경우만 저장한다. 필수 여부는 `REQUIRED/OPTIONAL/UNKNOWN`; 불확실한 길이 제한은 `null`로 둔다. 저장 결과는 사용자가 확인하기 전 `REVIEW`다. 재입력은 과거를 덮어쓰지 않는 새 이력이다.
 
-공개 지원 페이지 확인은 `CrawlerRuntime`의 기존 Playwright 작업자에서 공고 단위 큐로 처리하며 `/api/application-requirements/public-page` 등록 즉시 `WAITING_PUBLIC` 이력을 만든다. 빈 작업자가 해당 항목을 `FETCHING_PUBLIC`으로 임대하고, URL 호스트별 활성 페이지 제한 및 요청 간격을 적용한다. 렌더링 후 지원 문구가 있는 공개 앵커 링크만 최대 5개 확인한다. 로그인/계정/동의 페이지 조작, 버튼 클릭, 입력, 업로드, 제출은 없다. 사용자 로그인 쿠키가 없는 새 컨텍스트이며 HTTPS와 공개 IP만 허용하고 redirect·하위 요청의 사설/로컬 주소를 막는다. 원문이 발견되면 `WAITING_AI`로 바뀌고, 크롤러 작업자가 꺼져 있으면 `WAITING_PUBLIC`에 남는다. 네트워크·접근 제한·지원 링크 탐지 실패는 해당 이력에 오류를 저장하고 재시도할 수 있다.
+각 열린 공고 작업을 저장하는 시점에 현재 `collection_run_id`를 붙인 `WAITING_PUBLIC` 이력을 생성한다. `(collection_run_id, posting_id)` 고유 인덱스로 실행 안에서 공고별 확인을 하나만 만든다. 실행 기록이 삭제되어도 FK는 연결만 `NULL`로 바꾸고 원문 이력은 보존한다. 본문이 동일해도 지원서 페이지는 별도로 다시 확인한다. 전용 `applicationPageWorkers` 풀은 `CRAWLER_APPLICATION_PAGE_WORKERS`(기본 2)로 설정하며, 각 스레드는 자체 Playwright·브라우저를 생성·재사용한다. 공고 수집 작업자와 병렬로 동작하고 같은 `SiteLimiter`를 사용해 사이트별 활성 요청 수와 시작 간격을 지킨다. 실행 진행률은 페이지 확인 원문 저장과 AI 분석 진행을 구분하고 회사 선택 창 및 실행 기록에 최근 회사별 지원 상태를 표시한다.
 
-`TaskService.finish()`는 열린 공고 저장이 끝나면 공개 페이지 확인 이력을 검사한다. 해당 공고의 공개 페이지 이력이 없으면 `WAITING_PUBLIC` 작업을 자동 등록하며, 내용 변경(`CHANGED`) 때는 새 이력을 등록한다. 동일(`IDENTICAL`) 공고는 이미 공개 페이지 이력이 있으면 재방문하지 않는다. 실패 이력은 자동 재시도 대상으로 삼지 않는다. 첫 적용 뒤 다음 수집에서는 선택 범위 내 미확인 기존 공고도 작업 대상이 될 수 있으므로 회사·직군을 좁혀 실행할 수 있다. 이 큐는 공고 캡처 큐와 작업자·사이트 제한을 공유하지만 수집 실행의 완료·진행 건수와는 별도로 동작한다.
+공개 확인 작업자는 공고 페이지에서 지원 관련 공개 `<a href>`를 찾고 최대 12개까지 시도한다. 링크가 없으면 폼 바깥에 있고 제출 타입이 아닌 `지원하기` 버튼 진입만 시도한다. `type=submit`, 폼 안 버튼, 로그인·동의·입력·업로드·제출은 하지 않는다. 진입 후 페이지 전체 보이는 텍스트(최대 100,000자)를 저장한다. 원래 공고 URL의 본문은 지원 페이지 원문으로 채택하지 않으며 실제 지원 페이지를 못 열면 실패를 남긴다. 새 브라우저 컨텍스트에는 쿠키·기존 로그인 세션이 없고 HTTPS 공개 IP만 허용하며 redirect·하위 요청의 사설/로컬 주소를 막는다. 로그인 화면은 `로그인 필요` 오류로 표시한다.
+
+`TaskService.finish()`는 열린 공고가 완료될 때마다 해당 실행 ID에 연결된 지원 확인 이력을 예약한다. 같은 실행에서 중복으로 만들지 않으며, 새 실행은 열린 공고 전체를 다시 확인한다. 각 실행의 페이지 확인 진행은 공고 수집 진행과 별도 집계된다. 캡처 재사용·본문 동일 판단은 기존 규칙대로라 지원 페이지를 다시 확인해도 공고 캡처·본문 버전은 중복 저장하지 않는다.
 
 Codex 작업자는 `/api/application-requirements/worker/tasks/**`, `/api/career-materials/worker/tasks/**`, `/api/career-assistant/worker/tasks/**`, `/api/ai/worker/tasks/**` 네 큐를 순환 조회한다. 지원서 텍스트 분석은 웹 검색을 비활성화한다. 각 단계의 임대 만료 시 해당 건을 다시 claim할 수 있다. 공개 페이지 원문과 붙여넣은 텍스트 모두 AI 분석 시 Codex 서비스로 전달된다.
 
-2026-11-22 확인: `./gradlew compileKotlin`과 Docker 재빌드·백엔드 health check를 통과했다. 실제 공고 수집 버튼은 누르지 않았으며 공개 지원 페이지의 회사별 접근·문항 추출 성공은 아직 검증하지 않았다.
+2026-11-22 확인: 기존 Docker 백엔드 health check와 현재 워크트리의 `./gradlew compileKotlin`을 통과했다. 현재 V15 Flyway 변경은 DB에 적용하지 않았고, 실제 공고 수집·외부 회사 지원 페이지 접근·문항 추출은 실행하지 않았다.
 
 ## 경력 자료와 Codex 분석
 
@@ -189,7 +193,7 @@ V12가 원본 문서·추출 구간·AI 경력 정보·근거 인용 테이블�
 
 2026-11-22 추천 조건 적용 검증: `./gradlew compileKotlin`과 메인 `./start.sh`의 백엔드·프론트 Docker 빌드가 통과했고 MySQL·백엔드·프론트 컨테이너가 모두 healthy, 백엔드 readiness가 `UP`이었다. `./gradlew test`는 `NO-SOURCE`로 끝나 백엔드 자동 테스트 소스가 없는 상태다. 재시작 후 DB·캡처 볼륨이 유지됐다. 추천 POST·Codex 분석·개인 파일 업로드는 실행하지 않았으며, 브라우저 입력 확인 범위는 [프론트 검증 기록](../frontend/README.md#경력-자료)에 적었다.
 
-백업 형식은 `jobmoa` v2 / DB 스냅샷 스키마 13이며, 복원은 스키마 10·11·12·13과 형식 v1·v2를 지원한다. ZIP은 `workspace.json`, `captures/{sha256}.png`, `career-materials/{uuid}.bin`으로 구성된다. 스키마 10 백업에는 경력 자료·지원서 요구 정보·추천 초안이 없고, 스키마 11에는 지원서 요구 정보·추천 초안이 없으며, 스키마 12에는 추천 초안이 없다. 복원 미리보기는 백업에서 빠져 전체 교체로 삭제될 현재 데이터를 알린다. 백업 생성 시 진행 중인 AI 작업은 다시 대기하도록 정리한다. ZIP 2 GiB·해제 4 GiB·개별 경력 원본 50 MiB·캡처/JSON 128 MiB 제한이다. 임시 파일은 `${STORAGE_DIRECTORY}/workspace-tmp`에 저장하고 만료·재시작 잔여물을 정리한다. Spring multipart와 Docker 프론트 NGINX의 업로드 크기/타임아웃을 함께 조정했다. 백업 생성은 파일 스트리밍을 사용하지만 스냅샷 JSON·DB 행은 메모리에 보관하므로 한도까지의 대규모 복원 성능은 별도 검증이 필요하다.
+백업 형식은 `jobmoa` v2 / DB 스냅샷 스키마 14이며, 복원은 스키마 10~14와 형식 v1·v2를 지원한다. 스키마 14는 지원 페이지 확인을 수집 실행과 연결하고 실제 페이지 원문 저장 여부를 보관한다. 스키마 13 백업의 이전 열은 복원 시 새 열을 기본값으로 보완한다. ZIP은 `workspace.json`, `captures/{sha256}.png`, `career-materials/{uuid}.bin`으로 구성된다. 복원 미리보기는 백업에서 빠져 전체 교체로 삭제될 현재 데이터를 알린다. 백업 생성 시 진행 중인 AI 작업은 다시 대기하도록 정리한다. ZIP 2 GiB·해제 4 GiB·개별 경력 원본 50 MiB·캡처/JSON 128 MiB 제한이다. 임시 파일은 `${STORAGE_DIRECTORY}/workspace-tmp`에 저장하고 만료·재시작 잔여물을 정리한다. Spring multipart와 Docker 프론트 NGINX의 업로드 크기/타임아웃을 함께 조정했다. 백업 생성은 파일 스트리밍을 사용하지만 스냅샷 JSON·DB 행은 메모리에 보관하므로 한도까지의 대규모 복원 성능은 별도 검증이 필요하다.
 
 `/api/state`의 `workspaceRevision`은 초기화·복원 때 바뀐다. 클라이언트는 리비전이 바뀌면 이전 버전 ID의 본문 캐시를 버린다. 유지보수는 수집 중 409로 차단하며, 사용자 확인 문구도 서버에서 검증한다.
 
@@ -223,7 +227,7 @@ Docker 반영 전후 공고 메타데이터·버전 목록·읽음 상태·개�
 
 작업 결과 `CLOSED`는 `COMPLETED`에 속한다. `GET /api/collections/{id}/tasks`의 `closed` 및 진단 메시지(`error`)로 판별 결과를 확인할 수 있다. 기업별 결과의 `closed`는 성공 처리된 마감 공고 수로, `succeeded`에 포함된다. 본문이 달라지지 않았음을 확인한 `IDENTICAL`과 구별한다. 수집 후 변화 요약의 새로 마감된 공고·관심 공고도 같은 트랜잭션에서 기록한다.
 
-마감 결과 추가 당시 백업은 v2 / DB 스키마 10이었으며, 이후 경력 자료(V12), 공고별 지원서 요구 정보(V13), 경력 추천·맞춤 초안(V14) 기능을 거쳐 현재 스키마는 13이다. 오늘의집 목록은 제목과 지원 URL이 동시에 없는 작성 중 항목만 건너뛰도록 보완했다. 정상 공고의 필수 정보 누락 오류는 숨기지 않는다.
+마감 결과를 추가했던 당시 백업은 v2 / DB 스키마 10이었다. 그 뒤 경력 자료(V12), 공고별 지원서 요구 정보(V13), 경력 추천·맞춤 초안(V14), 수집 실행별 지원 페이지 확인(V15)이 추가되어 현재 스키마는 14다. 오늘의집 목록은 제목과 지원 URL이 동시에 없는 작성 중 항목만 건너뛰도록 보완했다. 정상 공고의 필수 정보 누락 오류는 숨기지 않는다.
 
 대표 화면 확인 후 외부 접속을 차단한 HTML/SSR 재현, localhost 브라우저 응답, 임시 MySQL 저장 프로브로 검증했다. 실제 사용자 DB의 수집·재시도는 실행하지 않았고, 원래 실패 기록과 공고 상태를 유지했다. 실패 재시도의 실제 동작 확인은 사용자가 수행한다.
 

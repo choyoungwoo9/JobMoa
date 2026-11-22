@@ -460,6 +460,12 @@ function Workspace({ collection }: { collection: ReturnType<typeof useCollection
                         <Icon name="chevron" size={12} />
                       </button>
                     </div>
+                    {latestRun.applicationProgress && <div className="live-application-progress">
+                      <Icon name="file" size={13} />
+                      <span>지원 페이지 확인</span>
+                      <strong>{latestRun.applicationProgress.fetched + latestRun.applicationProgress.failed} / {latestRun.applicationProgress.total}</strong>
+                      <small>페이지 저장 {latestRun.applicationProgress.fetched} · 실패 {latestRun.applicationProgress.failed} · 대기 {latestRun.applicationProgress.pending} · 진행 중 {latestRun.applicationProgress.processing}</small>
+                    </div>}
                     <div className="live-source-list">
                       {latestRun.results.map((r) => (
                         <span

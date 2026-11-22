@@ -7,6 +7,7 @@ import java.time.Duration
 @ConfigurationProperties("jobmoa.crawler")
 data class CrawlerProperties(
     val workers: Int = 3,
+    val applicationPageWorkers: Int = 2,
     val siteConcurrency: Int = 1,
     val siteOverrides: Map<String, Int> = emptyMap(),
     val minimumNavigationInterval: Duration = Duration.ofMillis(700),
@@ -19,6 +20,7 @@ data class CrawlerProperties(
 ) {
     init {
         require(workers in 1..16) { "작업자 수는 1~16 사이여야 합니다." }
+        require(applicationPageWorkers in 1..8) { "지원 페이지 작업자 수는 1~8 사이여야 합니다." }
         require(siteConcurrency > 0 && siteOverrides.values.all { it > 0 })
         require(leaseDuration >= navigationTimeout.multipliedBy(2))
         require(!minimumNavigationInterval.isNegative)

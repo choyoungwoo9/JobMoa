@@ -69,7 +69,7 @@ class TaskService(private val tasks: CrawlTaskRepository, private val postings: 
             sourceId = task.sourceId, company = task.company, title = task.title, location = task.location,
             url = task.url, urlHash = task.urlHash, firstSeen = task.discoveredAt, lastSeen = now,
             closed = task.closed, lastChange = "new", categories = classification.categories, classification = classification.details))
-        if (!task.closed) applicationRequirements.collectAfterPostingCrawl(posting.id, contentChanged = outcome == TaskOutcome.CHANGED)
+        applicationRequirements.collectAfterPostingCrawl(posting.id, task.runId)
         if (outcome != TaskOutcome.IDENTICAL) postings.saveVersion(PostingVersion(postingId = posting.id,
             taskId = task.id, contentHash = task.contentHash, bodyText = checkNotNull(task.bodyText), capturePath = task.capturePath, savedAt = now))
         changes.append(CollectionChange(task.id, task.runId, posting.id, outcome.name, interests.find(posting.id)?.starred ?: false,

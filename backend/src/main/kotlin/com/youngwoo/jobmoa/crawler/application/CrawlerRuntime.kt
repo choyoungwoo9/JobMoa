@@ -30,6 +30,7 @@ class CrawlerRuntime(private val properties: CrawlerProperties, private val task
     private val log = LoggerFactory.getLogger(javaClass)
     private val sequence = AtomicInteger()
     private val workers = Executors.newFixedThreadPool(properties.workers) { r -> Thread(r, "crawl-worker-${sequence.incrementAndGet()}") }
+    private val applicationPageWorkers = Executors.newFixedThreadPool(properties.applicationPageWorkers) { r -> Thread(r, "application-page-worker-${sequence.incrementAndGet()}") }
     private val discovery = Executors.newSingleThreadExecutor { r -> Thread(r, "crawl-discovery") }
     private val owned = ConcurrentHashMap<String, String>()
     private val ownedPublicFetches = ConcurrentHashMap<String, String>()
@@ -42,48 +43,19 @@ class CrawlerRuntime(private val properties: CrawlerProperties, private val task
         tasks.recoverExpired(Instant.now())
         running = true
         repeat(properties.workers) { workers.submit { workerLoop() } }
+        repeat(properties.applicationPageWorkers) { applicationPageWorkers.submit { applicationPageWorkerLoop() } }
         discovery.submit { discoveryLoop() }
     }
 
     private fun workerLoop() {
         var browser: BrowserSession? = null
         var browserHeadless: Boolean? = null
-        var browserPublicOnly = false
         var offset = 0
-        var preferPublicFetch = true
-        fun processPublicFetch(publicFetch: PublicPageFetchLease) {
-            ownedPublicFetches[publicFetch.id] = publicFetch.leaseToken
-            try {
-                if (browser != null && (browserHeadless != true || !browserPublicOnly)) {
-                    browser?.close(); browser = null
-                }
-                val session = browser ?: BrowserSession(properties.copy(headless = true), limiter, publicOnly = true).also {
-                    browser = it; browserHeadless = true; browserPublicOnly = true
-                }
-                fetchPublicApplicationPage(publicFetch, session)
-            } catch (interrupted: InterruptedException) {
-                Thread.currentThread().interrupt()
-            } catch (error: Exception) {
-                try { applicationRequirements.failPublicPage(publicFetch.id, publicFetch.leaseToken, error.message ?: "공개 지원 페이지를 읽지 못했습니다.") }
-                catch (_: LeaseLost) { log.info("공개 페이지 작업 임대 만료: {}", publicFetch.id) }
-                catch (failure: Exception) { log.warn("공개 페이지 실패 상태 저장 실패: {}", publicFetch.id, failure) }
-                log.info("공개 지원 페이지 확인 실패: {} · {}", publicFetch.id, error.message)
-                try { browser?.close() } catch (_: Exception) { }; browser = null; browserPublicOnly = false; browserHeadless = null
-            } finally { ownedPublicFetches.remove(publicFetch.id) }
-        }
         try {
             while (running && !Thread.currentThread().isInterrupted) {
                 var task: CrawlTask? = null
                 var permit: AutoCloseable? = null
                 try {
-                    if (preferPublicFetch) {
-                        val publicFetch = applicationRequirements.claimPublicPage()
-                        if (publicFetch != null) {
-                            processPublicFetch(publicFetch)
-                            preferPublicFetch = false
-                            continue
-                        }
-                    }
                     val hosts = tasks.pendingSites()
                     for (index in hosts.indices) {
                         val host = hosts[(index + offset) % hosts.size]
@@ -93,11 +65,7 @@ class CrawlerRuntime(private val properties: CrawlerProperties, private val task
                         task = candidate; permit = slot; offset++; break
                     }
                     if (task == null) {
-                        val publicFetch = applicationRequirements.claimPublicPage()
-                        if (publicFetch != null) {
-                            processPublicFetch(publicFetch)
-                            preferPublicFetch = false
-                        } else Thread.sleep(400)
+                        Thread.sleep(400)
                         continue
                     }
                     val token = task.leaseToken!!
@@ -107,11 +75,9 @@ class CrawlerRuntime(private val properties: CrawlerProperties, private val task
                         val headless = properties.headless && !adapter.requiresWindowedBrowser
                         // 사이트에 필요한 모드가 바뀌면 이전 브라우저를 정리한다. 작업자당 하나만 유지한다.
                         if (browser != null && browserHeadless != headless) {
-                            browser?.close()
+                            browser.close()
                             browser = null
-                            browserPublicOnly = false
                         }
-                        if (browserPublicOnly && browser != null) { browser?.close(); browser = null; browserHeadless = null; browserPublicOnly = false }
                         val session = browser ?: BrowserSession(properties.copy(headless = headless), limiter).also {
                             browser = it
                             browserHeadless = headless
@@ -177,8 +143,39 @@ class CrawlerRuntime(private val properties: CrawlerProperties, private val task
                     // 브라우저 장애는 다음 작업에서 새 세션으로 복구한다. 정리도 동일 스레드에서 수행한다.
                     try { browser?.close() } catch (_: Exception) { }
                     browser = null
-                    browserPublicOnly = false
-                } finally { task?.let { owned.remove(it.id) }; permit?.close(); if (task != null) preferPublicFetch = true }
+                } finally { task?.let { owned.remove(it.id) }; permit?.close() }
+            }
+        } finally { try { browser?.close() } catch (_: Exception) { } }
+    }
+
+    private fun applicationPageWorkerLoop() {
+        var browser: BrowserSession? = null
+        fun process(publicFetch: PublicPageFetchLease) {
+            ownedPublicFetches[publicFetch.id] = publicFetch.leaseToken
+            try {
+                val session = browser ?: BrowserSession(properties.copy(headless = true), limiter, publicOnly = true).also { browser = it }
+                fetchPublicApplicationPage(publicFetch, session)
+            } catch (interrupted: InterruptedException) {
+                Thread.currentThread().interrupt()
+            } catch (error: Exception) {
+                try { applicationRequirements.failPublicPage(publicFetch.id, publicFetch.leaseToken, error.message ?: "공개 지원 페이지를 읽지 못했습니다.") }
+                catch (_: LeaseLost) { log.info("공개 페이지 작업 임대 만료: {}", publicFetch.id) }
+                catch (failure: Exception) { log.warn("공개 페이지 실패 상태 저장 실패: {}", publicFetch.id, failure) }
+                log.info("공개 지원 페이지 확인 실패: {} · {}", publicFetch.id, error.message)
+                try { browser?.close() } catch (_: Exception) { }; browser = null
+            } finally { ownedPublicFetches.remove(publicFetch.id) }
+        }
+        try {
+            while (running && !Thread.currentThread().isInterrupted) {
+                try {
+                    val publicFetch = applicationRequirements.claimPublicPage()
+                    if (publicFetch == null) Thread.sleep(400) else process(publicFetch)
+                } catch (interrupted: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                } catch (error: Exception) {
+                    log.warn("지원 페이지 작업 큐 조회 실패", error)
+                    Thread.sleep(1000)
+                }
             }
         } finally { try { browser?.close() } catch (_: Exception) { } }
     }
@@ -236,37 +233,78 @@ class CrawlerRuntime(private val properties: CrawlerProperties, private val task
             }
 
             navigatePublic(fetch.postingUrl)
-            val links = page.evaluate("""() => Array.from(document.querySelectorAll('a[href]')).map(a => ({href:a.href, text:(a.innerText || a.getAttribute('aria-label') || '').trim()})).filter(x => /지원하기|입사지원|지원서 작성|지원서|^지원$|apply(?: now)?|submit application/i.test(x.text)).filter(x => x.href && !/login|signin|sign-in|logout|terms|privacy/i.test(x.href + ' ' + x.text)).slice(0, 12)""") as? List<*> ?: emptyList<Any>()
+            val postingUrl = page.currentUrl().orEmpty()
+            val links = page.evaluate("""() => Array.from(document.querySelectorAll('a[href]')).map(a => ({href:a.href, text:(a.innerText || a.getAttribute('aria-label') || '').trim()})).filter(x => /지원|접수|apply|application|submit/i.test(x.text + ' ' + x.href)).filter(x => x.href && !/login|signin|sign-in|logout|terms|privacy/i.test(x.href + ' ' + x.text)).slice(0, 24)""") as? List<*> ?: emptyList<Any>()
             val candidates = links.mapNotNull { raw ->
                 val row = raw as? Map<*, *> ?: return@mapNotNull null
                 val url = row["href"]?.toString()?.takeIf(String::isNotBlank) ?: return@mapNotNull null
-                val label = row["text"]?.toString().orEmpty()
-                val score = (if (Regex("지원하기|입사지원|지원서 작성|apply(?: now)?|submit application", RegexOption.IGNORE_CASE).containsMatchIn(label)) 2 else 0) +
-                    (if (Regex("/apply|/application|/job-application", RegexOption.IGNORE_CASE).containsMatchIn(url)) 1 else 0)
-                url to score
-            }.sortedByDescending { it.second }.take(5)
+                url
+            }.distinct().filterNot { samePublicUrl(it, postingUrl) }.take(12)
 
             var selectedText: String? = null
-            var selectedUrl = page.currentUrl().orEmpty()
-            val directText = visibleText(page)
-            if (directText.isNotBlank() && isApplicationPage(page, directText)) selectedText = directText
-            for ((url, _) in candidates) {
+            var selectedUrl = postingUrl
+            var loginRequired = false
+            // 원래 공고 본문은 폼처럼 보이는 요소가 있더라도 지원 페이지 원문으로 사용하지 않는다.
+            for (url in candidates) {
                 if (selectedText != null) break
                 try {
                     navigatePublic(url)
                     val text = visibleText(page)
-                    if (text.isNotBlank() && isApplicationPage(page, text) && !looksLikeLoginPage(page, text)) {
+                    val resolvedUrl = page.currentUrl().orEmpty()
+                    if (looksLikeLoginPage(page, text)) {
+                        loginRequired = true
+                        continue
+                    }
+                    if (!samePublicUrl(resolvedUrl, postingUrl) && text.length >= ApplicationRequirementService.MIN_PUBLIC_TEXT_CHARS) {
                         selectedText = text
-                        selectedUrl = page.currentUrl().orEmpty()
+                        selectedUrl = resolvedUrl
                     }
                 } catch (error: Exception) {
-                    // 한 링크가 비공개이거나 로그인으로 이어져도 다른 공개 지원 링크는 확인한다.
+                    if (error.message.orEmpty().contains("로그인")) loginRequired = true
+                    // 한 링크가 비공개이거나 로그인으로 이어져도 다른 공개 지원 경로를 확인한다.
                     log.debug("공개 지원 링크 확인 생략: {} · {}", url, error.message)
                 }
             }
+            if (selectedText == null) {
+                navigatePublic(fetch.postingUrl)
+                val host = PostingUrl.siteKey(postingUrl)
+                val textBeforeClick = visibleText(page)
+                var clickPermit: AutoCloseable? = null
+                while (clickPermit == null) { clickPermit = limiter.tryAcquire(host); if (clickPermit == null) Thread.sleep(200) }
+                try {
+                    limiter.beforeNavigation(host)
+                    val clicked = page.evaluate("""() => {
+                        const label = /지원하기|입사지원|지원서 작성|apply(?: now)?|submit application/i;
+                        const button = [...document.querySelectorAll('button,[role="button"]')].find(el => {
+                            const text = (el.innerText || el.getAttribute('aria-label') || '').trim();
+                            const type = (el.getAttribute('type') || '').toLowerCase();
+                            return label.test(text) && type !== 'submit' && !el.closest('form') && !el.matches(':disabled,[aria-disabled="true"]');
+                        });
+                        if (!button) return false;
+                        button.click();
+                        return true;
+                    }""") as? Boolean ?: false
+                    if (clicked) {
+                        page.evaluate("() => new Promise(resolve => setTimeout(resolve, 1200))")
+                        selectedUrl = page.currentUrl().orEmpty()
+                        PublicUrlGuard.validate(selectedUrl)
+                        val text = visibleText(page)
+                        if (looksLikeLoginPage(page, text)) loginRequired = true
+                        else {
+                            val dialogText = page.evaluate("""() => (document.querySelector('[role="dialog"],[aria-modal="true"]')?.innerText || '').trim()""") as? String
+                            val capturedText = dialogText?.takeIf { it.length >= ApplicationRequirementService.MIN_PUBLIC_TEXT_CHARS }
+                                ?: text.takeIf { !samePublicUrl(selectedUrl, postingUrl) && text != textBeforeClick }
+                            if (capturedText != null && capturedText.length >= ApplicationRequirementService.MIN_PUBLIC_TEXT_CHARS) selectedText = capturedText
+                        }
+                    }
+                } finally { clickPermit.close() }
+            }
             val content = selectedText ?: throw IllegalStateException(
-                if (candidates.isEmpty()) "공개 지원 링크를 찾지 못했습니다. 빈 문항을 직접 복사해 주세요."
-                else "공개 문항을 확인하지 못했습니다. 로그인 없이 볼 수 있는 문항을 직접 복사해 주세요.",
+                when {
+                    loginRequired -> "지원 페이지에서 로그인이 필요합니다. 로그인하지 않고 직접 복사해 주세요."
+                    candidates.isEmpty() -> "공개 지원 페이지 경로를 찾지 못했습니다. 공고 본문은 지원서 항목으로 사용하지 않았습니다."
+                    else -> "지원 경로는 찾았지만 실제 지원 페이지 원문을 열지 못했습니다. 공고 본문은 지원서 항목으로 사용하지 않았습니다."
+                },
             )
             applicationRequirements.completePublicPage(fetch.id, fetch.leaseToken, selectedUrl, content)
         }
@@ -275,10 +313,9 @@ class CrawlerRuntime(private val properties: CrawlerProperties, private val task
     private fun visibleText(page: BrowserPage): String = (page.evaluate("""() => document.body?.innerText || ''""") as? String)
         ?.replace(Regex("\\n{3,}"), "\n\n")?.trim()?.take(ApplicationRequirementService.MAX_TEXT_CHARS).orEmpty()
 
-    private fun isApplicationPage(page: BrowserPage, text: String): Boolean {
-        val hasForm = page.evaluate("""() => !!document.querySelector('textarea, input[type="file"], input[type="radio"], input[type="checkbox"]') || document.querySelectorAll('form input:not([type="hidden"]):not([type="search"])').length >= 3""") as? Boolean ?: false
-        return hasForm || Regex("지원서|자기소개서|제출 서류|resume|cover letter|application question", RegexOption.IGNORE_CASE).containsMatchIn(text)
-    }
+    private fun samePublicUrl(left: String, right: String): Boolean = runCatching {
+        PostingUrl.normalize(left) == PostingUrl.normalize(right)
+    }.getOrDefault(left.trimEnd('/') == right.trimEnd('/'))
 
     private fun looksLikeLoginPage(page: BrowserPage, text: String): Boolean {
         val url = page.currentUrl().orEmpty()
@@ -289,7 +326,7 @@ class CrawlerRuntime(private val properties: CrawlerProperties, private val task
     @PreDestroy
     fun stop() {
         running = false
-        discovery.shutdownNow(); workers.shutdownNow()
-        discovery.awaitTermination(3, TimeUnit.SECONDS); workers.awaitTermination(3, TimeUnit.SECONDS)
+        discovery.shutdownNow(); workers.shutdownNow(); applicationPageWorkers.shutdownNow()
+        discovery.awaitTermination(3, TimeUnit.SECONDS); workers.awaitTermination(3, TimeUnit.SECONDS); applicationPageWorkers.awaitTermination(3, TimeUnit.SECONDS)
     }
 }
