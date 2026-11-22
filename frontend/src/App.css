@@ -3775,6 +3775,84 @@ dialog::backdrop {
 .application-answer-footer > div { display: flex; gap: 7px; }
 .application-fact-note { margin: 8px 0 0; overflow-wrap: anywhere; }
 .application-fact-warning { margin: 8px 0 0; color: #9b6b35; font-size: 9px; line-height: 1.6; }
+.application-document-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 7px; }
+.application-document-help { margin: 4px 0 12px; color: #86917d; font-size: 10px; line-height: 1.65; }
+.application-previous-versions { margin: 10px 0; padding: 10px 12px; border: 1px solid #e5eadf; border-radius: 8px; background: #fbfcf9; color: #66765c; font-size: 10px; }
+.application-previous-versions summary { cursor: pointer; font-weight: 650; }
+.application-previous-versions > div { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-top: 9px; }
+.application-previous-versions > div span { color: #88937e; }
+.application-project-meta-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.application-project-meta-fields > label { display: block; color: #748367; font-size: 10px; }
+.application-project-meta-fields input { display: block; width: 100%; margin-top: 5px; }
+.application-edit-item label small { color: #97a08e; font-size: 9px; font-weight: 400; }
+.application-document-overlay { position: fixed; inset: 0; z-index: 1500; display: flex; flex-direction: column; overflow: auto; background: #eef1ec; }
+.application-document-toolbar { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px max(20px, calc((100vw - 1240px) / 2)); border-bottom: 1px solid #dce2d7; background: #fff; }
+.application-document-toolbar > div:first-child { display: flex; flex-direction: column; gap: 3px; }
+.application-document-toolbar strong { color: #34452d; font-size: 13px; }
+.application-document-toolbar span { color: #8b9682; font-size: 10px; }
+.application-document-toolbar > div:last-child { display: flex; flex: 0 0 auto; gap: 7px; }
+.application-document-page { position: relative; box-sizing: border-box; width: 210mm; min-height: 297mm; margin: 22px auto; padding: 19mm 19mm 20mm; background: #fff; color: #202a38; box-shadow: 0 4px 24px #2636221c; font-family: Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; font-size: 10.5pt; line-height: 1.65; }
+.application-document-page h1 { margin: 9px 0 5px; color: #17283e; font-size: 25pt; font-weight: 700; line-height: 1.25; letter-spacing: -.04em; overflow-wrap: anywhere; }
+.application-document-page h2 { margin: 0 0 8px; padding-bottom: 5px; border-bottom: 1px solid #d9e1e8; color: #253e58; font-size: 12pt; line-height: 1.35; }
+.application-document-profile { margin: 14px 0; padding: 12px; border: 1px solid #e7ebdf; border-radius: 8px; background: #fbfcf9; }
+.application-document-profile > strong,.application-document-profile > small { display: block; }
+.application-document-profile > strong { color: #566a49; font-size: 10px; }
+.application-document-profile > small { margin-top: 4px; color: #89947f; font-size: 9px; line-height: 1.5; }
+.application-document-profile-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px 12px; margin-top: 9px; }
+.application-document-profile-grid label { display: block; min-width: 0; color: #77836e; font-size: 9px; }
+.application-document-profile-grid input { display: block; width: 100%; margin-top: 4px; }
+.application-document-contact { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; color: #68788a; font-size: 9pt; overflow-wrap: anywhere; }
+.application-document-contact a { color: inherit; text-decoration: none; }
+.application-document-kicker { color: #64806f; font-size: 8pt; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.application-document-heading { margin-bottom: 18px; padding-bottom: 13px; border-bottom: 2px solid #506d5a; }
+.application-document-heading > p { margin: 4px 0 0; color: #748197; font-size: 10pt; }
+.application-document-summary { margin: 18px 0 20px; padding: 13px 15px; border-left: 3px solid #739078; background: #f5f8f5; }
+.application-document-summary h2 { border: 0; padding: 0; }
+.application-document-summary p { margin: 0; color: #3b4857; }
+.application-document-section { margin: 18px 0; break-inside: avoid; page-break-inside: avoid; }
+.application-document-text p { margin: 0 0 8px; white-space: pre-line; }
+.application-document-text ul,.application-document-section > ul { margin: 0; padding-left: 20px; }
+.application-document-text li,.application-document-section > ul li { margin: 3px 0; padding-left: 2px; }
+.application-document-empty { color: #84907c; }
+.application-portfolio-cover { display: flex; flex-direction: column; justify-content: space-between; border-top: 8px solid #314b41; }
+.application-portfolio-cover-content { margin: auto 0; padding: 35px 0; }
+.application-portfolio-mark { display: inline-grid; width: 44px; height: 44px; place-items: center; border-radius: 50%; background: #eaf0ea; color: #44614f; font-size: 19pt; font-weight: 700; }
+.application-portfolio-cover-content h1 { max-width: 150mm; margin-top: 20px; font-size: 29pt; }
+.application-portfolio-cover-content p { max-width: 150mm; color: #536172; font-size: 12pt; line-height: 1.8; }
+.application-portfolio-cover-content p.application-portfolio-role { margin: 5px 0; color: #64806f; font-size: 11pt; font-weight: 650; }
+.application-portfolio-cover-footer { display: grid; gap: 3px; padding-top: 12px; border-top: 1px solid #dce3dc; }
+.application-portfolio-cover-footer span,.application-portfolio-cover-footer small { color: #829080; font-size: 9pt; }
+.application-portfolio-cover-footer strong { color: #283c32; font-size: 12pt; }
+.application-portfolio-index { margin: 18px 0 0; padding: 0; list-style: none; color: #657467; font-size: 9pt; }
+.application-portfolio-index li { padding: 4px 0; border-bottom: 1px solid #edf0ed; }
+.application-portfolio-case { padding-top: 24mm; }
+.application-portfolio-case .application-document-heading { margin-bottom: 14px; }
+.application-portfolio-case .application-document-heading h1 { font-size: 22pt; }
+.application-document-tech { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; }
+.application-document-tech span { padding: 3px 8px; border: 1px solid #dce5df; border-radius: 999px; color: #50675a; font-size: 8.5pt; }
+.application-document-page-footer { position: absolute; right: 19mm; bottom: 10mm; left: 19mm; display: flex; justify-content: space-between; padding-top: 7px; border-top: 1px solid #e5e9e6; color: #849086; font-size: 8pt; }
+@media (max-width: 760px) {
+  .application-document-toolbar { align-items: flex-start; padding: 10px 12px; }
+  .application-document-toolbar > div:first-child span { max-width: 46vw; line-height: 1.5; }
+  .application-document-toolbar .button { padding: 7px 9px; font-size: 10px; }
+  .application-document-page { width: min(100%, 210mm); min-height: 260mm; margin: 10px auto; padding: 12mm 10mm 16mm; font-size: 10pt; }
+  .application-document-page-footer { right: 10mm; left: 10mm; }
+  .application-document-profile-grid { grid-template-columns: minmax(0,1fr); }
+}
+@page { size: A4; margin: 0; }
+@media print {
+  html, body { width: 100%; height: auto; overflow: visible !important; background: #fff !important; }
+  body > *:not(.application-document-overlay) { display: none !important; }
+  body * { visibility: hidden !important; }
+  .application-document-overlay, .application-document-overlay * { visibility: visible !important; }
+  .application-document-overlay { position: static !important; inset: auto !important; display: block !important; width: 100% !important; height: auto !important; overflow: visible !important; background: #fff !important; }
+  .application-document-toolbar { display: none !important; }
+  .application-document-page { width: 210mm !important; min-height: 297mm !important; margin: 0 !important; padding: 19mm 19mm 20mm !important; border: 0 !important; box-shadow: none !important; break-after: page; page-break-after: always; }
+  .application-document-page:last-child { break-after: auto; page-break-after: auto; }
+  .application-document-page-footer { right: 19mm !important; left: 19mm !important; }
+  .application-document-section, .application-document-tech { break-inside: avoid; page-break-inside: avoid; }
+  a { color: inherit; text-decoration: none; }
+}
 .application-research-meta { margin: 10px 0; color: #88957d; font-size: 9px; }
 .application-research-group > article { margin: 9px 0; padding: 11px; border: 1px solid #edf0e8; border-radius: 7px; background: #fbfcf9; }
 .application-research-group > article > strong { display: block; color: #526847; font-size: 10px; line-height: 1.6; }

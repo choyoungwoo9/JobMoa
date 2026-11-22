@@ -5,6 +5,7 @@ import type { Job } from '../types'
 import { BrandMark } from './BrandMark'
 import { Icon } from './Icon'
 import { ApplicationRequirementsPanel } from './ApplicationRequirementsPanel'
+import { ApplicationDocumentPreview } from './ApplicationDocumentPreview'
 
 type CaseStatus = 'PREPARING' | 'APPLIED'
 type TaskStatus = 'WAITING_AI' | 'ANALYZING' | 'COMPLETED' | 'FAILED'
@@ -23,14 +24,14 @@ type Detail = {
   recentTasks: Task[]
 }
 type MaterialSection = { id: string; heading: string; content: string; included: boolean; order: number; factIds: string[]; evidence: Evidence[] }
-type MaterialProject = { id: string; title: string; selectionReason: string; summary: string; included: boolean; order: number; factIds: string[]; evidence: Evidence[] }
+type MaterialProject = { id: string; title: string; selectionReason: string; summary: string; role?: string; period?: string; technologies?: string[]; problem?: string; contributions?: string[]; outcome?: string; included: boolean; order: number; factIds: string[]; evidence: Evidence[] }
 type Evidence = { id?: string; title?: string; summary?: string; locationLabel?: string; excerpt?: string }
-type MaterialDraft = { resumeHeadline: string; resumeSummary: string; resumeHeadlineEvidence: Evidence[]; resumeSummaryEvidence: Evidence[]; resumeSections: MaterialSection[]; portfolioProjects: MaterialProject[]; informationGaps: string[]; hasUnlinkedContent: boolean }
+type MaterialDraft = { resumeHeadline: string; resumeSummary: string; candidateName: string; contactEmail: string; contactPhone: string; contactLinks: string[]; resumeHeadlineEvidence: Evidence[]; resumeSummaryEvidence: Evidence[]; resumeSections: MaterialSection[]; portfolioProjects: MaterialProject[]; informationGaps: string[]; hasUnlinkedContent: boolean }
 type Pane = 'materials' | 'questions' | 'interview' | 'source'
 const paneLabels: Record<Pane, string> = { materials: '맞춤 이력서·포트폴리오', questions: '지원서 문항', interview: '면접 준비', source: '지원서 원문' }
 const basisLabels: Record<string, string> = { POSTING: '공고 기반', RESUME: '이력서 기반', PORTFOLIO: '포트폴리오 기반', APPLICATION_ANSWER: '지원서 답변 기반', COMPANY_TREND: '회사·직무 경향' }
 const taskLabels: Record<TaskType, string> = { MATERIAL_DRAFT: '맞춤 자료 구성', EXTRACT_QUESTIONS: '문항 추출', DRAFT_ANSWER: '답변 초안 작성', INTERVIEW_RESEARCH: '면접 경향 조사', INTERVIEW_FOLLOW_UP: '꼬리 질문 작성' }
-const emptyDraft: MaterialDraft = { resumeHeadline: '', resumeSummary: '', resumeHeadlineEvidence: [], resumeSummaryEvidence: [], resumeSections: [], portfolioProjects: [], informationGaps: [], hasUnlinkedContent: false }
+const emptyDraft: MaterialDraft = { resumeHeadline: '', resumeSummary: '', candidateName: '', contactEmail: '', contactPhone: '', contactLinks: [], resumeHeadlineEvidence: [], resumeSummaryEvidence: [], resumeSections: [], portfolioProjects: [], informationGaps: [], hasUnlinkedContent: false }
 
 function taskState(task: Task | null | undefined) {
   if (!task) return null
@@ -43,6 +44,8 @@ function initialDraft(value: any): MaterialDraft {
   if (!value || typeof value !== 'object') return emptyDraft
   return {
     resumeHeadline: value.resumeHeadline ?? '', resumeSummary: value.resumeSummary ?? '',
+    candidateName: value.candidateName ?? '', contactEmail: value.contactEmail ?? '', contactPhone: value.contactPhone ?? '',
+    contactLinks: Array.isArray(value.contactLinks) ? value.contactLinks : [],
     resumeHeadlineEvidence: Array.isArray(value.resumeHeadlineEvidence) ? value.resumeHeadlineEvidence : [],
     resumeSummaryEvidence: Array.isArray(value.resumeSummaryEvidence) ? value.resumeSummaryEvidence : [],
     resumeSections: Array.isArray(value.resumeSections) ? value.resumeSections.map((item: any, index: number) => ({ ...item, order: item.order ?? index, included: item.included !== false, factIds: item.factIds ?? [], evidence: item.evidence ?? [] })) : [],
@@ -71,6 +74,7 @@ export function ApplicationWorkspace({ jobs, demo = false, initialApplicationId,
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [documentPreview, setDocumentPreview] = useState<{ kind: 'resume' | 'portfolio'; draft: MaterialDraft; version: number | null; application: Detail['application'] } | null>(null)
   const detailRef = useRef<Detail | null>(null)
   const materialsVersionRef = useRef<number | null>(null)
   const selectedJob = useMemo(() => jobs.find(job => Number(job.id) === detail?.application.postingId) ?? null, [jobs, detail?.application.postingId])
@@ -185,15 +189,21 @@ export function ApplicationWorkspace({ jobs, demo = false, initialApplicationId,
   }
   async function saveMaterials() {
     if (!detail) return
-    const body = { resumeHeadline: draft.resumeHeadline, resumeSummary: draft.resumeSummary,
+    const body = { resumeHeadline: draft.resumeHeadline, resumeSummary: draft.resumeSummary, candidateName: draft.candidateName,
+      contactEmail: draft.contactEmail, contactPhone: draft.contactPhone, contactLinks: draft.contactLinks,
       resumeSections: draft.resumeSections.map((item, order) => ({ id: item.id, heading: item.heading, content: item.content, included: item.included, order })),
-      portfolioProjects: draft.portfolioProjects.map((item, order) => ({ id: item.id, title: item.title, selectionReason: item.selectionReason, summary: item.summary, included: item.included, order })) }
+      portfolioProjects: draft.portfolioProjects.map((item, order) => ({ id: item.id, title: item.title, selectionReason: item.selectionReason, summary: item.summary, included: item.included, order,
+        role: item.role, period: item.period, technologies: item.technologies ?? [], problem: item.problem, contributions: item.contributions ?? [], outcome: item.outcome })) }
     const saved = await api<{ draft: any; version: number }>(`/api/applications/${detail.application.id}/materials`, { method: 'PUT', ...json(body) })
     setDraft(initialDraft(saved.draft)); await refreshDetail(detail.application.id)
   }
   async function retry(task: Task) {
     if (!detail) return
     const updated = await api<Task>(`/api/applications/${detail.application.id}/tasks/${task.id}/retry`, { method: 'POST' }); setActiveTask(updated)
+  }
+  function previewDocument(kind: 'resume' | 'portfolio', value: any = draft, version = detail?.materialsVersion ?? null) {
+    if (!detail) return
+    setDocumentPreview({ kind, draft: initialDraft(value), version, application: detail.application })
   }
   async function answerInterview(turn: Turn, text: string) {
     if (!detail?.interviewSession || !detail.interviewSession.session) return
@@ -250,16 +260,37 @@ export function ApplicationWorkspace({ jobs, demo = false, initialApplicationId,
         {currentTask && <div className="application-ai-progress" role="status"><span className="application-ai-spinner" /><div><strong>{taskLabels[currentTask.type]} · {taskState(currentTask)}</strong><small>브라우저를 닫아도 작업은 취소되지 않아요. 이 화면을 다시 열면 저장된 상태를 이어서 확인합니다.</small></div><button className="text-button" onClick={() => void refreshDetail(detail.application.id)}>새로고침</button></div>}
         {activeTask?.status === 'FAILED' && <div className="application-task-error"><div><strong>{taskLabels[activeTask.type]} 실패</strong><p>{activeTask.errorMessage}</p></div><button className="button secondary small" disabled={busy} onClick={() => void run(() => retry(activeTask))}>실패한 작업 재시도</button></div>}
         {pane === 'materials' && <div className="application-pane-content">
-          <div className="application-pane-heading"><div><h3>공고 맞춤 자료</h3><p>여러 경력 자료에서 관련 경험을 찾아 초안을 만들어요. 원문 근거 링크는 가능한 문장에 연결하고, 연결이 빠진 곳은 확인 표시를 남겨요.</p></div>{!detail.materials && <button className="button primary" disabled={busy || !!currentTask} onClick={() => void run(() => queueTask(`/api/applications/${detail.application.id}/materials/generate`))}>맞춤 이력서·포트폴리오 만들기</button>}</div>
-          {!detail.materials && <div className="application-empty-inline"><strong>맞춤 자료 초안이 없어요</strong><p>등록된 경력 자료에서 공고와 관련된 경험을 찾아 이력서와 포트폴리오를 구성해요. 자료와 대조가 필요한 부분은 초안에 표시합니다.</p><button className="text-button" onClick={onOpenCareer}>경력 자료 열기</button></div>}
+          <div className="application-pane-heading"><div><h3>제출용 이력서·포트폴리오</h3><p>여러 경력 자료에서 공고와 맞는 내용을 골라 실제 문서 형태로 구성해요. 미리보기에서 PDF로 저장할 수 있어요.</p></div>{!detail.materials
+            ? <button className="button primary" disabled={busy || !!currentTask} onClick={() => void run(() => queueTask(`/api/applications/${detail.application.id}/materials/generate`))}>이력서·포트폴리오 만들기</button>
+            : <div className="application-document-actions"><button className="button secondary" disabled={!draft.resumeHeadline && !draft.resumeSummary && !draft.resumeSections.length} onClick={() => previewDocument('resume')}>이력서 미리보기</button><button className="button secondary" disabled={!draft.portfolioProjects.length} onClick={() => previewDocument('portfolio')}>포트폴리오 미리보기</button><button className="button primary" disabled={busy || !!currentTask} onClick={() => void run(() => queueTask(`/api/applications/${detail.application.id}/materials/regenerate`))}>문서 다시 구성</button></div>}</div>
+          {!detail.materials && <div className="application-empty-inline"><strong>제출용 문서를 만들어보세요</strong><p>등록된 경력 자료에서 직무 경험과 프로젝트를 찾아 이력서와 포트폴리오를 구성합니다. 이름·연락처처럼 자료에서 확인되지 않는 정보는 임의로 만들지 않아요.</p><button className="text-button" onClick={onOpenCareer}>경력 자료 열기</button></div>}
           {detail.materials && <>
+            <p className="application-document-help">근거와 확인 메모는 검토 화면에만 표시되고 PDF에는 포함되지 않습니다. 문서를 다시 구성하면 현재 저장본은 이전 버전으로 보관돼요.</p>
+            {!!detail.materials.previousVersions?.length && <details className="application-previous-versions"><summary>이전 생성본 {detail.materials.previousVersions.length}개 보기</summary>{detail.materials.previousVersions.map((entry: any) => <div key={entry.version}><span>초안 v{entry.version}</span><button className="text-button" onClick={() => previewDocument('resume', entry.draft, entry.version)}>이력서 보기</button><button className="text-button" disabled={!entry.draft?.portfolioProjects?.length} onClick={() => previewDocument('portfolio', entry.draft, entry.version)}>포트폴리오 보기</button></div>)}</details>}
             <div className="application-material-card"><div className="application-material-card-heading"><h4>이력서</h4><span>초안 v{detail.materialsVersion}</span></div>
+              <div className="application-document-profile"><strong>문서 기본 정보</strong><small>자료에서 찾지 못한 정보는 직접 입력할 수 있어요. 비워둔 항목은 PDF에 표시하지 않아요.</small><div className="application-document-profile-grid">
+                <label>이름<input maxLength={100} value={draft.candidateName} onChange={e => setDraft(value => ({ ...value, candidateName: e.target.value }))} /></label>
+                <label>이메일<input type="email" maxLength={320} value={draft.contactEmail} onChange={e => setDraft(value => ({ ...value, contactEmail: e.target.value }))} /></label>
+                <label>전화번호<input maxLength={100} value={draft.contactPhone} onChange={e => setDraft(value => ({ ...value, contactPhone: e.target.value }))} /></label>
+                <label>링크<input maxLength={4000} value={draft.contactLinks.join(', ')} onChange={e => setDraft(value => ({ ...value, contactLinks: e.target.value.split(',').map(part => part.trim()).filter(Boolean).slice(0, 8) }))} placeholder="GitHub, 블로그 등 쉼표로 구분" /></label>
+              </div></div>
               <label>이력서 제목<input maxLength={500} value={draft.resumeHeadline} onChange={e => setDraft(value => ({ ...value, resumeHeadline: e.target.value }))} /></label><EvidenceList evidence={draft.resumeHeadlineEvidence} />
               <label>요약<textarea rows={4} maxLength={3000} value={draft.resumeSummary} onChange={e => setDraft(value => ({ ...value, resumeSummary: e.target.value }))} /></label><EvidenceList evidence={draft.resumeSummaryEvidence} />
               {draft.resumeSections.map((section, index) => <article className={`application-edit-item ${section.included ? '' : 'excluded'}`} key={section.id}><div className="application-edit-item-heading"><label><input type="checkbox" checked={section.included} onChange={e => setDraft(value => ({ ...value, resumeSections: value.resumeSections.map(item => item.id === section.id ? { ...item, included: e.target.checked } : item) }))} /> 이력서에 포함</label><div><button aria-label="이력서 항목 위로" disabled={index === 0} onClick={() => setDraft(value => ({ ...value, resumeSections: moveItem(value.resumeSections, index, -1) }))}>↑</button><button aria-label="이력서 항목 아래로" disabled={index === draft.resumeSections.length - 1} onClick={() => setDraft(value => ({ ...value, resumeSections: moveItem(value.resumeSections, index, 1) }))}>↓</button></div></div><input aria-label="이력서 항목 제목" value={section.heading} onChange={e => setDraft(value => ({ ...value, resumeSections: value.resumeSections.map(item => item.id === section.id ? { ...item, heading: e.target.value } : item) }))} /><textarea aria-label="이력서 항목 내용" rows={4} value={section.content} onChange={e => setDraft(value => ({ ...value, resumeSections: value.resumeSections.map(item => item.id === section.id ? { ...item, content: e.target.value } : item) }))} /><EvidenceList evidence={section.evidence} /></article>)}
             </div>
             <div className="application-material-card"><div className="application-material-card-heading"><h4>포트폴리오</h4><span>{draft.portfolioProjects.length}개 프로젝트</span></div>
-              {draft.portfolioProjects.map((project, index) => <article className={`application-edit-item ${project.included ? '' : 'excluded'}`} key={project.id}><div className="application-edit-item-heading"><label><input type="checkbox" checked={project.included} onChange={e => setDraft(value => ({ ...value, portfolioProjects: value.portfolioProjects.map(item => item.id === project.id ? { ...item, included: e.target.checked } : item) }))} /> 포트폴리오에 포함</label><div><button aria-label="프로젝트 위로" disabled={index === 0} onClick={() => setDraft(value => ({ ...value, portfolioProjects: moveItem(value.portfolioProjects, index, -1) }))}>↑</button><button aria-label="프로젝트 아래로" disabled={index === draft.portfolioProjects.length - 1} onClick={() => setDraft(value => ({ ...value, portfolioProjects: moveItem(value.portfolioProjects, index, 1) }))}>↓</button></div></div><input aria-label="프로젝트 제목" value={project.title} onChange={e => setDraft(value => ({ ...value, portfolioProjects: value.portfolioProjects.map(item => item.id === project.id ? { ...item, title: e.target.value } : item) }))} /><textarea aria-label="프로젝트 설명" rows={4} value={project.summary} onChange={e => setDraft(value => ({ ...value, portfolioProjects: value.portfolioProjects.map(item => item.id === project.id ? { ...item, summary: e.target.value } : item) }))} /><label>선정 이유<input value={project.selectionReason} onChange={e => setDraft(value => ({ ...value, portfolioProjects: value.portfolioProjects.map(item => item.id === project.id ? { ...item, selectionReason: e.target.value } : item) }))} /></label><EvidenceList evidence={project.evidence} /></article>)}
+              {draft.portfolioProjects.map((project, index) => <article className={`application-edit-item ${project.included ? '' : 'excluded'}`} key={project.id}>
+                <div className="application-edit-item-heading"><label><input type="checkbox" checked={project.included} onChange={e => setDraft(value => ({ ...value, portfolioProjects: value.portfolioProjects.map(item => item.id === project.id ? { ...item, included: e.target.checked } : item) }))} /> 포트폴리오에 포함</label><div><button aria-label="프로젝트 위로" disabled={index === 0} onClick={() => setDraft(value => ({ ...value, portfolioProjects: moveItem(value.portfolioProjects, index, -1) }))}>↑</button><button aria-label="프로젝트 아래로" disabled={index === draft.portfolioProjects.length - 1} onClick={() => setDraft(value => ({ ...value, portfolioProjects: moveItem(value.portfolioProjects, index, 1) }))}>↓</button></div></div>
+                <label>프로젝트 제목<input value={project.title} onChange={e => setDraft(value => ({ ...value, portfolioProjects: value.portfolioProjects.map(item => item.id === project.id ? { ...item, title: e.target.value } : item) }))} /></label>
+                <label>한 줄 개요<textarea rows={3} value={project.summary} onChange={e => setDraft(value => ({ ...value, portfolioProjects: value.portfolioProjects.map(item => item.id === project.id ? { ...item, summary: e.target.value } : item) }))} /></label>
+                <div className="application-project-meta-fields"><label>담당 역할<input value={project.role ?? ''} onChange={e => setDraft(value => ({ ...value, portfolioProjects: value.portfolioProjects.map(item => item.id === project.id ? { ...item, role: e.target.value } : item) }))} /></label><label>기간<input value={project.period ?? ''} onChange={e => setDraft(value => ({ ...value, portfolioProjects: value.portfolioProjects.map(item => item.id === project.id ? { ...item, period: e.target.value } : item) }))} /></label></div>
+                <label>사용 기술<input value={(project.technologies ?? []).join(', ')} onChange={e => setDraft(value => ({ ...value, portfolioProjects: value.portfolioProjects.map(item => item.id === project.id ? { ...item, technologies: e.target.value.split(',').map(part => part.trim()).filter(Boolean) } : item) }))} placeholder="쉼표로 구분" /></label>
+                <label>해결 과제<textarea rows={3} value={project.problem ?? ''} onChange={e => setDraft(value => ({ ...value, portfolioProjects: value.portfolioProjects.map(item => item.id === project.id ? { ...item, problem: e.target.value } : item) }))} /></label>
+                <label>담당 역할과 기여<textarea rows={4} value={(project.contributions ?? []).join('\n')} onChange={e => setDraft(value => ({ ...value, portfolioProjects: value.portfolioProjects.map(item => item.id === project.id ? { ...item, contributions: e.target.value.split('\n').map(part => part.trim()).filter(Boolean) } : item) }))} /></label>
+                <label>결과<textarea rows={3} value={project.outcome ?? ''} onChange={e => setDraft(value => ({ ...value, portfolioProjects: value.portfolioProjects.map(item => item.id === project.id ? { ...item, outcome: e.target.value } : item) }))} /></label>
+                <label>공고와 연결한 이유 <small>문서에는 포함되지 않아요.</small><input value={project.selectionReason} onChange={e => setDraft(value => ({ ...value, portfolioProjects: value.portfolioProjects.map(item => item.id === project.id ? { ...item, selectionReason: e.target.value } : item) }))} /></label>
+                <EvidenceList evidence={project.evidence} />
+              </article>)}
               {!draft.portfolioProjects.length && <p className="application-no-evidence">기존 경력 자료에서 공고와 연결할 프로젝트를 찾지 못했어요.</p>}
             </div>
             {!!draft.informationGaps.length && <div className="application-information-gaps"><strong>추가 확인이 필요한 내용</strong><ul>{draft.informationGaps.map((gap, index) => <li key={index}>{gap}</li>)}</ul></div>}
@@ -291,6 +322,7 @@ export function ApplicationWorkspace({ jobs, demo = false, initialApplicationId,
         {pane === 'source' && <div className="application-pane-content"><div className="application-pane-heading"><div><h3>지원서 원문</h3><p>원문은 로컬에 저장됩니다. AI 문항 추출 시에만 저장된 최신 원문을 분석 작업으로 전달해요.</p></div></div>{selectedJob ? <ApplicationRequirementsPanel job={selectedJob} onSaved={() => void refreshDetail(detail.application.id)} /> : <p>공고 원문을 불러올 수 없어요.</p>}</div>}
       </>}
       {error && <div className="application-global-error" role="alert">{error}</div>}{notice && <div className="application-global-notice" role="status">{notice}</div>}
+      {documentPreview && <ApplicationDocumentPreview kind={documentPreview.kind} draft={documentPreview.draft} version={documentPreview.version} application={documentPreview.application} onClose={() => setDocumentPreview(null)} />}
     </div>
   </section>
 }
