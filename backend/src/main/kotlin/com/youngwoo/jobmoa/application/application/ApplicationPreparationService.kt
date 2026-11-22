@@ -486,7 +486,9 @@ class ApplicationPreparationService(
                 set("factIds", mapper.valueToTree(ids)); set("evidence", mapper.valueToTree(evidence(ids)))
             }
         }
-        require(result["resumeHeadline"].asString().isNotBlank() || result["resumeSummary"].asString().isNotBlank() || sections.isNotEmpty()) { "AI가 이력서 내용을 작성하지 못했습니다. 다시 시도해 주세요." }
+        require(sections.isNotEmpty()) { "AI가 이력서에 넣을 경력·역량 섹션을 만들지 못했습니다. 경력 자료를 확인하거나 다시 시도해 주세요." }
+        val sourceContainsProjects = request["facts"]?.takeIf { it.isArray }?.any { it["kind"]?.asString() == "PROJECT" } == true
+        require(!sourceContainsProjects || projects.isNotEmpty()) { "경력 자료에 프로젝트가 있지만 포트폴리오 사례를 만들지 못했습니다. 다시 시도해 주세요." }
         result.set("resumeSections", mapper.valueToTree(sections)); result.set("portfolioProjects", mapper.valueToTree(projects))
         val hasUnlinkedContent = (result["resumeHeadline"].asString().isNotBlank() && headingFactIds.isEmpty()) ||
             (result["resumeSummary"].asString().isNotBlank() && summaryFactIds.isEmpty()) ||
